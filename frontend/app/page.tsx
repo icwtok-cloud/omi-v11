@@ -1,201 +1,294 @@
-"use client";
+import Link from "next/link";
 
-import { useEffect, useState } from "react";
-import { useAuth, SignInButton, UserButton } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
-import {
-  getAvailableCombinations,
-  createProject,
-  AvailableCombination,
-} from "@/lib/api";
+const PAIN_CARDS = [
+  {
+    module: "Contactos",
+    pain: "1 de cada 8 contactos con email mal formado",
+    consequence: "Las campañas de cobranza y marketing rebotan sin que nadie note por qué.",
+    fix: "Detecta y corrige el formato antes de importar.",
+  },
+  {
+    module: "CRM",
+    pain: "Oportunidades sin etapa reconocida por Odoo",
+    consequence: "El pipeline de ventas aparece vacío el primer día de uso.",
+    fix: "Mapea cada etapa contra las reales de tu versión de Odoo.",
+  },
+  {
+    module: "Ventas",
+    pain: "Órdenes con precio en cero",
+    consequence: "Facturás $0 sin darte cuenta hasta que el cliente reclama.",
+    fix: "Marca cada precio en cero antes de que llegue a producción.",
+  },
+  {
+    module: "Facturación",
+    pain: "Monedas no configuradas en el sistema",
+    consequence: "Las facturas quedan en un limbo que ni contabilidad puede cerrar.",
+    fix: "Verifica cada moneda contra la configuración real de Odoo.",
+  },
+  {
+    module: "Inventario",
+    pain: "SKUs duplicados entre depósitos",
+    consequence: "El stock se descuenta del producto equivocado.",
+    fix: "Detecta duplicados antes de que se mezcle el inventario.",
+  },
+  {
+    module: "Productos",
+    pain: "Categorías que no existen en el catálogo",
+    consequence: "Los productos quedan huérfanos, invisibles en los reportes.",
+    fix: "Valida cada categoría contra las reales de tu versión.",
+  },
+  {
+    module: "Contabilidad",
+    pain: "Asientos sin contraparte",
+    consequence: "El balance no cierra y nadie sabe en qué línea está el error.",
+    fix: "Encuentra el asiento exacto antes del cierre.",
+  },
+  {
+    module: "Compras",
+    pain: "Órdenes sin proveedor asignado",
+    consequence: "El área de pagos no sabe a quién transferirle.",
+    fix: "Bloquea la importación hasta resolver cada caso.",
+  },
+];
 
-const MODULE_LABELS: Record<string, string> = {
-  contactos: "Contactos",
-  crm: "CRM",
-  ventas: "Ventas",
-  facturacion: "Facturación",
-  inventario: "Inventario",
-  productos: "Productos",
-  contabilidad: "Contabilidad",
-  compras: "Compras",
-};
+const STEPS = [
+  {
+    n: "01",
+    title: "Subís tu archivo",
+    body: "CSV o Excel. Elegís el módulo y la versión de Odoo de tu implementación.",
+  },
+  {
+    n: "02",
+    title: "OMI analiza tus datos",
+    body: "Valida cada campo contra las reglas reales de esa versión. En segundos, no horas.",
+  },
+  {
+    n: "03",
+    title: "Revisás cada problema",
+    body: "Aceptás el fix automático o corregís a mano. Con el antes y el después a la vista.",
+  },
+  {
+    n: "04",
+    title: "Descargás el archivo corregido",
+    body: "Listo para importar a Odoo, con los headers exactos que tu versión espera.",
+  },
+];
 
-export default function HomePage() {
-  const { isSignedIn, getToken } = useAuth();
-  const router = useRouter();
+const FAQS = [
+  {
+    q: "¿Qué formatos acepta?",
+    a: "CSV y Excel (.xlsx / .xls). El archivo puede tener cualquier nombre de columnas — OMI las mapea contra los campos reales de Odoo.",
+  },
+  {
+    q: "¿Mis datos se quedan guardados?",
+    a: "No. El archivo original se elimina automáticamente apenas se genera tu archivo corregido. No queda nada guardado más de lo necesario para procesarlo.",
+  },
+  {
+    q: "¿Qué versiones de Odoo soporta?",
+    a: "De la 14 a la 19, incluyendo versiones que ya no tienen soporte oficial de Odoo — son justamente las que tienen más urgencia de migrar.",
+  },
+  {
+    q: "¿Puedo usarlo sin ser técnico?",
+    a: "Sí. No necesitás saber SQL ni Python. Subís el archivo, revisás cada problema en pantalla, y descargás el resultado.",
+  },
+  {
+    q: "¿Cómo se paga?",
+    a: "En USDC, por Polygon o Base, directo desde tu wallet. Elegís por proyecto o suscripción mensual — sin tarjeta de crédito.",
+  },
+];
 
-  const [combinations, setCombinations] = useState<AvailableCombination[]>([]);
-  const [selectedModule, setSelectedModule] = useState<string>("");
-  const [selectedVersion, setSelectedVersion] = useState<string>("");
-  const [file, setFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isSignedIn) return;
-    getAvailableCombinations(getToken)
-      .then(setCombinations)
-      .catch(() => setError("No se pudieron cargar los módulos disponibles."));
-  }, [isSignedIn, getToken]);
-
-  const availableModules = Array.from(new Set(combinations.map((c) => c.module)));
-  const availableVersions = combinations
-    .filter((c) => c.module === selectedModule)
-    .map((c) => c.version);
-
-  async function handleSubmit() {
-    if (!selectedModule || !selectedVersion || !file) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const result = await createProject(getToken, selectedModule, selectedVersion, file);
-      router.push(`/proyectos/${result.project_id}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al subir el archivo");
-    } finally {
-      setUploading(false);
-    }
-  }
-
+export default function LandingPage() {
   return (
-    <main className="min-h-screen flex flex-col">
-      <header className="border-b border-line px-6 md:px-12 py-5 flex items-center justify-between">
-        <span className="font-display text-2xl tracking-tight">OMI</span>
-        {isSignedIn ? (
-          <UserButton afterSignOutUrl="/" />
-        ) : (
-          <SignInButton mode="modal">
-            <button className="text-sm font-medium border border-ink rounded-full px-4 py-1.5 hover:bg-ink hover:text-paper transition-colors">
-              Ingresar
-            </button>
-          </SignInButton>
-        )}
+    <main className="min-h-screen">
+      <header className="border-b border-line">
+        <div className="max-w-6xl mx-auto px-6 md:px-10 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-md bg-brand flex items-center justify-center text-white text-xs font-bold">
+              OMI
+            </div>
+            <span className="font-extrabold text-lg tracking-tight">OMI Engine</span>
+          </div>
+          <nav className="hidden md:flex items-center gap-8 text-sm text-graphite">
+            <a href="#como-funciona" className="hover:text-ink transition-colors">Cómo funciona</a>
+            <a href="#modulos" className="hover:text-ink transition-colors">Módulos</a>
+            <a href="#precios" className="hover:text-ink transition-colors">Precios</a>
+          </nav>
+          <div className="flex items-center gap-4">
+            <Link href="/app" className="text-sm font-medium text-graphite hover:text-ink transition-colors">
+              Iniciar sesión
+            </Link>
+            <Link
+              href="/app"
+              className="bg-brand text-white text-sm font-semibold rounded-md px-4 py-2 hover:bg-brand-dark transition-colors"
+            >
+              Empezar gratis
+            </Link>
+          </div>
+        </div>
       </header>
 
-      <section className="px-6 md:px-12 pt-16 pb-12 max-w-3xl">
-        <p className="font-mono text-xs uppercase tracking-widest text-verify mb-4">
-          Preparación de datos para Odoo
-        </p>
-        <h1 className="font-display text-4xl md:text-5xl leading-[1.1] mb-6">
-          Tus datos, listos para Odoo, antes de que Odoo los rechace.
+      <section className="max-w-3xl mx-auto px-6 text-center pt-20 pb-16">
+        <span className="inline-flex items-center gap-2 text-xs font-medium text-graphite border border-line rounded-full px-3 py-1.5 mb-6">
+          <span className="w-1.5 h-1.5 rounded-full bg-verify" />
+          Para implementadores y consultoras Odoo
+        </span>
+        <h1 className="font-extrabold text-4xl md:text-6xl leading-[1.05] tracking-tight mb-6">
+          Migrá a Odoo<br />
+          <span className="text-brand">sin sorpresas</span>
         </h1>
-        <p className="text-graphite text-lg leading-relaxed max-w-xl">
-          Subí tu archivo, elegí el módulo y la versión, y vas a ver exactamente
-          qué filas tienen un problema, por qué, y cómo se corrige — antes de pagar nada.
+        <p className="text-graphite text-lg leading-relaxed max-w-xl mx-auto mb-8">
+          Analizá tus datos antes de importar. Detectá duplicados, campos vacíos,
+          CUIT inválidos y errores que Odoo va a rechazar — antes del Go Live.
         </p>
+        <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+          <Link
+            href="/app"
+            className="bg-brand text-white font-semibold rounded-md px-6 py-3 hover:bg-brand-dark transition-colors"
+          >
+            Analizar mis datos gratis →
+          </Link>
+          <a
+            href="#como-funciona"
+            className="border border-line font-medium rounded-md px-6 py-3 hover:bg-white transition-colors"
+          >
+            Ver cómo funciona
+          </a>
+        </div>
+        <p className="text-sm text-graphite">Sin tarjeta. Sin instalación. Resultados en segundos.</p>
       </section>
 
-      <section className="px-6 md:px-12 pb-24 max-w-3xl w-full">
-        {!isSignedIn ? (
-          <div className="border border-line bg-white/60 rounded-lg p-8 text-center">
-            <p className="text-graphite mb-4">
-              Necesitás ingresar para subir un archivo.
-            </p>
-            <SignInButton mode="modal">
-              <button className="bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity">
-                Ingresar para empezar
-              </button>
-            </SignInButton>
-          </div>
-        ) : (
-          <div className="border border-line bg-white/60 rounded-lg p-6 md:p-8 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" htmlFor="module-select">
-                  Módulo de Odoo
-                </label>
-                <select
-                  id="module-select"
-                  className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink"
-                  value={selectedModule}
-                  onChange={(e) => {
-                    setSelectedModule(e.target.value);
-                    setSelectedVersion("");
-                  }}
-                >
-                  <option value="">Elegí un módulo</option>
-                  {availableModules.map((m) => (
-                    <option key={m} value={m}>
-                      {MODULE_LABELS[m] || m}
-                    </option>
-                  ))}
-                </select>
+      <section id="modulos" className="border-t border-line bg-white/60 py-20">
+        <div className="max-w-6xl mx-auto px-6 md:px-10">
+          <p className="text-xs font-semibold uppercase tracking-widest text-graphite text-center mb-3">
+            El problema real
+          </p>
+          <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight text-center mb-4">
+            La migración de datos rompe implementaciones
+          </h2>
+          <p className="text-graphite text-center max-w-xl mx-auto mb-14">
+            Seleccionás los módulos de tu implementación al crear el proyecto.
+            OMI aplica solo las validaciones relevantes a cada uno.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {PAIN_CARDS.map((card) => (
+              <div key={card.module} className="bg-white border border-line rounded-xl p-5 flex flex-col">
+                <p className="text-xs font-semibold uppercase tracking-wide text-graphite mb-3">
+                  {card.module}
+                </p>
+                <p className="font-bold text-alert leading-snug mb-2">{card.pain}</p>
+                <p className="text-sm text-graphite leading-relaxed mb-4 flex-1">
+                  {card.consequence}
+                </p>
+                <div className="bg-verify-light text-verify text-sm font-medium rounded-md px-3 py-2.5 leading-snug">
+                  {card.fix}
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2" htmlFor="version-select">
-                  Versión de Odoo
-                </label>
-                <select
-                  id="version-select"
-                  className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
-                  value={selectedVersion}
-                  onChange={(e) => setSelectedVersion(e.target.value)}
-                  disabled={!selectedModule}
-                >
-                  <option value="">Elegí una versión</option>
-                  {availableVersions.map((v) => (
-                    <option key={v} value={v}>
-                      Odoo {v}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setIsDragging(false);
-                const dropped = e.dataTransfer.files[0];
-                if (dropped) setFile(dropped);
-              }}
-              className={`border-2 border-dashed rounded-lg p-10 text-center transition-colors ${
-                isDragging ? "border-verify bg-verify-light" : "border-line"
-              }`}
-            >
-              {file ? (
-                <p className="font-mono text-sm text-ink">{file.name}</p>
-              ) : (
-                <>
-                  <p className="text-graphite mb-3">
-                    Arrastrá tu archivo CSV o Excel acá
-                  </p>
-                  <label className="inline-block cursor-pointer text-verify font-medium underline">
-                    o elegilo manualmente
-                    <input
-                      type="file"
-                      accept=".csv,.xlsx,.xls"
-                      className="hidden"
-                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                    />
-                  </label>
-                </>
-              )}
-            </div>
-
-            {error && (
-              <p className="text-alert text-sm bg-alert-light rounded-md px-4 py-2.5">
-                {error}
-              </p>
-            )}
-
-            <button
-              onClick={handleSubmit}
-              disabled={!selectedModule || !selectedVersion || !file || uploading}
-              className="w-full bg-ink text-paper rounded-full py-3 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-            >
-              {uploading ? "Subiendo..." : "Analizar archivo gratis"}
-            </button>
+            ))}
           </div>
-        )}
+        </div>
       </section>
+
+      <section id="como-funciona" className="py-20">
+        <div className="max-w-6xl mx-auto px-6 md:px-10">
+          <p className="text-xs font-semibold uppercase tracking-widest text-graphite text-center mb-3">
+            Proceso
+          </p>
+          <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight text-center mb-14">
+            Cómo funciona
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+            {STEPS.map((step) => (
+              <div key={step.n}>
+                <p className="font-extrabold text-4xl text-line mb-3">{step.n}</p>
+                <p className="font-bold text-lg mb-2">{step.title}</p>
+                <p className="text-sm text-graphite leading-relaxed">{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="precios" className="border-t border-line bg-white/60 py-20">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-graphite mb-3">
+            Precios
+          </p>
+          <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight mb-4">
+            Pagás en cripto, sin suscripciones escondidas
+          </h2>
+          <p className="text-graphite mb-14">
+            USDC en Polygon o Base, directo desde tu wallet. Sin tarjeta, sin intermediarios.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+            <div className="bg-white border border-line rounded-xl p-7">
+              <p className="font-bold text-lg mb-1">Por proyecto</p>
+              <p className="font-extrabold text-4xl tracking-tight mb-1">USD 99</p>
+              <p className="text-sm text-graphite mb-6">Pago único por proyecto descargado</p>
+              <ul className="space-y-2 text-sm mb-6">
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Reporte completo gratis, sin límite</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Validaciones por módulo y versión</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Export listo para Odoo</li>
+              </ul>
+              <Link
+                href="/app"
+                className="block text-center border border-line font-semibold rounded-md px-4 py-2.5 hover:bg-canvas transition-colors"
+              >
+                Empezar con un proyecto
+              </Link>
+            </div>
+
+            <div className="bg-white border-2 border-brand rounded-xl p-7 relative">
+              <span className="absolute -top-3 left-7 bg-brand text-white text-xs font-bold rounded-full px-3 py-1">
+                Para consultoras
+              </span>
+              <p className="font-bold text-lg mb-1">Mensual</p>
+              <p className="font-extrabold text-4xl tracking-tight mb-1">USD 149</p>
+              <p className="text-sm text-graphite mb-6">Proyectos ilimitados mientras esté activa</p>
+              <ul className="space-y-2 text-sm mb-6">
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Todo lo del plan por proyecto</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Proyectos ilimitados por mes</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Pensado para varios clientes a la vez</li>
+              </ul>
+              <Link
+                href="/app"
+                className="block text-center bg-brand text-white font-semibold rounded-md px-4 py-2.5 hover:bg-brand-dark transition-colors"
+              >
+                Suscribirme
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20">
+        <div className="max-w-3xl mx-auto px-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-graphite text-center mb-3">
+            FAQ
+          </p>
+          <h2 className="font-extrabold text-3xl tracking-tight text-center mb-12">
+            Preguntas frecuentes
+          </h2>
+          <div className="space-y-4">
+            {FAQS.map((faq) => (
+              <div key={faq.q} className="bg-white border border-line rounded-xl p-5">
+                <p className="font-bold mb-1.5">{faq.q}</p>
+                <p className="text-sm text-graphite leading-relaxed">{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-line py-10">
+        <div className="max-w-6xl mx-auto px-6 md:px-10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-graphite">
+          <p>© 2026 OMI Engine</p>
+          <Link href="/app" className="text-brand font-medium hover:underline">
+            Analizar mis datos gratis →
+          </Link>
+        </div>
+      </footer>
     </main>
   );
 }

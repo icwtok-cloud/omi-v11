@@ -17,7 +17,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="es">
-        <body className="font-sans bg-paper text-ink min-h-screen">
+        <body className="font-sans bg-canvas text-ink min-h-screen">
           <Web3Providers>{children}</Web3Providers>
         </body>
       </html>

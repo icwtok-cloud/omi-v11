@@ -114,7 +114,7 @@ export function PaywallPanel({
   if (step === "confirmed") {
     return (
       <div className="border border-verify bg-verify-light rounded-lg p-6 text-center">
-        <p className="font-display text-xl text-verify mb-3">Pago confirmado</p>
+        <p className="font-extrabold text-xl text-verify mb-3">Pago confirmado</p>
         <a
           href={downloadUrl(projectId)}
           className="inline-block bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity"
@@ -128,7 +128,7 @@ export function PaywallPanel({
   return (
     <div className="border border-line bg-white rounded-lg p-6 space-y-5">
       <div>
-        <p className="font-display text-xl mb-1">Desbloqueá la descarga</p>
+        <p className="font-extrabold text-xl mb-1">Desbloqueá la descarga</p>
         <p className="text-graphite text-sm">{priceLabel}</p>
       </div>
 
@@ -187,7 +187,7 @@ export function PaywallPanel({
 
       {(step === "connect" || step === "confirm-wallet") && payment && (
         <div className="space-y-4">
-          <div className="bg-paper border border-line rounded-md p-4 space-y-2">
+          <div className="bg-canvas border border-line rounded-md p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-graphite">Red</span>
               <span className="font-mono capitalize">{network}</span>

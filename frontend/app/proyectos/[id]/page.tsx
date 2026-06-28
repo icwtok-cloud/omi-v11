@@ -60,7 +60,7 @@ export default function ProjectPage() {
         <p className="font-mono text-xs uppercase tracking-widest text-verify mb-2">
           Reporte de validación
         </p>
-        <h1 className="font-display text-3xl mb-4">
+        <h1 className="font-extrabold text-3xl mb-4 tracking-tight">
           {report.total_issues === 0
             ? "Tu archivo está listo para Odoo"
             : `${report.total_issues} ${
@@ -71,7 +71,7 @@ export default function ProjectPage() {
         <div className="grid grid-cols-3 gap-3">
           <Stat label="Filas totales" value={report.total_rows} />
           <Stat label="Filas sin errores" value={Math.max(okRows, 0)} tone="verify" />
-          <Stat label="Se corrigen solas" value={autoFixable} tone="amber" />
+          <Stat label="Se corrigen solas" value={autoFixable} tone="brand" />
         </div>
       </header>
 
@@ -117,10 +117,10 @@ function Stat({
 }: {
   label: string;
   value: number;
-  tone?: "verify" | "amber";
+  tone?: "verify" | "brand";
 }) {
   const toneClass =
-    tone === "verify" ? "text-verify" : tone === "amber" ? "text-amber" : "text-ink";
+    tone === "verify" ? "text-verify" : tone === "brand" ? "text-brand" : "text-ink";
   return (
     <div className="border border-line rounded-md px-4 py-3 bg-white">
       <p className={`font-mono text-2xl ${toneClass}`}>{value}</p>
