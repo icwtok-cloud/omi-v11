@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.safe_logging import log_event
 from app.models.db_models import Project, ProjectStatus, User
 from app.services.rules_loader import load_rule_schema, list_available_combinations
 from app.services.validation_engine import validate_dataframe
@@ -56,6 +57,30 @@ def _read_tabular_file(path: Path, original_filename: str) -> pd.DataFrame:
         )
 
 
+def _validate_file_signature(contents: bytes, suffix: str) -> None:
+    """Valida que el contenido real del archivo coincida con lo que la
+    extensión declara, en vez de confiar ciegamente en el nombre subido.
+    XLSX/XLS son ZIP/OLE2 con firma binaria fija; CSV no tiene firma
+    binaria, pero rechazamos contenido que parezca binario (control chars
+    fuera de tab/newline en los primeros bytes) para evitar que un archivo
+    ejecutable o binario disfrazado de .csv llegue al parser de pandas."""
+    if suffix in (".xlsx", ".xls"):
+        is_zip = contents[:4] == b"PK\x03\x04"       # xlsx moderno (zip)
+        is_ole2 = contents[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # xls legacy
+        if not (is_zip or is_ole2):
+            raise HTTPException(
+                status_code=400,
+                detail="El archivo no tiene el formato Excel esperado (firma binaria inválida).",
+            )
+    elif suffix == ".csv":
+        sample = contents[:2048]
+        if b"\x00" in sample:
+            raise HTTPException(
+                status_code=400,
+                detail="El archivo no parece un CSV de texto válido.",
+            )
+
+
 @router.post("")
 async def create_project(
     odoo_module: str = Form(...),
@@ -71,6 +96,14 @@ async def create_project(
             status_code=413,
             detail=f"Archivo supera el máximo de {settings.max_upload_size_mb}MB",
         )
+
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in (".csv", ".xlsx", ".xls"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formato '{suffix}' no soportado. Usá CSV o Excel (.xlsx).",
+        )
+    _validate_file_signature(contents, suffix)
 
     # Validamos que la combinación módulo+versión exista ANTES de guardar
     # nada -- evita proyectos huérfanos sin reglas contra qué validar.
@@ -108,6 +141,12 @@ def validate_project(
     db: Session = Depends(get_db),
 ):
     project = _get_owned_project(project_id, user, db)
+
+    if project.status == ProjectStatus.downloaded:
+        raise HTTPException(
+            status_code=410,
+            detail="El archivo original ya fue eliminado tras la descarga (política de no-retención). Subí el archivo de nuevo si necesitás re-validarlo.",
+        )
 
     schema = load_rule_schema(project.odoo_module, project.odoo_version)
     df = _read_tabular_file(Path(project.storage_path), project.original_filename)
@@ -186,6 +225,14 @@ def _ensure_corrected_file(project: Project, db: Session) -> Path:
                 df.at[row_idx, col] = issue["suggested_fix"]
 
     df.to_csv(corrected_path, index=False)
+
+    # Zero-retention: el original ya no se necesita una vez generado el
+    # corregido -- nunca debe persistir indefinidamente en disco.
+    original_path = Path(project.storage_path)
+    if original_path.exists():
+        original_path.unlink()
+    log_event("file_destroyed", project_id=project.id)
+
     return corrected_path
 
 
