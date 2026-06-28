@@ -47,6 +47,6 @@ services:
 
 databases:
   - name: omi-db
-    plan: starter
+    plan: free
     databaseName: omi
     user: omi
