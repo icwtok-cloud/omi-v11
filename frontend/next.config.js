@@ -1,10 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // @metamask/sdk (vía wagmi) referencia 'pino-pretty' y 'encoding' como
+  // dependencias opcionales de su rama de Node. Ninguna de las dos está
+  // instalada a propósito -- no hacen falta en el navegador, y el propio
+  // paquete maneja su ausencia en runtime. Sin esto, el build falla al
+  // intentar resolverlas tanto del lado servidor como del lado cliente.
+  serverExternalPackages: ["pino-pretty", "encoding"],
   webpack: (config) => {
-    // @metamask/sdk pide estas dependencias opcionales en su path de Node,
-    // pero corremos esto en el navegador -- no existen ni hacen falta.
-    // Sin este fallback, el build de Next.js falla al intentar resolverlas.
     config.resolve.fallback = {
       ...config.resolve.fallback,
       encoding: false,
