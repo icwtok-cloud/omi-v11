@@ -2,7 +2,7 @@ services:
   - type: web
     name: omi-backend
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
@@ -30,7 +30,7 @@ services:
   - type: worker
     name: omi-payment-listener
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python -m app.workers.payment_listener"
     envVars:
