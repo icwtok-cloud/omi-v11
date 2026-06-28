@@ -1,0 +1,136 @@
+# OMI — Odoo Migration Inspector
+
+OMI valida archivos de datos (CSV/Excel) contra las reglas reales de un
+módulo y versión específica de Odoo, antes de que el usuario los importe.
+Gratis: ves el reporte completo de errores y fixes sugeridos. De pago:
+descargás el archivo corregido.
+
+**El motor de validación es 100% determinístico — no usa IA.** Las reglas
+se generan una sola vez, offline, leyendo el código fuente real de Odoo.
+
+## Los tres subsistemas
+
+```
+omi/
+├── rules-generator/   offline · genera los schemas de validación
+├── backend/           Render  · API que valida archivos y cobra
+└── frontend/          Vercel  · UI: subir, ver reporte, pagar, descargar
+```
+
+### 1. `rules-generator/`
+
+Script que **no corre en producción**. Se ejecuta manualmente (o desde CI)
+cuando:
+- sale una versión nueva de Odoo a soportar
+- querés refrescar las reglas de una versión existente
+
+Pasos:
+```bash
+cd rules-generator/scripts
+./clone_odoo.sh                  # clona las 6 versiones soportadas
+python build_rules.py            # genera los 48 JSON (8 módulos x 6 versiones)
+cp -r ../output/* ../../backend/rules/
+```
+
+Qué hace `build_rules.py` por cada módulo+versión:
+1. **Introspección de modelos** (`introspect_models.py`): parsea con AST
+   de Python los archivos `models/*.py` del addon correspondiente, sin
+   levantar el runtime de Odoo. Extrae campos, tipos, `required`, y
+   relaciones (`comodel_name`).
+2. **Extracción de defaults** (`extract_default_data.py`): parsea los XML
+   en `data/*.xml` para sacar los valores de fábrica (etapas de CRM,
+   categorías de producto, plan de cuentas, monedas).
+3. Combina todo en un JSON por módulo+versión, que el backend consume tal
+   cual — el backend nunca vuelve a tocar código fuente de Odoo.
+
+Ver `module_map.py` para el mapeo entre los 8 módulos "de cara al
+usuario" (Contactos, CRM, Ventas, Facturación, Inventario, Productos,
+Contabilidad, Compras) y sus addons/modelos técnicos reales en Odoo.
+
+### 2. `backend/` (FastAPI, deploy en Render)
+
+100% determinístico. Sin llamadas a ningún modelo de IA.
+
+Piezas clave:
+- `app/services/rules_loader.py` — carga los JSON de `rules/` generados
+  por el subsistema 1.
+- `app/services/validation_engine.py` + `format_rules.py` — el motor de
+  validación: por cada fila del archivo subido, chequea campos
+  obligatorios, formato (email, teléfono, CUIT...), y coherencia contra
+  los valores reales de Odoo (relaciones, opciones de selección, defaults
+  de fábrica o el override que el cliente haya provisto).
+- `app/services/payment_matching.py` + `app/workers/payment_listener.py`
+  — el flujo de pago cripto (ver sección de pagos abajo).
+- `app/core/auth.py` — verifica el JWT de sesión de Clerk en cada request.
+
+Correr en local:
+```bash
+cd backend
+pip install -r requirements.txt
+cp .env.example .env   # completar con tus credenciales
+uvicorn app.main:app --reload
+```
+
+El worker de pagos corre como **proceso separado** (no en el mismo
+proceso que atiende HTTP):
+```bash
+python -m app.workers.payment_listener
+```
+
+Deploy en Render: `render.yaml` ya define ambos servicios (web + worker)
+más la base Postgres. Conectá el repo en el dashboard de Render y va a
+detectar el `render.yaml` automáticamente.
+
+### 3. `frontend/` (Next.js, deploy en Vercel)
+
+Flujo de pantallas:
+1. `/` — elegir módulo + versión, subir archivo (requiere sesión de Clerk)
+2. `/proyectos/[id]` — reporte completo gratis (errores, fixes auto y
+   manuales) + panel de pago al final
+3. Pago confirmado → botón de descarga del archivo corregido
+
+Correr en local:
+```bash
+cd frontend
+npm install
+cp .env.example .env.local   # completar con tus credenciales
+npm run dev
+```
+
+## Flujo de pago cripto
+
+No usa Stripe ni Mercado Pago — pagos directos en **USDC** sobre
+**Polygon** o **Base**, a una dirección fija única.
+
+El problema de "¿cómo sé de quién es cada pago que llega a la misma
+dirección?" se resuelve con un **monto único por pago**: en vez de
+cobrar exactamente $99.00, el backend genera $99.0034 (una
+micro-variación de hasta 4 decimales sobre el precio base) y se la
+muestra al usuario antes de que pague. Un worker en background
+(`app/workers/payment_listener.py`) escucha los eventos `Transfer` del
+contrato de USDC en cada red, y cuando ve una transferencia a nuestra
+dirección por un monto que matchea exactamente un pago pendiente, lo
+marca como confirmado tras esperar las confirmaciones de bloque
+configuradas (protección contra reorgs).
+
+Si dos pagos pendientes generaran el mismo monto por casualidad, el
+generador reintenta — ver `generate_unique_amount()` en
+`payment_matching.py`.
+
+## Decisiones de diseño que vale la pena recordar
+
+- **Por qué AST y no importar el ORM de Odoo de verdad**: importar Odoo
+  requiere su runtime completo (Postgres, configuración, addons path).
+  Parsear el árbol de sintaxis directamente da la misma información
+  (declaración de campos) sin esa complejidad.
+- **Por qué el generador de reglas vive separado del backend**: la
+  introspección es lenta y solo cambia cuando sale una versión nueva de
+  Odoo — no tiene sentido correrla por cada request de usuario.
+- **Por qué defaults de fábrica + override de cliente, no solo uno de
+  los dos**: muchos clientes personalizan sus categorías/etapas/plan de
+  cuentas. Validar solo contra el default de fábrica daría falsos
+  positivos a esos clientes; permitir override sin tener un default
+  rompería la experiencia gratuita para el resto.
+- **Por qué versiones EOL (14-16) y no solo las 3 oficialmente
+  soportadas (17-19)**: ahí está la mayor urgencia real de migrar (Odoo
+  cobra un recargo a quien sigue en versiones sin soporte).

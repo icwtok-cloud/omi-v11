@@ -1,0 +1,175 @@
+"""
+Reglas de formato: validan la FORMA del dato, no su coherencia con Odoo.
+Estas son las reglas que aparecían en la imagen de referencia de OMI:
+emails inválidos, teléfonos sin formato, CUIT duplicados, precios en
+cero, stock negativo, etc.
+
+Estas reglas son las mismas sin importar la versión de Odoo -- por eso
+viven separadas del RuleSchema (que sí varía por versión).
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+
+import pandas as pd
+
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# Acepta formatos comunes de LatAm: +54 11 1234-5678, (011) 1234-5678, etc.
+# No intenta validar de más -- el objetivo es atrapar basura obvia
+# (texto random, números con letras mezcladas) sin rechazar formatos
+# legítimos pero poco comunes.
+PHONE_RE = re.compile(r"^[\d\s()+\-]{6,20}$")
+
+# CUIT argentino: XX-XXXXXXXX-X (con o sin guiones)
+CUIT_RE = re.compile(r"^\d{2}-?\d{8}-?\d{1}$")
+
+
+@dataclass
+class FormatIssue:
+    issue_type: str
+    message: str
+    suggested_fix: object | None
+    fix_is_automatic: bool
+
+
+# Columnas que activan cada chequeo, por nombre de campo Odoo.
+# (los nombres reales de columna en el archivo pueden variar; el matching
+# contra el field_def ya viene resuelto antes de llegar acá)
+EMAIL_FIELDS = {"email"}
+PHONE_FIELDS = {"phone", "mobile"}
+VAT_FIELDS = {"vat"}
+PRICE_FIELDS = {"list_price", "price_unit", "price_subtotal", "amount_total"}
+STOCK_FIELDS = {"quantity", "qty_available"}
+
+
+def _clean_phone(value: str) -> str:
+    """Sugerencia simple de normalización: deja solo dígitos y el +
+    inicial si existe."""
+    value = value.strip()
+    prefix = "+" if value.startswith("+") else ""
+    digits = re.sub(r"\D", "", value)
+    return f"{prefix}{digits}"
+
+
+def check(column: str, field_type: str, value) -> FormatIssue | None:
+    str_value = str(value).strip()
+
+    if column in EMAIL_FIELDS:
+        if not EMAIL_RE.match(str_value):
+            return FormatIssue(
+                issue_type="invalid_format",
+                message=f"'{str_value}' no parece un email válido",
+                suggested_fix=None,  # un email mal formado no se puede "arreglar" solo, requiere intervención manual
+                fix_is_automatic=False,
+            )
+
+    elif column in PHONE_FIELDS:
+        if not PHONE_RE.match(str_value):
+            return FormatIssue(
+                issue_type="invalid_format",
+                message=f"'{str_value}' no tiene formato de teléfono reconocible",
+                suggested_fix=None,
+                fix_is_automatic=False,
+            )
+        cleaned = _clean_phone(str_value)
+        if cleaned != str_value:
+            return FormatIssue(
+                issue_type="invalid_format",
+                message=f"'{str_value}' tiene formato inconsistente",
+                suggested_fix=cleaned,
+                fix_is_automatic=True,  # normalizar formato sí es seguro de aplicar solo
+            )
+
+    elif column in VAT_FIELDS:
+        if not CUIT_RE.match(str_value):
+            return FormatIssue(
+                issue_type="invalid_format",
+                message=f"'{str_value}' no tiene formato de CUIT/CUIL válido",
+                suggested_fix=None,
+                fix_is_automatic=False,
+            )
+
+    elif column in PRICE_FIELDS:
+        try:
+            numeric = float(value)
+            if numeric == 0:
+                return FormatIssue(
+                    issue_type="invalid_format",
+                    message=f"'{column}' está en cero, probablemente un dato faltante",
+                    suggested_fix=None,
+                    fix_is_automatic=False,
+                )
+            if numeric < 0:
+                return FormatIssue(
+                    issue_type="negative_value",
+                    message=f"'{column}' es negativo ({numeric}), no es válido para un precio",
+                    suggested_fix=abs(numeric),
+                    fix_is_automatic=False,  # un valor negativo puede ser un signo invertido por error de carga, pero no siempre -- requiere confirmación
+                )
+        except (ValueError, TypeError):
+            return FormatIssue(
+                issue_type="invalid_format",
+                message=f"'{value}' no es un número válido para '{column}'",
+                suggested_fix=None,
+                fix_is_automatic=False,
+            )
+
+    elif column in STOCK_FIELDS:
+        try:
+            numeric = float(value)
+            if numeric < 0:
+                return FormatIssue(
+                    issue_type="negative_value",
+                    message=f"Stock negativo ({numeric}) en '{column}'",
+                    suggested_fix=0,
+                    fix_is_automatic=False,
+                )
+        except (ValueError, TypeError):
+            return FormatIssue(
+                issue_type="invalid_format",
+                message=f"'{value}' no es un número válido para '{column}'",
+                suggested_fix=None,
+                fix_is_automatic=False,
+            )
+
+    return None
+
+
+def check_duplicates(df: pd.DataFrame, columns: list[str]) -> list:
+    """Detecta duplicados en columnas que deberían ser únicas (CUIT, SKU,
+    código de cuenta, referencia interna). Se chequea a nivel de toda la
+    columna, no fila por fila."""
+    from app.services.validation_engine import FieldIssue  # import local para evitar ciclo
+
+    unique_candidates = {"vat", "default_code", "code", "barcode"}
+    issues = []
+
+    for col in columns:
+        if col not in unique_candidates:
+            continue
+        if col not in df.columns:
+            continue
+
+        seen: dict = {}
+        for row_idx, value in df[col].items():
+            if pd.isna(value) or str(value).strip() == "":
+                continue
+            key = str(value).strip()
+            if key in seen:
+                issues.append(FieldIssue(
+                    row_index=int(row_idx),
+                    column=col,
+                    issue_type="duplicate",
+                    message=f"'{key}' en '{col}' ya aparece en la fila {seen[key]}",
+                    current_value=key,
+                    suggested_fix=None,
+                    fix_is_automatic=False,
+                ))
+            else:
+                seen[key] = int(row_idx)
+
+    return issues

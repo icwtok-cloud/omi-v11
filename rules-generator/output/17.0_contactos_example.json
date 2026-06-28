@@ -1,0 +1,33 @@
+{
+  "omi_module": "contactos",
+  "omi_module_label": "Contactos",
+  "odoo_version": "17.0",
+  "models": {
+    "res.partner": {
+      "name": "res.partner",
+      "inherits": [],
+      "source_file": "odoo/addons/base/models/res_partner.py",
+      "fields": [
+        {"name": "name", "type": "Char", "required": true, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": "Nombre completo del contacto o razón social"},
+        {"name": "email", "type": "Char", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": null},
+        {"name": "phone", "type": "Char", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": null},
+        {"name": "mobile", "type": "Char", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": null},
+        {"name": "vat", "type": "Char", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": "CUIT/CUIL/identificación fiscal"},
+        {"name": "street", "type": "Char", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": null},
+        {"name": "city", "type": "Char", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": null},
+        {"name": "zip", "type": "Char", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": null},
+        {"name": "country_id", "type": "Many2one", "required": false, "comodel_name": "res.country", "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": null},
+        {"name": "state_id", "type": "Many2one", "required": false, "comodel_name": "res.country.state", "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": null},
+        {"name": "company_type", "type": "Selection", "required": false, "comodel_name": null, "selection_options": ["person", "company"], "selection_dynamic": false, "default_present": true, "help_text": null},
+        {"name": "is_company", "type": "Boolean", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": true, "help_text": null},
+        {"name": "parent_id", "type": "Many2one", "required": false, "comodel_name": "res.partner", "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": "Empresa relacionada, para contactos tipo persona dentro de una compañía"},
+        {"name": "category_id", "type": "Many2many", "required": false, "comodel_name": "res.partner.category", "selection_options": null, "selection_dynamic": false, "default_present": false, "help_text": null},
+        {"name": "lang", "type": "Selection", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": true, "default_present": true, "help_text": "Idioma, depende de los idiomas instalados en la base"},
+        {"name": "customer_rank", "type": "Integer", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": true, "help_text": null},
+        {"name": "supplier_rank", "type": "Integer", "required": false, "comodel_name": null, "selection_options": null, "selection_dynamic": false, "default_present": true, "help_text": null}
+      ]
+    }
+  },
+  "default_records": [],
+  "_note": "Este archivo es un ejemplo generado a mano con los campos reales y estables de res.partner, para destrabar el desarrollo del backend mientras se corre build_rules.py con acceso real a internet. El formato es idéntico al que produce el generador automático."
+}

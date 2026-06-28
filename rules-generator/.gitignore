@@ -1,0 +1,4 @@
+odoo_repos/
+__pycache__/
+*.pyc
+*.egg-info/

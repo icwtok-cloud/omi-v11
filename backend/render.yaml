@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: omi-backend
+    runtime: python
+    plan: starter
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: omi-db
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_WEBHOOK_SIGNING_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: PAYMENT_RECEIVE_ADDRESS
+        sync: false
+      - key: POLYGON_RPC_URL
+        sync: false
+      - key: BASE_RPC_URL
+        sync: false
+
+  - type: worker
+    name: omi-payment-listener
+    runtime: python
+    plan: starter
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -m app.workers.payment_listener"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: omi-db
+          property: connectionString
+      - key: PAYMENT_RECEIVE_ADDRESS
+        sync: false
+      - key: POLYGON_RPC_URL
+        sync: false
+      - key: BASE_RPC_URL
+        sync: false
+
+databases:
+  - name: omi-db
+    plan: starter
+    databaseName: omi
+    user: omi
