@@ -13,6 +13,7 @@ const nextConfig = {
       encoding: false,
       "pino-pretty": false,
     };
+    config.externals.push("pino-pretty", "encoding");
     return config;
   },
 };
