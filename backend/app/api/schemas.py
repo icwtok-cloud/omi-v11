@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class AvailableCombination(BaseModel):
     version: str
     module: str
+    country: str | None = None  # None = módulo sin variación por país
 
 
 class ProjectCreateResponse(BaseModel):

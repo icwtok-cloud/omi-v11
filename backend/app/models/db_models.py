@@ -57,6 +57,7 @@ class Project(Base):
 
     odoo_module = Column(String, nullable=False)   # ej "contactos"
     odoo_version = Column(String, nullable=False)  # ej "17.0"
+    odoo_country = Column(String, nullable=True)   # ej "ar", None si el módulo no varía por país
 
     original_filename = Column(String, nullable=False)
     storage_path = Column(String, nullable=False)  # path del archivo subido

@@ -54,26 +54,47 @@ class RuleSchema:
         return [r for r in self.default_records if r["model"] == model_name]
 
 
-@lru_cache(maxsize=128)
-def load_rule_schema(module: str, version: str) -> RuleSchema:
-    """Carga (y cachea) el schema de un módulo+versión específico.
-    Lanza FileNotFoundError si no existe -- el caller decide cómo
-    responder al usuario en ese caso (módulo/versión todavía no soportada).
+# Módulos cuyas reglas varían por país (tienen subruta {module}/{country}.json)
+COUNTRY_SCOPED_MODULES = {"contactos", "contabilidad", "facturacion"}
+
+@lru_cache(maxsize=256)
+def load_rule_schema(module: str, version: str, country: str | None = None) -> RuleSchema:
+    """Carga (y cachea) el schema de un módulo+versión+país.
+
+    Para módulos en COUNTRY_SCOPED_MODULES, `country` es obligatorio y la
+    ruta esperada es: {version}/{module}/{country}.json
+    Para el resto, la ruta sigue siendo: {version}/{module}.json
+    Lanza FileNotFoundError si no existe -- el caller decide cómo responder.
     """
-    path = Path(settings.rules_base_path) / version / f"{module}.json"
+    base = Path(settings.rules_base_path)
+
+    if module in COUNTRY_SCOPED_MODULES:
+        if not country:
+            raise ValueError(
+                f"El módulo '{module}' requiere un país (ej. 'ar', 'mx')."
+            )
+        path = base / version / module / f"{country}.json"
+    else:
+        path = base / version / f"{module}.json"
+
     if not path.exists():
         raise FileNotFoundError(
-            f"No hay reglas generadas para módulo='{module}' versión='{version}' "
-            f"(esperado en {path})"
+            f"No hay reglas generadas para módulo='{module}' versión='{version}'"
+            + (f" país='{country}'" if country else "")
+            + f" (esperado en {path})"
         )
     raw = json.loads(path.read_text(encoding="utf-8"))
     return RuleSchema(raw)
 
 
 def list_available_combinations() -> list[dict]:
-    """Recorre rules/ y devuelve qué combinaciones módulo+versión existen
-    realmente -- esto alimenta el selector del frontend, para no ofrecer
-    una combinación que todavía no se generó."""
+    """Recorre rules/ y devuelve qué combinaciones módulo+versión(+país) existen.
+
+    - Para módulos sin variación por país: devuelve {version, module, country: null}
+    - Para módulos con variación por país: devuelve una entrada por país disponible,
+      con {version, module, country: "ar"} etc.
+    Esto alimenta el selector del frontend.
+    """
     base = Path(settings.rules_base_path)
     if not base.exists():
         return []
@@ -82,9 +103,22 @@ def list_available_combinations() -> list[dict]:
     for version_dir in sorted(base.iterdir()):
         if not version_dir.is_dir():
             continue
-        for schema_file in sorted(version_dir.glob("*.json")):
-            combos.append({
-                "version": version_dir.name,
-                "module": schema_file.stem,
-            })
+        version = version_dir.name
+
+        for item in sorted(version_dir.iterdir()):
+            if item.is_file() and item.suffix == ".json":
+                # Módulo plano (sin variación por país)
+                combos.append({
+                    "version": version,
+                    "module": item.stem,
+                    "country": None,
+                })
+            elif item.is_dir() and item.name in COUNTRY_SCOPED_MODULES:
+                # Módulo con variación por país — una entrada por país
+                for country_file in sorted(item.glob("*.json")):
+                    combos.append({
+                        "version": version,
+                        "module": item.name,
+                        "country": country_file.stem,
+                    })
     return combos

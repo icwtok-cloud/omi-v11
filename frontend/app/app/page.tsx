@@ -20,6 +20,27 @@ const MODULE_LABELS: Record<string, string> = {
   compras: "Compras",
 };
 
+const COUNTRY_LABELS: Record<string, string> = {
+  ar: "Argentina",
+  bo: "Bolivia",
+  br: "Brasil",
+  cl: "Chile",
+  co: "Colombia",
+  cr: "Costa Rica",
+  do: "República Dominicana",
+  ec: "Ecuador",
+  gt: "Guatemala",
+  mx: "México",
+  pa: "Panamá",
+  pe: "Perú",
+  py: "Paraguay",
+  uy: "Uruguay",
+  ve: "Venezuela",
+};
+
+// Módulos cuyas reglas varían por país (deben mostrar selector de país)
+const COUNTRY_SCOPED_MODULES = new Set(["contactos", "contabilidad", "facturacion"]);
+
 export default function HomePage() {
   const { isSignedIn, getToken } = useAuth();
   const router = useRouter();
@@ -27,6 +48,7 @@ export default function HomePage() {
   const [combinations, setCombinations] = useState<AvailableCombination[]>([]);
   const [selectedModule, setSelectedModule] = useState<string>("");
   const [selectedVersion, setSelectedVersion] = useState<string>("");
+  const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -40,16 +62,38 @@ export default function HomePage() {
   }, [isSignedIn, getToken]);
 
   const availableModules = Array.from(new Set(combinations.map((c) => c.module)));
+
   const availableVersions = combinations
     .filter((c) => c.module === selectedModule)
-    .map((c) => c.version);
+    .map((c) => c.version)
+    .filter((v, i, arr) => arr.indexOf(v) === i); // dedup
+
+  const needsCountry = selectedModule ? COUNTRY_SCOPED_MODULES.has(selectedModule) : false;
+
+  const availableCountries = needsCountry
+    ? combinations
+        .filter((c) => c.module === selectedModule && c.version === selectedVersion && c.country)
+        .map((c) => c.country as string)
+    : [];
+
+  const isFormReady =
+    selectedModule &&
+    selectedVersion &&
+    (!needsCountry || selectedCountry) &&
+    file;
 
   async function handleSubmit() {
-    if (!selectedModule || !selectedVersion || !file) return;
+    if (!isFormReady) return;
     setUploading(true);
     setError(null);
     try {
-      const result = await createProject(getToken, selectedModule, selectedVersion, file);
+      const result = await createProject(
+        getToken,
+        selectedModule,
+        selectedVersion,
+        file!,
+        needsCountry ? selectedCountry : null
+      );
       router.push(`/proyectos/${result.project_id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al subir el archivo");
@@ -100,6 +144,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="border border-line bg-white/60 rounded-lg p-6 md:p-8 space-y-6">
+            {/* Fila 1: Módulo + Versión */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2" htmlFor="module-select">
@@ -112,6 +157,7 @@ export default function HomePage() {
                   onChange={(e) => {
                     setSelectedModule(e.target.value);
                     setSelectedVersion("");
+                    setSelectedCountry("");
                   }}
                 >
                   <option value="">Elegí un módulo</option>
@@ -131,7 +177,10 @@ export default function HomePage() {
                   id="version-select"
                   className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
                   value={selectedVersion}
-                  onChange={(e) => setSelectedVersion(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedVersion(e.target.value);
+                    setSelectedCountry("");
+                  }}
                   disabled={!selectedModule}
                 >
                   <option value="">Elegí una versión</option>
@@ -144,6 +193,33 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* Fila 2: País (solo para módulos que lo requieren) */}
+            {needsCountry && (
+              <div>
+                <label className="block text-sm font-medium mb-2" htmlFor="country-select">
+                  País de localización
+                  <span className="ml-2 text-xs font-normal text-graphite">
+                    Las reglas de {MODULE_LABELS[selectedModule] || selectedModule} varían según el país
+                  </span>
+                </label>
+                <select
+                  id="country-select"
+                  className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
+                  value={selectedCountry}
+                  onChange={(e) => setSelectedCountry(e.target.value)}
+                  disabled={!selectedVersion}
+                >
+                  <option value="">Elegí un país</option>
+                  {availableCountries.map((c) => (
+                    <option key={c} value={c}>
+                      {COUNTRY_LABELS[c] || c.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Zona de upload */}
             <div
               onDragOver={(e) => {
                 e.preventDefault();
@@ -188,7 +264,7 @@ export default function HomePage() {
 
             <button
               onClick={handleSubmit}
-              disabled={!selectedModule || !selectedVersion || !file || uploading}
+              disabled={!isFormReady || uploading}
               className="w-full bg-ink text-paper rounded-full py-3 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
             >
               {uploading ? "Subiendo..." : "Analizar archivo gratis"}

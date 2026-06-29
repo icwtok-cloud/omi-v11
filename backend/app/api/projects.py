@@ -85,6 +85,7 @@ def _validate_file_signature(contents: bytes, suffix: str) -> None:
 async def create_project(
     odoo_module: str = Form(...),
     odoo_version: str = Form(...),
+    odoo_country: str | None = Form(None),
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -105,15 +106,12 @@ async def create_project(
         )
     _validate_file_signature(contents, suffix)
 
-    # Validamos que la combinación módulo+versión exista ANTES de guardar
+    # Validamos que la combinación módulo+versión+país exista ANTES de guardar
     # nada -- evita proyectos huérfanos sin reglas contra qué validar.
     try:
-        load_rule_schema(odoo_module, odoo_version)
-    except FileNotFoundError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Módulo '{odoo_module}' versión '{odoo_version}' todavía no soportado",
-        )
+        load_rule_schema(odoo_module, odoo_version, odoo_country)
+    except (FileNotFoundError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     project_id = str(uuid.uuid4())
     storage_path = UPLOAD_DIR / f"{project_id}_{file.filename}"
@@ -124,6 +122,7 @@ async def create_project(
         owner_id=user.id,
         odoo_module=odoo_module,
         odoo_version=odoo_version,
+        odoo_country=odoo_country,
         original_filename=file.filename,
         storage_path=str(storage_path),
         status=ProjectStatus.uploaded,
@@ -148,7 +147,7 @@ def validate_project(
             detail="El archivo original ya fue eliminado tras la descarga (política de no-retención). Subí el archivo de nuevo si necesitás re-validarlo.",
         )
 
-    schema = load_rule_schema(project.odoo_module, project.odoo_version)
+    schema = load_rule_schema(project.odoo_module, project.odoo_version, project.odoo_country)
     df = _read_tabular_file(Path(project.storage_path), project.original_filename)
 
     report = validate_dataframe(df, schema, client_override=project.client_config_override)

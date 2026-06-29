@@ -26,6 +26,7 @@ async function authedFetch(
 export interface AvailableCombination {
   version: string;
   module: string;
+  country: string | null; // null = módulo sin variación por país
 }
 
 export async function getAvailableCombinations(
@@ -45,11 +46,13 @@ export async function createProject(
   getToken: GetToken,
   odooModule: string,
   odooVersion: string,
-  file: File
+  file: File,
+  odooCountry?: string | null
 ): Promise<CreateProjectResult> {
   const formData = new FormData();
   formData.append("odoo_module", odooModule);
   formData.append("odoo_version", odooVersion);
+  if (odooCountry) formData.append("odoo_country", odooCountry);
   formData.append("file", file);
 
   const res = await authedFetch("/projects", getToken, {
