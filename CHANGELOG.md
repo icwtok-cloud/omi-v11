@@ -10,6 +10,58 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## ⚠️ 2026-06-30 — CI ROTO desde hace 4 commits (sesión cortada, sin diagnosticar)
+
+**Detectado al final de la sesión, sin tiempo de diagnosticar -- primer
+pendiente de la próxima sesión, antes que cualquier otra cosa.**
+
+GitHub Actions viene en rojo (❌) desde el commit `9fbebf8` ("test:
+agregar tests de apply-fixes") en adelante -- 4 commits seguidos
+fallando: `9fbebf8`, `d66764b`, `9430493`, `f352cb0`. Esto contradice
+directamente la regla que el propio changelog establece más abajo
+("Antes de mergear a producción: correr pytest en backend/ y confirmar
+que el workflow de CI está verde. Si no está verde, no se deploya") --
+se pusheó sin verificar el estado de Actions después del commit de
+tests nuevos.
+
+**Lo confuso del caso:** localmente, con Python 3.9 +
+`eval_type_backport`, la suite completa corrió 19/19 en verde
+(`python3 -m pytest -v` desde `backend/`). Así que el problema no es
+que el test esté mal escrito en sí -- es probable que sea una
+diferencia de entorno entre la máquina local y el runner de GitHub
+Actions. Hipótesis a revisar primero, en este orden:
+
+1. **Versión de Python en el workflow.** Si `.github/workflows/ci.yml`
+   especifica una versión de Python distinta a 3.9 (probablemente una
+   más nueva, ya que el código usa `str | None` que rompe en 3.9 sin
+   el backport), revisar si `eval_type_backport` quedó realmente
+   necesario ahí o si el problema es otra cosa específica del runner
+   (variables de entorno faltantes para `Settings`, por ejemplo --
+   ver que el workflow tenga seteadas las mismas dummy env vars que
+   `conftest.py` espera, o que dependa de ellas estar en el entorno
+   del job y no solo en `conftest.py`).
+2. **Revisar el log real del job que falla** en
+   github.com/icwtok-cloud/omi-v11/actions -- no se llegó a abrir el
+   log de ningún run fallido en esta sesión, solo se vio la lista en
+   rojo. Sin el log real no se puede saber si es el mismo error de
+   tipos de Python 3.9, un problema de SQLite en el runner, una
+   dependencia faltante en `requirements.txt`/`requirements-dev.txt`,
+   o algo del todo distinto.
+3. Una vez identificada la causa real, agregar el fix correspondiente
+   Y confirmar que el run de Actions pasa a verde antes de dar por
+   cerrado este pendiente -- no alcanza con que ande local.
+
+**Regla para no repetirlo (refuerzo de la regla ya existente):**
+> "Pytest en verde localmente" no es lo mismo que "CI en verde". Antes
+> de dar un cambio por terminado, abrir
+> github.com/icwtok-cloud/omi-v11/actions y confirmar el ✅ real del
+> commit pusheado -- no asumirlo porque local funcionó. Esto es
+> particularmente cierto cuando el entorno local tiene parches
+> específicos (como `eval_type_backport` para Python 3.9) que el CI
+> puede o no necesitar de la misma forma.
+
+---
+
 ## 2026-06-30 — Fixes manuales: cerrado end-to-end (DB + frontend + tests)
 
 Se completaron los 3 pendientes que habían quedado abiertos al cortarse
@@ -64,6 +116,58 @@ momento se actualiza a Python 3.10+, se puede sacar esa dependencia.
 marcar un fix, confirmar, pagar, descargar, abrir el CSV) -- los tests
 automáticos de hoy dan confianza en la lógica, pero no reemplazan
 probar el flujo completo con Clerk real en el browser.
+
+---
+
+## ⚠️ 2026-06-30 — CI ROTO desde hace 4 commits (sesión cortada, sin diagnosticar)
+
+**Detectado al final de la sesión, sin tiempo de diagnosticar -- primer
+pendiente de la próxima sesión, antes que cualquier otra cosa.**
+
+GitHub Actions viene en rojo (❌) desde el commit `9fbebf8` ("test:
+agregar tests de apply-fixes") en adelante -- 4 commits seguidos
+fallando: `9fbebf8`, `d66764b`, `9430493`, `f352cb0`. Esto contradice
+directamente la regla que el propio changelog establece más abajo
+("Antes de mergear a producción: correr pytest en backend/ y confirmar
+que el workflow de CI está verde. Si no está verde, no se deploya") --
+se pusheó sin verificar el estado de Actions después del commit de
+tests nuevos.
+
+**Lo confuso del caso:** localmente, con Python 3.9 +
+`eval_type_backport`, la suite completa corrió 19/19 en verde
+(`python3 -m pytest -v` desde `backend/`). Así que el problema no es
+que el test esté mal escrito en sí -- es probable que sea una
+diferencia de entorno entre la máquina local y el runner de GitHub
+Actions. Hipótesis a revisar primero, en este orden:
+
+1. **Versión de Python en el workflow.** Si `.github/workflows/ci.yml`
+   especifica una versión de Python distinta a 3.9 (probablemente una
+   más nueva, ya que el código usa `str | None` que rompe en 3.9 sin
+   el backport), revisar si `eval_type_backport` quedó realmente
+   necesario ahí o si el problema es otra cosa específica del runner
+   (variables de entorno faltantes para `Settings`, por ejemplo --
+   ver que el workflow tenga seteadas las mismas dummy env vars que
+   `conftest.py` espera, o que dependa de ellas estar en el entorno
+   del job y no solo en `conftest.py`).
+2. **Revisar el log real del job que falla** en
+   github.com/icwtok-cloud/omi-v11/actions -- no se llegó a abrir el
+   log de ningún run fallido en esta sesión, solo se vio la lista en
+   rojo. Sin el log real no se puede saber si es el mismo error de
+   tipos de Python 3.9, un problema de SQLite en el runner, una
+   dependencia faltante en `requirements.txt`/`requirements-dev.txt`,
+   o algo del todo distinto.
+3. Una vez identificada la causa real, agregar el fix correspondiente
+   Y confirmar que el run de Actions pasa a verde antes de dar por
+   cerrado este pendiente -- no alcanza con que ande local.
+
+**Regla para no repetirlo (refuerzo de la regla ya existente):**
+> "Pytest en verde localmente" no es lo mismo que "CI en verde". Antes
+> de dar un cambio por terminado, abrir
+> github.com/icwtok-cloud/omi-v11/actions y confirmar el ✅ real del
+> commit pusheado -- no asumirlo porque local funcionó. Esto es
+> particularmente cierto cuando el entorno local tiene parches
+> específicos (como `eval_type_backport` para Python 3.9) que el CI
+> puede o no necesitar de la misma forma.
 
 ---
 
