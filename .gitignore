@@ -1,0 +1,4 @@
+omi-latam/
+rules-generator/output/
+rules-generator/odoo_repos/
+.DS_Store
