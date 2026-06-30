@@ -10,6 +10,150 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-06-30 — Fixes manuales: cerrado end-to-end (DB + frontend + tests)
+
+Se completaron los 3 pendientes que habían quedado abiertos al cortarse
+la sesión anterior (ver "Pendiente inmediato" más abajo en este mismo
+archivo, ahora resuelto):
+
+**1. Migración de DB.** El repo no tiene Alembic inicializado todavía
+(deuda técnica conocida, sin resolver). Se corrió el `ALTER TABLE`
+manual directo contra Postgres de Render vía `psql`, y se documentó en
+`backend/migrations/manual/001_add_confirmed_manual_fixes.sql` para que
+quede registro de qué se corrió y cuándo. La columna
+`confirmed_manual_fixes` (json, nullable) ya existe en producción.
+
+**2. Frontend cableado al endpoint real.** `IssueRow.tsx` ya estaba bien
+armado (solo necesitaba el callback correcto desde el padre). Se agregó
+`applyFixes()` en `lib/api.ts` y, en
+`app/proyectos/[id]/page.tsx`, un botón explícito "Confirmar
+correcciones" (en vez de mandar al backend en cada toggle) que junta los
+issues marcados, los mapea a `{row_index, column}` usando los datos
+reales del issue (no el índice del array), y llama a
+`POST /projects/{id}/apply-fixes`. El botón queda deshabilitado si no
+hay nada seleccionado, y muestra estado de guardado/error explícito.
+
+**3. Test automático del endpoint.** Antes solo estaba cubierto
+`validate_dataframe()` a nivel motor (`test_validation_engine.py`); el
+endpoint que persiste y aplica `confirmed_manual_fixes` no tenía
+ningún test. Se agregó `backend/tests/test_apply_fixes.py` (6 tests) y
+se amplió `conftest.py` con fixtures de `db_session`/`test_user`/`client`
+que overridean `get_db` y `get_current_user` -- permite testear
+endpoints de la API contra una SQLite en memoria, sin pegarle a Clerk
+ni a la base real de Render. Cubre: el endpoint guarda/rechaza
+correctamente, y -- más importante -- que `_ensure_corrected_file()`
+solo aplica el fix si fue confirmado vía el endpoint (un fix marcado en
+pantalla pero nunca confirmado NO debe tocar el archivo final).
+
+**Nota de entorno:** correr pytest local con Python 3.9 (el de Xcode
+CommandLineTools en macOS) rompe la importación de `app/api/schemas.py`
+por la sintaxis `str | None` de Pydantic v2. Se agregó
+`eval_type_backport` a `requirements-dev.txt` como parche -- si en algún
+momento se actualiza a Python 3.10+, se puede sacar esa dependencia.
+
+**Regla para no repetirlo:**
+> Un fix backend "listo" sin su test de endpoint no está realmente
+> probado -- los tests de `validation_engine.py` confirman que la
+> lógica de negocio funciona, pero no que el endpoint la invoque bien,
+> ni que el modelo de autorización (`_get_owned_project`) la proteja
+> correctamente. Cuando un endpoint nuevo persiste algo que después se
+> usa para generar el archivo que el cliente paga y descarga, necesita
+> tests a nivel API, no solo a nivel motor.
+
+**Pendiente:** falta el test E2E manual real (subir archivo por la UI,
+marcar un fix, confirmar, pagar, descargar, abrir el CSV) -- los tests
+automáticos de hoy dan confianza en la lógica, pero no reemplazan
+probar el flujo completo con Clerk real en el browser.
+
+---
+
+## 2026-06-30 — Fixes manuales: cerrado end-to-end (DB + frontend + tests)
+
+Se completaron los 3 pendientes que habían quedado abiertos al cortarse
+la sesión anterior (ver "Pendiente inmediato" más abajo en este mismo
+archivo, ahora resuelto):
+
+**1. Migración de DB.** El repo no tiene Alembic inicializado todavía
+(deuda técnica conocida, sin resolver). Se corrió el `ALTER TABLE`
+manual directo contra Postgres de Render vía `psql`, y se documentó en
+`backend/migrations/manual/001_add_confirmed_manual_fixes.sql` para que
+quede registro de qué se corrió y cuándo. La columna
+`confirmed_manual_fixes` (json, nullable) ya existe en producción.
+
+**2. Frontend cableado al endpoint real.** `IssueRow.tsx` ya estaba bien
+armado (solo necesitaba el callback correcto desde el padre). Se agregó
+`applyFixes()` en `lib/api.ts` y, en
+`app/proyectos/[id]/page.tsx`, un botón explícito "Confirmar
+correcciones" (en vez de mandar al backend en cada toggle) que junta los
+issues marcados, los mapea a `{row_index, column}` usando los datos
+reales del issue (no el índice del array), y llama a
+`POST /projects/{id}/apply-fixes`. El botón queda deshabilitado si no
+hay nada seleccionado, y muestra estado de guardado/error explícito.
+
+**3. Test automático del endpoint.** Antes solo estaba cubierto
+`validate_dataframe()` a nivel motor (`test_validation_engine.py`); el
+endpoint que persiste y aplica `confirmed_manual_fixes` no tenía
+ningún test. Se agregó `backend/tests/test_apply_fixes.py` (6 tests) y
+se amplió `conftest.py` con fixtures de `db_session`/`test_user`/`client`
+que overridean `get_db` y `get_current_user` -- permite testear
+endpoints de la API contra una SQLite en memoria, sin pegarle a Clerk
+ni a la base real de Render. Cubre: el endpoint guarda/rechaza
+correctamente, y -- más importante -- que `_ensure_corrected_file()`
+solo aplica el fix si fue confirmado vía el endpoint (un fix marcado en
+pantalla pero nunca confirmado NO debe tocar el archivo final).
+
+**Nota de entorno:** correr pytest local con Python 3.9 (el de Xcode
+CommandLineTools en macOS) rompe la importación de `app/api/schemas.py`
+por la sintaxis `str | None` de Pydantic v2. Se agregó
+`eval_type_backport` a `requirements-dev.txt` como parche -- si en algún
+momento se actualiza a Python 3.10+, se puede sacar esa dependencia.
+
+**Regla para no repetirlo:**
+> Un fix backend "listo" sin su test de endpoint no está realmente
+> probado -- los tests de `validation_engine.py` confirman que la
+> lógica de negocio funciona, pero no que el endpoint la invoque bien,
+> ni que el modelo de autorización (`_get_owned_project`) la proteja
+> correctamente. Cuando un endpoint nuevo persiste algo que después se
+> usa para generar el archivo que el cliente paga y descarga, necesita
+> tests a nivel API, no solo a nivel motor.
+
+**E2E manual (parcial -- ver hallazgos abajo):** se probó subiendo un
+archivo real de Contactos (1340 filas, export de un CRM) por la UI
+completa hasta el panel de pago. El flujo de subida → reporte → panel
+de pago funcionó visualmente bien. PERO el archivo de prueba dio "0
+errores", así que el botón "Confirmar correcciones" nunca llegó a
+aparecer (`hasManualFixableIssues` es `false` sin issues manuales) --
+no se alcanzó a probar el path de fix manual → confirmar → pagar →
+descargar → verificar CSV. Falta repetir la prueba con un archivo que
+tenga al menos un error de formato real con `fix_is_automatic: false`.
+
+**Hallazgos del E2E que abren 2 pendientes nuevos (no bugs confirmados,
+a investigar):**
+
+1. La columna "Empresa" del archivo de prueba quedó en "columnas que no
+   encontramos en el módulo elegido", a pesar de que el sinónimo
+   `Empresa→parent_id` se agregó hoy mismo a `FIELD_SYNONYMS` (ver
+   entrada de arriba sobre column_matcher). Sospecha: `parent_id` es un
+   campo de relación (`comodel_name` a `res.partner`), y el matching
+   por nombre técnico simple capaz no alcanza para campos de relación
+   -- a confirmar si `column_matcher.py` necesita lógica especial para
+   esos casos, o si el sinónimo no está siendo aplicado por algún otro
+   motivo.
+
+2. El archivo de prueba tenía casi todos los emails vacíos y el reporte
+   igual dijo "0 errores". Es el mismo patrón ya documentado en el bug
+   #3 original (required_fields() de Odoo no marca `email` como
+   required a nivel de field para `res.partner`, aunque en la práctica
+   importe mucho para un partner real). No es un bug técnico -- el
+   motor está validando exactamente lo que se le pidió -- pero sí una
+   limitación de producto real a evaluar: ¿conviene una alerta
+   no-bloqueante tipo "X% de filas sin email/teléfono" aunque el campo
+   no sea `required` técnico en Odoo? Discutir antes de implementar,
+   no es obvio que el approach correcto sea bloquear como
+   `structural_mismatch`.
+
+---
+
 ## 2026-06-30 — Matching de columnas: sinónimos en español + fuzzy (no más falsos "archivo ajeno")
 
 **Qué pasaba:** archivos 100% legítimos (ej. un export de Contactos con
