@@ -7,8 +7,16 @@ from app.core.error_handling import unhandled_exception_handler
 from app.api import projects, payments, webhooks
 
 # Crea las tablas si no existen. Para cambios de schema en producción,
-# usar alembic (ver alembic.ini) en vez de depender de esto.
-Base.metadata.create_all(bind=engine)
+# usar alembic (ver alembic.ini) en vez de depender de esto.Base.metadata.create_all(bind=engine)
+
+# Migraciones manuales para columnas nuevas en tablas existentes
+from sqlalchemy import text
+with engine.connect() as conn:
+    conn.execute(text("""
+        ALTER TABLE projects 
+        ADD COLUMN IF NOT EXISTS odoo_country VARCHAR;
+    """))
+    conn.commit()
 
 app = FastAPI(
     title="OMI API",
