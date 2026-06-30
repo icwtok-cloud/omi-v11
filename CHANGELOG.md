@@ -63,6 +63,66 @@ columnas parecidas pero semánticamente distintas antes de confiarlo.
 
 ---
 
+## 2026-06-30 — Mapeo de columnas visible + preview de filas + base para fixes manuales
+
+**Mapeo de columnas + preview (en producción, completo):**
+Se agregaron dos secciones nuevas al reporte de validación, visibles
+tanto cuando el archivo está OK como cuando hay `structural_mismatch`:
+
+- **Mapeo de columnas** (`ColumnMappingTable.tsx`): muestra explícitamente
+  qué columna del archivo se interpretó como qué campo de Odoo (ej.
+  `Nombre → name`), y cuáles columnas quedaron sin interpretar (no es un
+  error, simplemente se ignoran). Antes de esto, el usuario solo veía un
+  número ("3 de 13 columnas coinciden") sin saber cuáles ni por qué.
+- **Vista previa** (`DataPreview.tsx`): muestra las primeras 10 filas
+  reales del archivo, tal cual vinieron, sin pasar por el motor de
+  validación. Permite confirmar visualmente "esto es lo que subí" antes
+  de pagar o de decidir cambiar de módulo.
+
+Backend: `validate_dataframe()` ahora expone `column_mapping`,
+`unmatched_columns` y `preview_rows` en el reporte (antes se calculaba
+`column_mapping` internamente para el chequeo estructural pero se
+descartaba). Ver `ValidationReport.to_dict()` en `validation_engine.py`.
+
+**Regla para no repetirlo:**
+> Si el motor calcula algo internamente para tomar una decisión (ej. el
+> mapeo de columnas para `match_ratio`), evaluar si esa información
+> también le sirve al usuario antes de descartarla. Mostrar "por qué"
+> además de "qué" es la diferencia entre un reporte útil y un reporte
+> que genera más preguntas de las que responde.
+
+---
+
+**Fixes manuales: backend listo, frontend y DB pendientes (NO está
+funcionando todavía end-to-end, ver sección de pendientes al final del
+archivo):**
+
+Se descubrió que el botón "Aplicar fix" en `IssueRow.tsx` solo cambiaba
+estado local de React (`manualFixesApplied`) sin mandar nada al backend.
+El endpoint `POST /projects/{id}/apply-fixes` mencionado en el docstring
+de `projects.py` nunca había sido implementado. Resultado: un usuario
+podía marcar 50 fixes manuales como "aplicados" en pantalla, pagar,
+descargar, y el archivo seguía teniendo exactamente los mismos errores.
+
+Se implementó el lado backend:
+- `Project.confirmed_manual_fixes` (JSON, lista de `{row_index, column}`)
+  nuevo campo en `db_models.py`.
+- `POST /projects/{id}/apply-fixes` ahora existe y guarda esa lista.
+- `_ensure_corrected_file()` ahora aplica tanto los fixes con
+  `fix_is_automatic=True` como los manuales confirmados vía ese endpoint,
+  usando `(row_index, column)` como clave de matching (no el índice del
+  array de issues, para no depender del orden).
+
+**Regla para no repetirlo:**
+> Un botón que cambia solo estado visual sin persistir nada en el
+> backend es un bug de confianza, no una feature a medias. Si un fix
+> "se aplica" en pantalla, tiene que aplicarse de verdad en el archivo
+> que el usuario termina pagando y descargando — sin excepción, y sin
+> dejarlo para "después" sin un test o un TODO explícito que lo marque
+> como roto.
+
+---
+
 ## 2026-06-30 — Tests de regresión + CI
 
 A partir de hoy, los 3 bugs principales del 2026-06-29 (botón sin texto,
@@ -265,6 +325,95 @@ para que al menos no parezca roto mientras se despierta.
 5. **Antes de mergear a producción:** correr `pytest` en `backend/` y
    confirmar que el workflow de CI (`.github/workflows/`) está verde.
    Si no está verde, no se deploya — no importa cuán chico sea el cambio.
+
+---
+
+## ⚠️ Pendiente inmediato (sesión cortada por tiempo, 2026-06-30)
+
+Para retomar en la próxima sesión, en este orden:
+
+1. **Migración de DB — `confirmed_manual_fixes`.** El modelo
+   `Project.confirmed_manual_fixes` (JSON, nullable) ya está en
+   `db_models.py` y el endpoint `apply-fixes` ya lo usa, pero la columna
+   real en Postgres (Render) todavía NO existe. SQLAlchemy no crea
+   columnas automáticamente. Hay que: (a) confirmar si el repo tiene
+   Alembic inicializado (`alembic.ini` en la raíz de `backend/`, carpeta
+   `alembic/versions/`) — si no, inicializarlo; (b) generar la migración
+   (`alembic revision --autogenerate -m "add confirmed_manual_fixes"`)
+   o, más rápido para no bloquear, correr manualmente en la base de
+   Render: `ALTER TABLE projects ADD COLUMN confirmed_manual_fixes JSON;`
+   (c) aplicar la migración en producción.
+
+2. **Frontend — cablear el botón de fix manual al backend real.** Hoy
+   `IssueRow.tsx` + `page.tsx` solo cambian estado local
+   (`manualFixesApplied`), sin llamar a la API. Falta:
+   - Agregar `applyFixes()` en `lib/api.ts` (POST a
+     `/projects/{id}/apply-fixes` con body
+     `{fixes: [{row_index, column}, ...]}`).
+   - En `page.tsx`, juntar los issues marcados en `manualFixesApplied`
+     (mapeando índice → `{row_index, column}` del issue correspondiente)
+     y mandarlos al backend. Decidir UX: ¿se manda en cada toggle, o se
+     agrega un botón explícito "Confirmar correcciones" antes de mostrar
+     el `PaywallPanel`? (recomendado: botón explícito, más claro para el
+     usuario que "esto ya quedó guardado").
+   - Mientras este paso no esté, el botón "Aplicar fix" sigue siendo
+     decorativo — no rompe nada, pero tampoco corrige nada en el archivo
+     final. No anunciar esta feature a usuarios reales hasta que esté
+     conectada de punta a punta.
+
+3. **Verificar con un test E2E manual** (no hay test automático de esto
+   todavía): subir un archivo con al menos un issue con
+   `fix_is_automatic: false` y `suggested_fix` no nulo, marcarlo como
+   aplicado en la UI, confirmar el fix (paso 2), pagar, descargar, y
+   abrir el CSV resultante para confirmar que el valor corregido está
+   ahí. Si se puede, agregar un test de `apply-fixes` en
+   `backend/tests/` que cubra esto a nivel API (hoy solo está cubierto
+   `validate_dataframe()` a nivel motor, no el endpoint que persiste y
+   aplica `confirmed_manual_fixes`).
+
+## Deuda técnica de seguridad (no urgente — pre-lanzamiento, sin pagos reales todavía)
+
+- **Pagos crypto:** revisar `entitlements.py` / lógica de confirmación
+  de pago — validar que se chequee monto exacto, red correcta, y que un
+  `payment_id` no se pueda reusar para destrabar descargas sin pagar (o
+  pagando de menos). No se llegó a revisar este archivo en detalle.
+- **Rate limiting:** no hay límite a creación de proyectos/validaciones
+  por usuario/IP. Riesgo de abuso del validador gratis o de saturar el
+  free tier de Render.
+- **CORS:** no se revisó `app/main.py` — confirmar que el backend solo
+  acepta requests desde el dominio real del frontend (`omi.lat`), no
+  desde cualquier origen.
+- **CSV formula injection:** el archivo corregido (`_ensure_corrected_file`)
+  no sanitiza celdas que empiecen con `=`, `+`, `-`, `@` — pueden
+  ejecutarse como fórmulas si el usuario abre el CSV en Excel. Impacto
+  bajo-medio, pero es una corrección barata.
+- **Token de GitHub expuesto:** en algún momento de este historial de
+  chat se pegó un PAT de GitHub real en texto plano. Si todavía no se
+  revocó (aunque se haya generado uno nuevo después), revocarlo.
+
+## Otras ideas (no bugs, mejoras a futuro -- backlog, no urgente)
+
+Pensando como alguien que limpia datos para clientes de Odoo
+(data analyst / partner de Odoo), lo que más valor agregaría después de
+lo de arriba, en orden de impacto:
+
+1. Mapeo de columnas **editable a mano** (hoy solo es informativo) --
+   que el usuario pueda corregir un mapeo mal hecho o mapear una columna
+   que el algoritmo de sinónimos no reconoció.
+2. Guardar/reutilizar un mapeo de columnas como plantilla, para clientes
+   que suben el mismo formato de CRM todos los meses.
+3. Detección de duplicados contra la base real de Odoo del cliente (vía
+   API), no solo duplicados internos del archivo subido.
+4. Que la config de override del cliente (`client_config_override`, ya
+   existe en el modelo) tenga un paso visible en la UI, no solo
+   backend.
+5. Modo "dry run" -- ver el archivo completo con fixes aplicados antes
+   de pagar, no solo las 10 filas de preview.
+6. Reporte exportable (PDF/Excel) del análisis, separado del archivo
+   corregido, para que un partner se lo mande al cliente como evidencia.
+7. Soporte multi-modelo en un mismo archivo (ej. Excel con hoja de
+   Contactos + hoja de Direcciones relacionadas). Hoy `primary_model()`
+   asume un solo modelo por archivo.
 
 ---
 
