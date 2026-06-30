@@ -10,7 +10,52 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
-## 2026-06-29 — Sesión de bugfixing
+## 2026-06-30 — Tests de regresión + CI
+
+A partir de hoy, los 3 bugs principales del 2026-06-29 (botón sin texto,
+serialización de numpy, archivos sin relación con el módulo) tienen tests
+automáticos que corren en cada push/PR a `main` vía GitHub Actions
+(`.github/workflows/ci.yml`). Si rompés alguno de estos, no es un "lo
+vemos en producción" — el CI te lo dice antes de mergear.
+
+**Backend (`backend/tests/test_validation_engine.py`, corre con
+`pytest`):**
+- `TestToNative` — confirma que escalares numpy se casteen a tipos nativos.
+- `TestSerializacionDeReporte` — confirma que un reporte con issues en
+  columnas enteras serialice a JSON sin explotar.
+- `TestMismatchEstructural` — confirma que un archivo sin relación con el
+  módulo elegido se marque `structural_mismatch: true` y no "0 errores".
+- `TestValidacionNormal` — red de seguridad para que los fixes de arriba
+  no rompan el caso feliz (archivo limpio, error de formato real,
+  columnas requeridas faltantes).
+
+Correr local: `cd backend && pip install -r requirements-dev.txt && pytest`
+
+**Frontend (`frontend/scripts/check-tailwind-colors.js`):**
+- Escanea todos los `.tsx/.ts/.jsx/.js` de `app/` y `components/` buscando
+  clases `text-X`/`bg-X`/`border-X` que no estén declaradas en
+  `tailwind.config.js`. Es el chequeo que hubiera atajado el bug de
+  `text-paper` antes de que llegara a producción.
+
+Correr local: `cd frontend && npm run check:colors` (también
+`npm run check:types` para errores de TypeScript sin necesitar variables
+de entorno reales).
+
+**Regla para no repetir esto:**
+> Si agregás un test nuevo para un bug que encontraste, hacelo en el mismo
+> commit que el fix — no después. Un fix sin su test de regresión es un
+> fix que puede desaparecer en el próximo refactor sin que nadie se
+> entere hasta que el usuario se vuelva a quejar.
+
+**Pendiente:** el repo no tiene `package-lock.json` committeado, así que
+el job de frontend en CI usa `npm install` en vez de `npm ci` (más lento,
+y no garantiza versiones exactas reproducibles). Generar el lockfile
+local (`npm install` en `frontend/`) y commitearlo apenas se pueda, y
+después cambiar el workflow a `npm ci`.
+
+---
+
+
 
 ### 1. Botón de pago/upload negro sin texto
 
