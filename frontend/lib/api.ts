@@ -84,6 +84,9 @@ export interface ValidationReport {
   columns_expected_missing: string[];
   structural_mismatch: boolean;
   matched_columns_count: number;
+  column_mapping: Record<string, string>;
+  unmatched_columns: string[];
+  preview_rows: Record<string, unknown>[];
   issues: ValidationIssue[];
   can_download: boolean;
 }

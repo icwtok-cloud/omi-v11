@@ -6,6 +6,8 @@ import { useAuth } from "@clerk/nextjs";
 import { runValidation, ValidationReport } from "@/lib/api";
 import { IssueRow } from "@/components/IssueRow";
 import { PaywallPanel } from "@/components/PaywallPanel";
+import { ColumnMappingTable } from "@/components/ColumnMappingTable";
+import { DataPreview } from "@/components/DataPreview";
 
 export default function ProjectPage() {
   const params = useParams<{ id: string }>();
@@ -77,6 +79,13 @@ export default function ProjectPage() {
           <p className="font-mono text-sm text-alert">{report.columns_seen.join(", ")}</p>
         </div>
 
+        <ColumnMappingTable
+          columnMapping={report.column_mapping}
+          unmatchedColumns={report.unmatched_columns}
+        />
+
+        <DataPreview columns={report.columns_seen} rows={report.preview_rows} />
+
         <a
           href="/app"
           className="inline-block bg-ink text-paper rounded-full px-6 py-3 font-medium hover:opacity-90 transition-opacity"
@@ -124,6 +133,13 @@ export default function ProjectPage() {
           </p>
         </div>
       )}
+
+      <ColumnMappingTable
+        columnMapping={report.column_mapping}
+        unmatchedColumns={report.unmatched_columns}
+      />
+
+      <DataPreview columns={report.columns_seen} rows={report.preview_rows} />
 
       <section className="space-y-3 mb-12">
         {report.issues.map((issue, idx) => (
