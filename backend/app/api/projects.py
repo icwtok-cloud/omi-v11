@@ -184,6 +184,25 @@ def get_report(
     )
 
 
+@router.post("/{project_id}/apply-fixes")
+def apply_fixes(
+    project_id: str,
+    fixes: list[dict],
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Guarda qué fixes manuales eligió aplicar el usuario (lista de
+    {"row_index": int, "column": str}). Se aplican recién al generar el
+    archivo corregido, en _ensure_corrected_file()."""
+    project = _get_owned_project(project_id, user, db)
+    if not project.validation_report:
+        raise HTTPException(status_code=404, detail="Este proyecto todavía no fue validado")
+
+    project.confirmed_manual_fixes = fixes
+    db.commit()
+    return {"confirmed_count": len(fixes)}
+
+
 @router.get("/{project_id}/download")
 def download_project(
     project_id: str,
@@ -220,10 +239,16 @@ def _ensure_corrected_file(project: Project, db: Session) -> Path:
     df = _read_tabular_file(Path(project.storage_path), project.original_filename)
     report = project.validation_report or {}
 
+    confirmed_manual = {
+        (f["row_index"], f["column"]) for f in (project.confirmed_manual_fixes or [])
+    }
+
     for issue in report.get("issues", []):
-        if issue.get("fix_is_automatic") and issue.get("suggested_fix") is not None:
-            row_idx = issue["row_index"]
-            col = issue["column"]
+        row_idx = issue["row_index"]
+        col = issue["column"]
+        is_confirmed_manual = (row_idx, col) in confirmed_manual
+        should_apply = issue.get("fix_is_automatic") or is_confirmed_manual
+        if should_apply and issue.get("suggested_fix") is not None:
             if col in df.columns and row_idx in df.index:
                 df.at[row_idx, col] = issue["suggested_fix"]
 

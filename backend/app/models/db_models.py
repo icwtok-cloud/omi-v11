@@ -73,6 +73,14 @@ class Project(Base):
     # etapas, plan de cuentas propios), si la proveyó.
     client_config_override = Column(JSON, nullable=True)
 
+    # Fixes manuales que el usuario confirmó explícitamente en el reporte
+    # (issues con fix_is_automatic=False pero suggested_fix presente, que
+    # el usuario eligió aplicar). Se guarda como lista de
+    # {"row_index": int, "column": str} -- NO como índices del array de
+    # issues, porque ese orden podría cambiar entre validaciones. Se
+    # aplican en _ensure_corrected_file() junto con los automáticos.
+    confirmed_manual_fixes = Column(JSON, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
