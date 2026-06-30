@@ -1,0 +1,688 @@
+{
+  "omi_module": "compras",
+  "omi_module_label": "Compras",
+  "odoo_version": "16.0",
+  "country": null,
+  "models": {
+    "purchase.order": {
+      "name": "purchase.order",
+      "inherits": [
+        "portal.mixin",
+        "mail.thread",
+        "mail.activity.mixin"
+      ],
+      "source_file": "/Users/hv/Downloads/omi-v11/rules-generator/odoo_repos/16.0/addons/purchase/models/purchase.py",
+      "fields": [
+        {
+          "name": "name",
+          "type": "Char",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "priority",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": [
+            "0",
+            "1"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "origin",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Reference of the document that generated this purchase order request (e.g. a sales order)"
+        },
+        {
+          "name": "partner_ref",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Reference of the sales order or bid sent by the vendor. It's used to do the matching when you receive the products as this reference is usually written on the delivery order sent by your vendor."
+        },
+        {
+          "name": "date_order",
+          "type": "Datetime",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Depicts the date within which the Quotation should be confirmed and converted into a purchase order."
+        },
+        {
+          "name": "date_approve",
+          "type": "Datetime",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "partner_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "res.partner",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "You can find a vendor by its Name, TIN, Email or Internal Reference."
+        },
+        {
+          "name": "dest_address_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.partner",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Put an address if you want to deliver directly from the vendor to the customer. Otherwise, keep empty to deliver to your own company."
+        },
+        {
+          "name": "currency_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "res.currency",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "state",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": [
+            "draft",
+            "sent",
+            "to approve",
+            "purchase",
+            "done",
+            "cancel"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "order_line",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "purchase.order.line",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "notes",
+          "type": "Html",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "invoice_count",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "invoice_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "account.move",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "invoice_status",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": [
+            "no",
+            "to invoice",
+            "invoiced"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "date_planned",
+          "type": "Datetime",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Delivery date promised by vendor. This date is used to determine expected arrival of products."
+        },
+        {
+          "name": "date_calendar_start",
+          "type": "Datetime",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "amount_untaxed",
+          "type": "Monetary",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "tax_totals",
+          "type": "Binary",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "amount_tax",
+          "type": "Monetary",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "amount_total",
+          "type": "Monetary",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "fiscal_position_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "account.fiscal.position",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "tax_country_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.country",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Technical field to filter the available taxes depending on the fiscal country and fiscal position."
+        },
+        {
+          "name": "payment_term_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "account.payment.term",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "incoterm_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "account.incoterms",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "International Commercial Terms are a series of predefined commercial terms used in international transactions."
+        },
+        {
+          "name": "product_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "product.product",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "user_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.users",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "company_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "res.company",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "country_code",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "currency_rate",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Ratio between the purchase order currency and the company currency"
+        },
+        {
+          "name": "mail_reminder_confirmed",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "True if the reminder email is confirmed by the vendor."
+        },
+        {
+          "name": "mail_reception_confirmed",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "True if PO reception is confirmed by the vendor."
+        },
+        {
+          "name": "receipt_reminder_email",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "reminder_date_before_receipt",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        }
+      ]
+    },
+    "purchase.order.line": {
+      "name": "purchase.order.line",
+      "inherits": [
+        "analytic.mixin"
+      ],
+      "source_file": "/Users/hv/Downloads/omi-v11/rules-generator/odoo_repos/16.0/addons/purchase/models/purchase.py",
+      "fields": [
+        {
+          "name": "name",
+          "type": "Text",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "sequence",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "product_qty",
+          "type": "Float",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_uom_qty",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "date_planned",
+          "type": "Datetime",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Delivery date expected from vendor. This date respectively defaults to vendor pricelist lead time then today's date."
+        },
+        {
+          "name": "taxes_id",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "account.tax",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_uom",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "uom.uom",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_uom_category_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "product.product",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_type",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "price_unit",
+          "type": "Float",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "price_subtotal",
+          "type": "Monetary",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "price_total",
+          "type": "Monetary",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "price_tax",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "order_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "purchase.order",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "company_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.company",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "state",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "invoice_lines",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "account.move.line",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "qty_invoiced",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "qty_received_method",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": [
+            "manual"
+          ],
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "According to product configuration, the received quantity can be automatically computed by mechanism :\n  - Manual: the quantity is set manually on the line\n  - Stock Moves: the quantity comes from confirmed pickings\n"
+        },
+        {
+          "name": "qty_received",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "qty_received_manual",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "qty_to_invoice",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "partner_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.partner",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "currency_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "date_order",
+          "type": "Datetime",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "date_approve",
+          "type": "Datetime",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_packaging_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "product.packaging",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_packaging_qty",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "display_type",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": [
+            "line_section",
+            "line_note"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Technical field for UX purpose."
+        }
+      ]
+    }
+  },
+  "default_records": []
+}

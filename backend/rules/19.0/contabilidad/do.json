@@ -1,0 +1,588 @@
+{
+  "omi_module": "contabilidad",
+  "omi_module_label": "Contabilidad",
+  "odoo_version": "19.0",
+  "country": "do",
+  "country_label": "R. Dominicana",
+  "l10n_found": true,
+  "country_rules": {},
+  "models": {
+    "account.journal": {
+      "name": "account.journal",
+      "inherits": [
+        "portal.mixin",
+        "mail.alias.mixin.optional",
+        "mail.thread",
+        "mail.activity.mixin"
+      ],
+      "source_file": "/Users/hv/Downloads/omi-v11/rules-generator/odoo_repos/19.0/addons/account/models/account_journal.py",
+      "fields": [
+        {
+          "name": "name",
+          "type": "Char",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "name_placeholder",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "code",
+          "type": "Char",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Shorter name used for display. The journal entries of this journal will also be named using this prefix by default."
+        },
+        {
+          "name": "active",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Set active to false to hide the Journal without removing it."
+        },
+        {
+          "name": "type",
+          "type": "Selection",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": [
+            "sale",
+            "purchase",
+            "cash",
+            "bank",
+            "credit",
+            "general"
+          ],
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "\n        Select 'Sale' for customer invoices journals.\n        Select 'Purchase' for vendor bills journals.\n        Select 'Cash', 'Bank' or 'Credit Card' for journals that are used in customer or vendor payments.\n        Select 'General' for miscellaneous operations journals.\n        "
+        },
+        {
+          "name": "is_self_billing",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "This journal is for self-billing invoices. Invoices will be created using a different sequence per partner."
+        },
+        {
+          "name": "default_account_type",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "default_account_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "account.account",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "suspense_account_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "account.account",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Bank statements transactions will be posted on the suspense account until the final reconciliation allowing finding the right account."
+        },
+        {
+          "name": "non_deductible_account_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "account.account",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Account used to register the private part of mixed expenses."
+        },
+        {
+          "name": "restrict_mode_hash_table",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "If ticked, when an entry is posted, we retroactively hash all moves in the sequence from the entry back to the last hashed entry. The hash can also be performed on demand by the Secure Entries wizard."
+        },
+        {
+          "name": "sequence",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Used to order Journals in the dashboard view"
+        },
+        {
+          "name": "invoice_reference_type",
+          "type": "Selection",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": [
+            "partner",
+            "invoice"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "You can set here the default communication that will appear on customer invoices, once validated, to help the customer to refer to that particular invoice when making the payment."
+        },
+        {
+          "name": "invoice_reference_model",
+          "type": "Selection",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": [
+            "odoo",
+            "euro",
+            "number"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "You can choose different models for each type of reference. The default one is the Odoo reference."
+        },
+        {
+          "name": "currency_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.currency",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "The currency used to enter statement"
+        },
+        {
+          "name": "company_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "res.company",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Company related to this journal"
+        },
+        {
+          "name": "country_code",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "refund_sequence",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Check this box if you don't want to share the same sequence for invoices and credit notes made from this journal"
+        },
+        {
+          "name": "payment_sequence",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Check this box if you don't want to share the same sequence on payments and bank transactions posted on this journal"
+        },
+        {
+          "name": "invoice_template_pdf_report_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "ir.actions.report",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "available_invoice_template_pdf_report_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "ir.actions.report",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "display_invoice_template_pdf_report_id",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "sequence_override_regex",
+          "type": "Text",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Technical field used to enforce complex sequence composition that the system would normally misunderstand.\nThis is a regex that can include all the following capture groups: prefix1, year, prefix2, month, prefix3, seq, suffix.\nThe prefix* groups are the separators between the year, month and the actual increasing sequence number (seq).\ne.g: ^(?P<prefix1>.*?)(?P<year>\\d{4})(?P<prefix2>\\D*?)(?P<month>\\d{2})(?P<prefix3>\\D+?)(?P<seq>\\d+)(?P<suffix>\\D*?)$"
+        },
+        {
+          "name": "inbound_payment_method_line_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "account.payment.method.line",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Manual: Get paid by any method outside of Odoo.\nPayment Providers: Each payment provider has its own Payment Method. Request a transaction on/to a card thanks to a payment token saved by the partner when buying or subscribing online.\nBatch Deposit: Collect several customer checks at once generating and submitting a batch deposit to your bank. Module account_batch_payment is necessary.\nSEPA Direct Debit: Get paid in the SEPA zone thanks to a mandate your partner will have granted to you. Module account_sepa is necessary.\n"
+        },
+        {
+          "name": "outbound_payment_method_line_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "account.payment.method.line",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Manual: Pay by any method outside of Odoo.\nCheck: Pay bills by check and print it from Odoo.\nSEPA Credit Transfer: Pay in the SEPA zone by submitting a SEPA Credit Transfer file to your bank. Module account_sepa is necessary.\n"
+        },
+        {
+          "name": "profit_account_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "account.account",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Used to register a profit when the ending balance of a cash register differs from what the system computes"
+        },
+        {
+          "name": "loss_account_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "account.account",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Used to register a loss when the ending balance of a cash register differs from what the system computes"
+        },
+        {
+          "name": "company_partner_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.partner",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "bank_account_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.partner.bank",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "bank_statements_source",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": true,
+          "default_present": true,
+          "help_text": "Defines how the bank statements will be registered"
+        },
+        {
+          "name": "bank_acc_number",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "bank_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.bank",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "alias_name",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Send one separate email for each invoice.\nAny file extension will be accepted.\nOnly PDF and XML files will be interpreted by Odoo"
+        },
+        {
+          "name": "journal_group_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "account.journal.group",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "available_payment_method_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "account.payment.method",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "selected_payment_method_codes",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "accounting_date",
+          "type": "Date",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "display_alias_fields",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "has_invalid_statements",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "show_fetch_in_einvoices_button",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "show_refresh_out_einvoices_status_button",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "incoming_einvoice_notification_email",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Email addresses that will receive copy for sent and received invoices. Separate entries with ';'."
+        },
+        {
+          "name": "kanban_dashboard",
+          "type": "Text",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "kanban_dashboard_graph",
+          "type": "Text",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "json_activity_data",
+          "type": "Text",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "show_on_dashboard",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Whether this journal should be displayed on the dashboard or not"
+        },
+        {
+          "name": "color",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "current_statement_balance",
+          "type": "Monetary",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "has_statement_lines",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "entries_count",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "has_posted_entries",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "has_entries",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "has_sequence_holes",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "has_unhashed_entries",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "last_statement_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "account.bank.statement",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        }
+      ]
+    }
+  },
+  "default_records": []
+}

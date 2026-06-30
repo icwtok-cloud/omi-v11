@@ -1,0 +1,798 @@
+{
+  "omi_module": "productos",
+  "omi_module_label": "Productos",
+  "odoo_version": "15.0",
+  "country": null,
+  "models": {
+    "product.category": {
+      "name": "product.category",
+      "inherits": [],
+      "source_file": "/Users/hv/Downloads/omi-v11/rules-generator/odoo_repos/15.0/addons/product/models/product.py",
+      "fields": [
+        {
+          "name": "name",
+          "type": "Char",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "complete_name",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "parent_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "product.category",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "parent_path",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "child_id",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "product.category",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_count",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "The number of products under this category (Does not consider the children categories)"
+        }
+      ]
+    },
+    "product.product": {
+      "name": "product.product",
+      "inherits": [
+        "mail.thread",
+        "mail.activity.mixin"
+      ],
+      "source_file": "/Users/hv/Downloads/omi-v11/rules-generator/odoo_repos/15.0/addons/product/models/product.py",
+      "fields": [
+        {
+          "name": "price",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "price_extra",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "This is the sum of the extra price of all attributes"
+        },
+        {
+          "name": "lst_price",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "The sale price is managed from the product template. Click on the 'Configure Variants' button to set the extra attribute prices."
+        },
+        {
+          "name": "default_code",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "code",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "partner_ref",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "active",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "If unchecked, it will allow you to hide the product without removing it."
+        },
+        {
+          "name": "product_tmpl_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "product.template",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "barcode",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "International Article Number used for product identification."
+        },
+        {
+          "name": "product_template_attribute_value_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "product.template.attribute.value",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_template_variant_value_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "product.template.attribute.value",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "combination_indices",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "is_product_variant",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "standard_price",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "In Standard Price & AVCO: value of the product (automatically computed in AVCO).\n        In FIFO: value of the next unit that will leave the stock (automatically computed).\n        Used to value the product when the purchase cost is not known (e.g. inventory adjustment).\n        Used to compute margins on sale orders."
+        },
+        {
+          "name": "volume",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "weight",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "pricelist_item_count",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "packaging_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "product.packaging",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Gives the different ways to package the same product."
+        },
+        {
+          "name": "can_image_variant_1024_be_zoomed",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "can_image_1024_be_zoomed",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        }
+      ]
+    },
+    "product.template": {
+      "name": "product.template",
+      "inherits": [
+        "mail.thread",
+        "mail.activity.mixin",
+        "image.mixin"
+      ],
+      "source_file": "/Users/hv/Downloads/omi-v11/rules-generator/odoo_repos/15.0/addons/product/models/product_template.py",
+      "fields": [
+        {
+          "name": "name",
+          "type": "Char",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "sequence",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Gives the sequence order when displaying a product list"
+        },
+        {
+          "name": "description",
+          "type": "Html",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "description_purchase",
+          "type": "Text",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "description_sale",
+          "type": "Text",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "A description of the Product that you want to communicate to your customers. This description will be copied to every Sales Order, Delivery Order and Customer Invoice/Credit Note"
+        },
+        {
+          "name": "detailed_type",
+          "type": "Selection",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": [
+            "consu",
+            "service"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "A storable product is a product for which you manage stock. The Inventory app has to be installed.\nA consumable product is a product for which stock is not managed.\nA service is a non-material product you provide."
+        },
+        {
+          "name": "type",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": [
+            "consu",
+            "service"
+          ],
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "categ_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "product.category",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Select category for the current product"
+        },
+        {
+          "name": "currency_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.currency",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "cost_currency_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.currency",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "price",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "list_price",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Price at which the product is sold to customers."
+        },
+        {
+          "name": "standard_price",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "In Standard Price & AVCO: value of the product (automatically computed in AVCO).\n        In FIFO: value of the next unit that will leave the stock (automatically computed).\n        Used to value the product when the purchase cost is not known (e.g. inventory adjustment).\n        Used to compute margins on sale orders."
+        },
+        {
+          "name": "volume",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "volume_uom_name",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "weight",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "weight_uom_name",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "sale_ok",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "purchase_ok",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "pricelist_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "product.pricelist",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Technical field. Used for searching on pricelists, not stored in database."
+        },
+        {
+          "name": "uom_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "uom.uom",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Default unit of measure used for all stock operations."
+        },
+        {
+          "name": "uom_name",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "uom_po_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "uom.uom",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Default unit of measure used for purchase orders. It must be in the same category as the default unit of measure."
+        },
+        {
+          "name": "company_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.company",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "packaging_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "product.packaging",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Gives the different ways to package the same product."
+        },
+        {
+          "name": "seller_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "product.supplierinfo",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Define vendor pricelists."
+        },
+        {
+          "name": "variant_seller_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "product.supplierinfo",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "active",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "If unchecked, it will allow you to hide the product without removing it."
+        },
+        {
+          "name": "color",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "is_product_variant",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "attribute_line_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "product.template.attribute.line",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "valid_product_template_attribute_line_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "product.template.attribute.line",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Technical compute"
+        },
+        {
+          "name": "product_variant_ids",
+          "type": "One2many",
+          "required": true,
+          "comodel_name": "product.product",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_variant_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "product.product",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_variant_count",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "barcode",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "default_code",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "pricelist_item_count",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "can_image_1024_be_zoomed",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "has_configurable_attributes",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_tooltip",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "priority",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": [
+            "0",
+            "1"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        }
+      ]
+    }
+  },
+  "default_records": [
+    {
+      "record_id": "product_category_all",
+      "model": "product.category",
+      "values": {
+        "name": "All"
+      }
+    },
+    {
+      "record_id": "product_category_1",
+      "model": "product.category",
+      "values": {
+        "parent_id": "",
+        "name": "Saleable"
+      }
+    },
+    {
+      "record_id": "cat_expense",
+      "model": "product.category",
+      "values": {
+        "parent_id": "",
+        "name": "Expenses"
+      }
+    },
+    {
+      "record_id": "product_category_2",
+      "model": "product.category",
+      "values": {
+        "parent_id": "",
+        "name": "Internal"
+      }
+    },
+    {
+      "record_id": "product_category_3",
+      "model": "product.category",
+      "values": {
+        "parent_id": "",
+        "name": "Services"
+      }
+    },
+    {
+      "record_id": "product_category_6",
+      "model": "product.category",
+      "values": {
+        "parent_id": "",
+        "name": "Saleable"
+      }
+    },
+    {
+      "record_id": "product_category_4",
+      "model": "product.category",
+      "values": {
+        "parent_id": "",
+        "name": "Software"
+      }
+    },
+    {
+      "record_id": "product_category_5",
+      "model": "product.category",
+      "values": {
+        "parent_id": "",
+        "name": "Office Furniture"
+      }
+    },
+    {
+      "record_id": "product_category_consumable",
+      "model": "product.category",
+      "values": {
+        "parent_id": "",
+        "name": "Consumable"
+      }
+    }
+  ]
+}

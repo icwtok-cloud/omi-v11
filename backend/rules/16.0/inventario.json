@@ -1,0 +1,994 @@
+{
+  "omi_module": "inventario",
+  "omi_module_label": "Inventario",
+  "odoo_version": "16.0",
+  "country": null,
+  "models": {
+    "stock.move": {
+      "name": "stock.move",
+      "inherits": [],
+      "source_file": "/Users/hv/Downloads/omi-v11/rules-generator/odoo_repos/16.0/addons/stock/models/stock_move.py",
+      "fields": [
+        {
+          "name": "name",
+          "type": "Char",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "sequence",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "priority",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": true,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "date",
+          "type": "Datetime",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Scheduled date until move is done, then date of actual move processing"
+        },
+        {
+          "name": "date_deadline",
+          "type": "Datetime",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Date Promise to the customer on the top level document (SO/PO)"
+        },
+        {
+          "name": "company_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "res.company",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "product_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "product.product",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "description_picking",
+          "type": "Text",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_qty",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Quantity in the default UoM of the product"
+        },
+        {
+          "name": "product_uom_qty",
+          "type": "Float",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "This is the quantity of products from an inventory point of view. For moves in the state 'done', this is the quantity of products that were actually moved. For other moves, this is the quantity of product that is planned to be moved. Lowering this quantity does not generate a backorder. Changing this quantity on assigned moves affects the product reservation, and should be done with care."
+        },
+        {
+          "name": "product_uom",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "uom.uom",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_uom_category_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_tmpl_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "product.template",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "location_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "stock.location",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Sets a location if you produce at a fixed location. This can be a partner location if you subcontract the manufacturing operations."
+        },
+        {
+          "name": "location_dest_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "stock.location",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Location where the system will stock the finished products."
+        },
+        {
+          "name": "location_usage",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "location_dest_usage",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "partner_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.partner",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Optional address where goods are to be delivered, specifically used for allotment"
+        },
+        {
+          "name": "move_dest_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "stock.move",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Optional: next stock move when chaining them"
+        },
+        {
+          "name": "move_orig_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "stock.move",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Optional: previous stock move when chaining them"
+        },
+        {
+          "name": "picking_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.picking",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "state",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": [
+            "draft",
+            "cancel",
+            "waiting",
+            "confirmed",
+            "partially_available",
+            "assigned",
+            "done"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "* New: When the stock move is created and not yet confirmed.\n* Waiting Another Move: This state can be seen when a move is waiting for another one, for example in a chained flow.\n* Waiting Availability: This state is reached when the procurement resolution is not straight forward. It may need the scheduler to run, a component to be manufactured...\n* Available: When products are reserved, it is set to 'Available'.\n* Done: When the shipment is processed, the state is 'Done'."
+        },
+        {
+          "name": "price_unit",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "origin",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "procure_method",
+          "type": "Selection",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": [
+            "make_to_stock",
+            "make_to_order"
+          ],
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "By default, the system will take from the stock in the source location and passively wait for availability. The other possibility allows you to directly create a procurement on the source location (and thus ignore its current stock) to gather products. If we want to chain moves and have this one to wait for the previous, this second option should be chosen."
+        },
+        {
+          "name": "scrapped",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "scrap_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "stock.scrap",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "group_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "procurement.group",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "rule_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.rule",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "The stock rule that created this stock move"
+        },
+        {
+          "name": "propagate_cancel",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "If checked, when this move is cancelled, cancel the linked move too"
+        },
+        {
+          "name": "delay_alert_date",
+          "type": "Datetime",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Process at this date to be on time"
+        },
+        {
+          "name": "picking_type_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.picking.type",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "is_inventory",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "move_line_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "stock.move.line",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "move_line_nosuggest_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "stock.move.line",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "origin_returned_move_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.move",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Move that created the return move"
+        },
+        {
+          "name": "returned_move_ids",
+          "type": "One2many",
+          "required": false,
+          "comodel_name": "stock.move",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Optional: all returned moves created from this move"
+        },
+        {
+          "name": "reserved_availability",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Quantity that has already been reserved for this move"
+        },
+        {
+          "name": "availability",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Quantity in stock that can still be reserved for this move"
+        },
+        {
+          "name": "restrict_partner_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.partner",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "route_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "stock.route",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Preferred route"
+        },
+        {
+          "name": "warehouse_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.warehouse",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "the warehouse to consider for the route selection on the next procurement (if any)."
+        },
+        {
+          "name": "has_tracking",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "quantity_done",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "show_operations",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "picking_code",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "show_details_visible",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "show_reserved_availability",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_type",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "additional",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "is_locked",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "is_initial_demand_editable",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "is_quantity_done_editable",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "reference",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "move_lines_count",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "package_level_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.package_level",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "picking_type_entire_packs",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "display_assign_serial",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "display_clear_serial",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "next_serial",
+          "type": "Char",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "next_serial_count",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "orderpoint_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.warehouse.orderpoint",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "forecast_availability",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "forecast_expected_date",
+          "type": "Datetime",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "lot_ids",
+          "type": "Many2many",
+          "required": false,
+          "comodel_name": "stock.lot",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "reservation_date",
+          "type": "Date",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Computes when a move should be reserved"
+        },
+        {
+          "name": "product_packaging_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "product.packaging",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "from_immediate_transfer",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        }
+      ]
+    },
+    "stock.quant": {
+      "name": "stock.quant",
+      "inherits": [],
+      "source_file": "/Users/hv/Downloads/omi-v11/rules-generator/odoo_repos/16.0/addons/stock/models/stock_quant.py",
+      "fields": [
+        {
+          "name": "product_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "product.product",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_tmpl_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "product.template",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_uom_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "uom.uom",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "priority",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "company_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "location_id",
+          "type": "Many2one",
+          "required": true,
+          "comodel_name": "stock.location",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "warehouse_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.warehouse",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "storage_category_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "cyclic_inventory_frequency",
+          "type": "Integer",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "lot_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.lot",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "sn_duplicated",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "If the same SN is in another Quant"
+        },
+        {
+          "name": "package_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "stock.quant.package",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "The package containing this quant"
+        },
+        {
+          "name": "owner_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.partner",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "This is the owner of the quant"
+        },
+        {
+          "name": "quantity",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Quantity of products in this quant, in the default unit of measure of the product"
+        },
+        {
+          "name": "reserved_quantity",
+          "type": "Float",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": "Quantity of reserved products in this quant, in the default unit of measure of the product"
+        },
+        {
+          "name": "available_quantity",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "On hand quantity which hasn't been reserved on a transfer, in the default unit of measure of the product"
+        },
+        {
+          "name": "in_date",
+          "type": "Datetime",
+          "required": true,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "tracking",
+          "type": "Selection",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "on_hand",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "product_categ_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "inventory_quantity",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "The product's counted quantity."
+        },
+        {
+          "name": "inventory_quantity_auto_apply",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "inventory_diff_quantity",
+          "type": "Float",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Indicates the gap between the product's theoretical quantity and its counted quantity."
+        },
+        {
+          "name": "inventory_date",
+          "type": "Date",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Next date the On Hand Quantity should be counted."
+        },
+        {
+          "name": "last_count_date",
+          "type": "Date",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "Last time the Quantity was Updated"
+        },
+        {
+          "name": "inventory_quantity_set",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": true,
+          "help_text": null
+        },
+        {
+          "name": "is_outdated",
+          "type": "Boolean",
+          "required": false,
+          "comodel_name": null,
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": null
+        },
+        {
+          "name": "user_id",
+          "type": "Many2one",
+          "required": false,
+          "comodel_name": "res.users",
+          "selection_options": null,
+          "selection_dynamic": false,
+          "default_present": false,
+          "help_text": "User assigned to do product count."
+        }
+      ]
+    }
+  },
+  "default_records": []
+}
