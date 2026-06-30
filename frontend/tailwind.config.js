@@ -8,6 +8,7 @@ module.exports = {
     extend: {
       colors: {
         canvas: "#F7F8FA",
+        paper: "#FFFFFF",
         ink: "#0E1116",
         graphite: "#5B6270",
         line: "#E4E7EC",

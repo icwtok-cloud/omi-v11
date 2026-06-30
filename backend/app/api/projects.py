@@ -158,7 +158,7 @@ def validate_project(
 
     return ValidationReportResponse(
         project_id=project.id,
-        can_download=user_can_download(db, project),
+        can_download=(False if report.structural_mismatch else user_can_download(db, project)),
         **report.to_dict(),
     )
 
@@ -175,7 +175,11 @@ def get_report(
 
     return ValidationReportResponse(
         project_id=project.id,
-        can_download=user_can_download(db, project),
+        can_download=(
+            False
+            if project.validation_report.get("structural_mismatch")
+            else user_can_download(db, project)
+        ),
         **project.validation_report,
     )
 

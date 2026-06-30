@@ -26,6 +26,23 @@ from app.services.rules_loader import RuleSchema
 from app.services import format_rules
 
 
+def _to_native(value: object) -> object:
+    """Convierte escalares de numpy/pandas (int64, float64, Timestamp, etc.)
+    a tipos nativos de Python, para que sean JSON-serializables al armar
+    la respuesta de la API. Sin esto, cualquier issue sobre una columna
+    numérica entera (numpy.int64) rompe la serialización de la respuesta
+    y el frontend nunca recibe `issues`, solo los contadores agregados."""
+    if value is None:
+        return None
+    if pd.isna(value):
+        return None
+    if hasattr(value, "item"):  # numpy scalar (int64, float64, bool_, etc.)
+        return value.item()
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    return value
+
+
 @dataclass
 class FieldIssue:
     row_index: int            # índice de fila en el archivo subido (0-based)
@@ -45,6 +62,8 @@ class ValidationReport:
     issues: list[FieldIssue] = field(default_factory=list)
     columns_seen: list[str] = field(default_factory=list)
     columns_expected_missing: list[str] = field(default_factory=list)
+    structural_mismatch: bool = False
+    matched_columns_count: int = 0
 
     def to_dict(self) -> dict:
         return {
@@ -52,6 +71,8 @@ class ValidationReport:
             "total_issues": self.total_issues,
             "columns_seen": self.columns_seen,
             "columns_expected_missing": self.columns_expected_missing,
+            "structural_mismatch": self.structural_mismatch,
+            "matched_columns_count": self.matched_columns_count,
             "issues": [
                 {
                     "row_index": i.row_index,
@@ -105,6 +126,35 @@ def validate_dataframe(
 
     issues: list[FieldIssue] = []
 
+    # --- 0. Chequeo estructural: ¿este archivo se parece en algo al modelo
+    # elegido? Confiar solo en `required_fields()` no alcanza -- muchos
+    # modelos de Odoo (ej. res.partner) no marcan ningún campo como
+    # `required=True` a nivel de código aunque en la práctica sea
+    # obligatorio (la regla vive en una constraint, no en el field). Sin
+    # este chequeo, un archivo totalmente ajeno al módulo (ej. el export
+    # de un bot) pasa con "0 errores" simplemente porque ninguna de sus
+    # columnas matchea nada y entonces no hay nada que validar fila por
+    # fila. Si casi ninguna columna matchea, es más probable que el
+    # archivo no corresponda al módulo/versión elegidos que que sea un
+    # archivo perfecto.
+    matched_columns = [c for c in columns_seen if c in fields_by_name]
+    match_ratio = (len(matched_columns) / len(columns_seen)) if columns_seen else 0.0
+    structural_mismatch = len(columns_seen) > 0 and match_ratio < 0.2
+
+    if structural_mismatch:
+        # No tiene sentido seguir validando fila por fila: las columnas no
+        # corresponden al modelo, así que cualquier "0 errores" sería
+        # engañoso. Devolvemos el reporte cortando acá.
+        return ValidationReport(
+            total_rows=len(df),
+            total_issues=0,
+            issues=[],
+            columns_seen=columns_seen,
+            columns_expected_missing=columns_expected_missing,
+            structural_mismatch=True,
+            matched_columns_count=len(matched_columns),
+        )
+
     # --- 1. Columnas requeridas que ni siquiera están en el archivo ---
     # (esto se reporta una vez a nivel reporte, no fila por fila, porque
     # afecta a todas las filas igual)
@@ -143,8 +193,8 @@ def validate_dataframe(
                     column=col_name,
                     issue_type=format_issue.issue_type,
                     message=format_issue.message,
-                    current_value=value,
-                    suggested_fix=format_issue.suggested_fix,
+                    current_value=_to_native(value),
+                    suggested_fix=_to_native(format_issue.suggested_fix),
                     fix_is_automatic=format_issue.fix_is_automatic,
                 ))
 
@@ -161,7 +211,7 @@ def validate_dataframe(
                             f"'{value}' no existe como {comodel} en Odoo "
                             f"{schema.version} (ni en tu configuración, si la diste)"
                         ),
-                        current_value=value,
+                        current_value=_to_native(value),
                         suggested_fix=None,
                         fix_is_automatic=False,
                     ))
@@ -178,7 +228,7 @@ def validate_dataframe(
                             f"'{value}' no es una opción válida para '{col_name}'. "
                             f"Opciones válidas: {', '.join(selection_options)}"
                         ),
-                        current_value=value,
+                        current_value=_to_native(value),
                         suggested_fix=selection_options[0] if selection_options else None,
                         fix_is_automatic=False,
                     ))
@@ -192,4 +242,6 @@ def validate_dataframe(
         issues=issues,
         columns_seen=columns_seen,
         columns_expected_missing=columns_expected_missing,
+        structural_mismatch=False,
+        matched_columns_count=len(matched_columns),
     )

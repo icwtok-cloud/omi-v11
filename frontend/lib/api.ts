@@ -82,6 +82,8 @@ export interface ValidationReport {
   total_issues: number;
   columns_seen: string[];
   columns_expected_missing: string[];
+  structural_mismatch: boolean;
+  matched_columns_count: number;
   issues: ValidationIssue[];
   can_download: boolean;
 }

@@ -20,6 +20,8 @@ class ValidationReportResponse(BaseModel):
     total_issues: int
     columns_seen: list[str]
     columns_expected_missing: list[str]
+    structural_mismatch: bool = False
+    matched_columns_count: int = 0
     issues: list[dict]
     can_download: bool
 

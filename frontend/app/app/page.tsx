@@ -53,12 +53,15 @@ export default function HomePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingModules, setLoadingModules] = useState(true);
 
   useEffect(() => {
     if (!isSignedIn) return;
+    setLoadingModules(true);
     getAvailableCombinations(getToken)
       .then(setCombinations)
-      .catch(() => setError("No se pudieron cargar los módulos disponibles."));
+      .catch(() => setError("No se pudieron cargar los módulos disponibles."))
+      .finally(() => setLoadingModules(false));
   }, [isSignedIn, getToken]);
 
   const availableModules = Array.from(new Set(combinations.map((c) => c.module)));
@@ -152,21 +155,30 @@ export default function HomePage() {
                 </label>
                 <select
                   id="module-select"
-                  className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink"
+                  className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
                   value={selectedModule}
+                  disabled={loadingModules}
                   onChange={(e) => {
                     setSelectedModule(e.target.value);
                     setSelectedVersion("");
                     setSelectedCountry("");
                   }}
                 >
-                  <option value="">Elegí un módulo</option>
+                  <option value="">
+                    {loadingModules ? "Cargando módulos…" : "Elegí un módulo"}
+                  </option>
                   {availableModules.map((m) => (
                     <option key={m} value={m}>
                       {MODULE_LABELS[m] || m}
                     </option>
                   ))}
                 </select>
+                {loadingModules && (
+                  <p className="text-xs text-graphite mt-2">
+                    Esto puede tardar hasta un minuto la primera vez (el servidor
+                    estaba "dormido" y se está despertando).
+                  </p>
+                )}
               </div>
 
               <div>
