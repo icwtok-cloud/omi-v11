@@ -65,6 +65,9 @@ class ValidationReport:
     columns_expected_missing: list[str] = field(default_factory=list)
     structural_mismatch: bool = False
     matched_columns_count: int = 0
+    column_mapping: dict = field(default_factory=dict)
+    unmatched_columns: list[str] = field(default_factory=list)
+    preview_rows: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -74,6 +77,9 @@ class ValidationReport:
             "columns_expected_missing": self.columns_expected_missing,
             "structural_mismatch": self.structural_mismatch,
             "matched_columns_count": self.matched_columns_count,
+            "column_mapping": self.column_mapping,
+            "unmatched_columns": self.unmatched_columns,
+            "preview_rows": self.preview_rows,
             "issues": [
                 {
                     "row_index": i.row_index,
@@ -140,8 +146,21 @@ def validate_dataframe(
     # archivo perfecto.
     column_mapping = match_columns(columns_seen, list(fields_by_name.keys()))
     matched_columns = list(column_mapping.keys())
+    unmatched_columns = [c for c in columns_seen if c not in column_mapping]
     match_ratio = (len(matched_columns) / len(columns_seen)) if columns_seen else 0.0
     structural_mismatch = len(columns_seen) > 0 and match_ratio < 0.2
+
+    # Preview de las primeras filas reales del archivo, tal cual vinieron
+    # (no solo el reporte de errores) -- para que el usuario pueda
+    # confirmar visualmente que el mapeo de columnas tiene sentido antes
+    # de pagar, sea o no haya errores. Se muestra siempre, incluso en
+    # structural_mismatch, porque "ver qué se detectó" es justo lo que
+    # necesita alguien para decidir si tiene que cambiar de módulo o no.
+    preview_n = min(10, len(df))
+    preview_rows = [
+        {col: _to_native(row[col]) for col in columns_seen}
+        for _, row in df.head(preview_n).iterrows()
+    ]
 
     if structural_mismatch:
         # No tiene sentido seguir validando fila por fila: las columnas no
@@ -155,6 +174,9 @@ def validate_dataframe(
             columns_expected_missing=columns_expected_missing,
             structural_mismatch=True,
             matched_columns_count=len(matched_columns),
+            column_mapping=column_mapping,
+            unmatched_columns=unmatched_columns,
+            preview_rows=preview_rows,
         )
 
     # --- 1. Columnas requeridas que ni siquiera están en el archivo ---
@@ -247,4 +269,7 @@ def validate_dataframe(
         columns_expected_missing=columns_expected_missing,
         structural_mismatch=False,
         matched_columns_count=len(matched_columns),
+        column_mapping=column_mapping,
+        unmatched_columns=unmatched_columns,
+        preview_rows=preview_rows,
     )

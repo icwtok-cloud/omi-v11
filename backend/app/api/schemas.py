@@ -22,6 +22,9 @@ class ValidationReportResponse(BaseModel):
     columns_expected_missing: list[str]
     structural_mismatch: bool = False
     matched_columns_count: int = 0
+    column_mapping: dict[str, str] = {}
+    unmatched_columns: list[str] = []
+    preview_rows: list[dict] = []
     issues: list[dict]
     can_download: bool
 
