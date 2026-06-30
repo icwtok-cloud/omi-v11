@@ -10,6 +10,32 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-06-30 — Agrupamiento de issues por tipo+columna (UX con archivos grandes)
+
+**Problema:** con un archivo de 20.000 filas y un error de formato en
+la columna `phone` en todas las filas, el reporte mostraba 20.000
+`IssueRow` individuales en una lista plana — inutilizable, nadie puede
+leer eso ni decidir qué hacer.
+
+**Fix:** se reemplazó la lista plana por `IssueGroupList`, un componente
+nuevo dentro de `page.tsx` que agrupa los issues por `issue_type +
+column` antes de renderizar. Cada grupo muestra: tipo de error, columna,
+cantidad de filas afectadas, y estado del fix. Los detalles individuales
+se pueden ver colapsando/expandiendo el grupo.
+
+Para grupos de fixes manuales con `suggested_fix`, se agregó un botón
+"Aplicar a todas" que marca/desmarca todos los índices del grupo de una
+sola vez — sin tener que expandir y clickear fila por fila.
+
+**Regla para no repetirlo:**
+> Antes de renderizar una lista de longitud variable que depende de
+> datos del usuario, preguntarse: ¿qué pasa si son 20.000 ítems?
+> Si la respuesta es "se rompe la UX", agrupar o paginar antes de
+> mostrar. Un reporte de validación que el usuario no puede leer no
+> es un reporte — es ruido.
+
+---
+
 ## ⚠️ 2026-06-30 — CI ROTO desde hace 4 commits (sesión cortada, sin diagnosticar)
 
 **Detectado al final de la sesión, sin tiempo de diagnosticar -- primer
@@ -116,6 +142,32 @@ momento se actualiza a Python 3.10+, se puede sacar esa dependencia.
 marcar un fix, confirmar, pagar, descargar, abrir el CSV) -- los tests
 automáticos de hoy dan confianza en la lógica, pero no reemplazan
 probar el flujo completo con Clerk real en el browser.
+
+---
+
+## 2026-06-30 — Agrupamiento de issues por tipo+columna (UX con archivos grandes)
+
+**Problema:** con un archivo de 20.000 filas y un error de formato en
+la columna `phone` en todas las filas, el reporte mostraba 20.000
+`IssueRow` individuales en una lista plana — inutilizable, nadie puede
+leer eso ni decidir qué hacer.
+
+**Fix:** se reemplazó la lista plana por `IssueGroupList`, un componente
+nuevo dentro de `page.tsx` que agrupa los issues por `issue_type +
+column` antes de renderizar. Cada grupo muestra: tipo de error, columna,
+cantidad de filas afectadas, y estado del fix. Los detalles individuales
+se pueden ver colapsando/expandiendo el grupo.
+
+Para grupos de fixes manuales con `suggested_fix`, se agregó un botón
+"Aplicar a todas" que marca/desmarca todos los índices del grupo de una
+sola vez — sin tener que expandir y clickear fila por fila.
+
+**Regla para no repetirlo:**
+> Antes de renderizar una lista de longitud variable que depende de
+> datos del usuario, preguntarse: ¿qué pasa si son 20.000 ítems?
+> Si la respuesta es "se rompe la UX", agrupar o paginar antes de
+> mostrar. Un reporte de validación que el usuario no puede leer no
+> es un reporte — es ruido.
 
 ---
 
