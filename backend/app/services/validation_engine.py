@@ -24,6 +24,7 @@ import pandas as pd
 
 from app.services.rules_loader import RuleSchema
 from app.services import format_rules
+from app.services.column_matcher import match_columns
 
 
 def _to_native(value: object) -> object:
@@ -137,7 +138,8 @@ def validate_dataframe(
     # fila. Si casi ninguna columna matchea, es más probable que el
     # archivo no corresponda al módulo/versión elegidos que que sea un
     # archivo perfecto.
-    matched_columns = [c for c in columns_seen if c in fields_by_name]
+    column_mapping = match_columns(columns_seen, list(fields_by_name.keys()))
+    matched_columns = list(column_mapping.keys())
     match_ratio = (len(matched_columns) / len(columns_seen)) if columns_seen else 0.0
     structural_mismatch = len(columns_seen) > 0 and match_ratio < 0.2
 
@@ -162,10 +164,11 @@ def validate_dataframe(
     # --- 2. Validación fila por fila para las columnas que sí vinieron ---
     for row_idx, row in df.iterrows():
         for col_name in columns_seen:
-            if col_name not in fields_by_name:
-                continue  # columna que el usuario subió pero Odoo no usa en este modelo; no es un error, se ignora
+            mapped_field = column_mapping.get(col_name)
+            if mapped_field is None:
+                continue  # columna que el usuario subió pero no matchea ningún campo conocido (ni exacto, ni sinónimo, ni fuzzy); no es un error, se ignora
 
-            field_def = fields_by_name[col_name]
+            field_def = fields_by_name[mapped_field]
             value = row[col_name]
             is_empty = pd.isna(value) or (isinstance(value, str) and value.strip() == "")
 
