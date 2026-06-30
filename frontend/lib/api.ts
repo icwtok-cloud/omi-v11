@@ -157,3 +157,25 @@ export async function getPaymentStatus(
 export function downloadUrl(projectId: string): string {
   return `${API_BASE}/projects/${projectId}/download`;
 }
+
+export interface ManualFix {
+  row_index: number;
+  column: string;
+}
+
+export async function applyFixes(
+  getToken: GetToken,
+  projectId: string,
+  fixes: ManualFix[]
+): Promise<{ confirmed_manual_fixes: ManualFix[] }> {
+  const res = await authedFetch(`/projects/${projectId}/apply-fixes`, getToken, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fixes }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "No se pudieron guardar las correcciones");
+  }
+  return res.json();
+}

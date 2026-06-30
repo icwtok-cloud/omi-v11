@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { runValidation, ValidationReport } from "@/lib/api";
+import { runValidation, applyFixes, ValidationReport } from "@/lib/api";
 import { IssueRow } from "@/components/IssueRow";
 import { PaywallPanel } from "@/components/PaywallPanel";
 import { ColumnMappingTable } from "@/components/ColumnMappingTable";
 import { DataPreview } from "@/components/DataPreview";
+
+type ConfirmStatus = "idle" | "saving" | "saved" | "error";
 
 export default function ProjectPage() {
   const params = useParams<{ id: string }>();
@@ -17,6 +19,8 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [manualFixesApplied, setManualFixesApplied] = useState<Set<number>>(new Set());
+  const [confirmStatus, setConfirmStatus] = useState<ConfirmStatus>("idle");
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!params.id) return;
@@ -33,6 +37,27 @@ export default function ProjectPage() {
       else next.add(index);
       return next;
     });
+    // Cualquier cambio en la selección invalida una confirmación previa:
+    // el usuario tiene que volver a confirmar para que el backend
+    // guarde el set actualizado.
+    setConfirmStatus("idle");
+  }
+
+  async function handleConfirmFixes() {
+    if (!report) return;
+    setConfirmStatus("saving");
+    setConfirmError(null);
+    const fixes = Array.from(manualFixesApplied).map((idx) => ({
+      row_index: report.issues[idx].row_index,
+      column: report.issues[idx].column,
+    }));
+    try {
+      await applyFixes(getToken, report.project_id, fixes);
+      setConfirmStatus("saved");
+    } catch (e) {
+      setConfirmStatus("error");
+      setConfirmError(e instanceof Error ? e.message : "Error al guardar las correcciones");
+    }
   }
 
   if (loading) {
@@ -55,6 +80,9 @@ export default function ProjectPage() {
 
   const okRows = report.total_rows - new Set(report.issues.map((i) => i.row_index)).size;
   const autoFixable = report.issues.filter((i) => i.fix_is_automatic).length;
+  const hasManualFixableIssues = report.issues.some(
+    (i) => !i.fix_is_automatic && i.suggested_fix !== null && i.suggested_fix !== undefined
+  );
 
   if (report.structural_mismatch) {
     return (
@@ -86,7 +114,7 @@ export default function ProjectPage() {
 
         <DataPreview columns={report.columns_seen} rows={report.preview_rows} />
 
-        <a
+          <a
           href="/app"
           className="inline-block bg-ink text-paper rounded-full px-6 py-3 font-medium hover:opacity-90 transition-opacity"
         >
@@ -99,7 +127,7 @@ export default function ProjectPage() {
   return (
     <main className="min-h-screen px-6 md:px-12 py-10 max-w-4xl mx-auto">
       <header className="mb-8">
-        <a
+          <a
           href="/app"
           className="inline-block text-sm text-graphite hover:text-ink mb-4 transition-colors"
         >
@@ -141,7 +169,7 @@ export default function ProjectPage() {
 
       <DataPreview columns={report.columns_seen} rows={report.preview_rows} />
 
-      <section className="space-y-3 mb-12">
+      <section className="space-y-3 mb-6">
         {report.issues.map((issue, idx) => (
           <IssueRow
             key={idx}
@@ -156,6 +184,27 @@ export default function ProjectPage() {
           </p>
         )}
       </section>
+
+      {hasManualFixableIssues && (
+        <div className="mb-12 flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleConfirmFixes}
+            disabled={manualFixesApplied.size === 0 || confirmStatus === "saving"}
+            className="bg-ink text-paper rounded-full px-6 py-3 font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {confirmStatus === "saving" ? "Guardando..." : "Confirmar correcciones"}
+          </button>
+          {confirmStatus === "saved" && (
+            <span className="text-verify text-sm font-medium">
+              {manualFixesApplied.size}{" "}
+              {manualFixesApplied.size === 1 ? "corrección guardada" : "correcciones guardadas"}
+            </span>
+          )}
+          {confirmStatus === "error" && (
+            <span className="text-alert text-sm">{confirmError}</span>
+          )}
+        </div>
+      )}
 
       <PaywallPanel
         projectId={report.project_id}
