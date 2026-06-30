@@ -10,6 +10,59 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-06-30 — Matching de columnas: sinónimos en español + fuzzy (no más falsos "archivo ajeno")
+
+**Qué pasaba:** archivos 100% legítimos (ej. un export de Contactos con
+columnas como `Nombre`, `Empresa`, `Cargo`, `Email`) se marcaban como
+`structural_mismatch: true` ("este archivo no parece corresponder al
+módulo elegido"), bloqueando la descarga/pago de un archivo que en
+realidad era válido y tenía errores reales para corregir.
+
+**Causa real:** el `match_ratio` (ver bug #3 más abajo) comparaba las
+columnas del archivo contra `fields_by_name`, que usa los nombres
+**técnicos** de Odoo (`name`, `email`, `parent_id`, `function`...). El
+schema generado por rules-generator nunca trae el label en español de
+cada campo, solo el nombre técnico y a veces un `help_text`. Como casi
+ningún usuario sube un archivo con headers ya en inglés técnico de Odoo
+(`name` en vez de `Nombre`, `email` en vez de `Correo`), el matching
+literal daba 0% incluso en archivos perfectos, y el chequeo estructural
+del bug #3 — pensado para frenar archivos *realmente* ajenos — terminaba
+frenando archivos legítimos por una razón equivocada.
+
+**Fix:** se agregó `backend/app/services/column_matcher.py`, que mapea
+columna del archivo → campo técnico de Odoo en 3 niveles: (1) exact
+match contra el nombre técnico, (2) diccionario de sinónimos en español
+normalizado (sin acentos/mayúsculas: `Nombre`→`name`, `Correo`/`Mail`→
+`email`, `Empresa`→`parent_id`, `Cargo`→`function`, etc.), (3) fuzzy
+match (`difflib.SequenceMatcher`, umbral 0.82) como último recurso para
+variantes no previstas. `validate_dataframe()` ahora usa este mapeo
+tanto para calcular `match_ratio` como para la validación fila por fila
+— el campo técnico correcto se valida aunque el header venga en
+español, y el mensaje de error sigue mostrando el nombre de columna tal
+cual lo puso el usuario (no el técnico), para que tenga sentido en
+pantalla.
+
+**Ojo con el fuzzy match:** un sinónimo demasiado genérico puede
+colisionar con palabras no relacionadas por simple similitud de letras
+(ej. se probó con `"contacto"` como sinónimo de `name`, y matcheaba por
+error con la columna `"Contactado"` de un CRM, que es un concepto
+completamente distinto — "¿lo contactaron?" vs "nombre de la persona").
+Se sacó ese sinónimo. Cualquier sinónimo nuevo que se agregue a
+`FIELD_SYNONYMS` en `column_matcher.py` hay que probarlo contra
+columnas parecidas pero semánticamente distintas antes de confiarlo.
+
+**Regla para no repetirlo:**
+> El chequeo estructural (`match_ratio`, bug #3) solo es confiable si el
+> matching de columnas entiende variantes humanas/en español, no solo
+> nombres técnicos en inglés. Si agregás un campo nuevo a un schema de
+> `rules-generator/` y querés que el matching lo reconozca en archivos
+> reales, agregá también sus sinónimos en español a `FIELD_SYNONYMS` en
+> `column_matcher.py` — no asumas que el fuzzy match (nivel 3) lo va a
+> cubrir solo, el umbral es conservador a propósito para evitar falsos
+> positivos como el de `"Contactado"`/`"contacto"`.
+
+---
+
 ## 2026-06-30 — Tests de regresión + CI
 
 A partir de hoy, los 3 bugs principales del 2026-06-29 (botón sin texto,
