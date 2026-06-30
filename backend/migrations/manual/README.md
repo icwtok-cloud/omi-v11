@@ -1,8 +1,15 @@
-# Migraciones manuales
+# Migraciones manuales (legado)
 
-El repo no tiene Alembic inicializado todavía (deuda técnica conocida,
-ver CHANGELOG.md). Hasta que se inicialice, cualquier cambio de schema
-se corre a mano contra la base de Render vía psql, y se documenta acá
-como un archivo `.sql` numerado secuencialmente — para que quede
-registro de qué se corrió y cuándo, aunque no sea reproducible
-automáticamente todavía.
+⚠️ Esta carpeta queda como **archivo histórico** de los cambios de schema
+que se corrieron a mano por psql antes de tener Alembic. A partir de la
+migración `0001_baseline` (en `backend/alembic/versions/`), todo cambio
+de schema nuevo se hace con Alembic:
+
+```bash
+# después de cambiar un modelo en app/models/db_models.py
+alembic revision --autogenerate -m "descripción del cambio"
+alembic upgrade head
+```
+
+No se agregan más archivos `.sql` acá.
+
