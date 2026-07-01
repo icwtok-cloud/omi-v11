@@ -127,8 +127,69 @@ class TestEnsureCorrectedFileAplicaManualFixes:
         result_df = pd.read_csv(corrected_path)
 
         assert result_df.at[0, "email"] == "corregido@example.com"
-        # zero-retention: el original tiene que haberse borrado
-        assert not original.exists()
+        # El original YA NO se borra acá (ver CHANGELOG -- se borraba
+        # antes, pero eso rompía la regeneración del corregido cuando
+        # el usuario confirmaba nuevos fixes manuales después de la
+        # primera descarga). Tiene que seguir existiendo para poder
+        # regenerar el .corrected.csv si se invalida el cache.
+        assert original.exists()
+
+    def test_confirmar_un_nuevo_fix_invalida_el_corregido_ya_generado(
+        self, client, db_session, test_user, tmp_path
+    ):
+        """Regresión P0: mismo bug de fondo que el de re-subir un
+        archivo con el mismo nombre, pero disparado por el flujo de
+        fixes manuales. Si el usuario ya descargó una vez (generando
+        el .corrected.csv en disco) y DESPUÉS confirma un fix manual
+        nuevo vía POST /apply-fixes, la próxima vez que se pida el
+        corregido tiene que reflejar ese fix -- no servir en silencio
+        el .csv que había quedado cacheado de la descarga anterior."""
+        original = tmp_path / "contactos.csv"
+        df = pd.DataFrame(
+            {
+                "name": ["Juan Perez"],
+                "vat": ["20-12345678-9"],
+                "email": ["esto-no-es-un-email"],
+            }
+        )
+        df.to_csv(original, index=False)
+
+        project = _make_project(db_session, test_user.id)
+        module = _make_module(
+            db_session,
+            project,
+            storage_path=str(original),
+            validation_report={
+                "issues": [
+                    {
+                        "row_index": 0,
+                        "column": "email",
+                        "issue_type": "invalid_format",
+                        "message": "no parece un email válido",
+                        "current_value": "esto-no-es-un-email",
+                        "suggested_fix": "corregido@example.com",
+                        "fix_is_automatic": False,
+                    }
+                ]
+            },
+            confirmed_manual_fixes=None,  # todavía no confirmó nada
+        )
+
+        # 1ra "descarga" -- sin fix confirmado, el email queda tal cual.
+        first_corrected = _ensure_corrected_file(module, db_session)
+        assert pd.read_csv(first_corrected).at[0, "email"] == "esto-no-es-un-email"
+
+        # Confirma el fix manual DESPUÉS de que el .corrected.csv ya
+        # existe en disco -- esto es lo que antes no invalidaba el cache.
+        resp = client.post(
+            f"/projects/{project.id}/modules/{module.id}/apply-fixes",
+            json=[{"row_index": 0, "column": "email"}],
+        )
+        assert resp.status_code == 200
+
+        db_session.refresh(module)
+        second_corrected = _ensure_corrected_file(module, db_session)
+        assert pd.read_csv(second_corrected).at[0, "email"] == "corregido@example.com"
 
     def test_fix_manual_no_confirmado_no_se_aplica(self, db_session, test_user, tmp_path):
         """Si el usuario marcó el fix en pantalla pero nunca llamó a

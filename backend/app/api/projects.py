@@ -26,7 +26,7 @@ from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
@@ -35,7 +35,6 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.database import get_db, SessionLocal
-from app.core.safe_logging import log_event
 from app.models.db_models import (
     Project, ProjectModule, ProjectStatus, ModuleStatus, MAX_MODULES_PER_PROJECT, User,
 )
@@ -56,6 +55,12 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 UPLOAD_DIR = Path(settings.upload_storage_path)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Si una validación sigue "en curso" pasado este tiempo, se asume que
+# el proceso que la corría murió (deploy, OOM, crash) sin llegar a
+# actualizar el status -- ver get_validate_status(). Generoso a
+# propósito: un archivo de 150.000 filas puede tardar minutos.
+VALIDATION_STALE_MINUTES = 15
 
 
 @router.get("/available-combinations", response_model=list[AvailableCombination])
@@ -419,6 +424,26 @@ def get_validate_status(
     project = _get_owned_project(project_id, user, db)
     module = _get_project_module(project, module_id)
 
+    # Si el proceso de Render se reinicia (deploy, OOM, crash) mientras
+    # _run_validation_job corre en background, ese except nunca llega a
+    # ejecutarse -- el módulo queda en "validating" para siempre, sin
+    # ningún cron que lo detecte (no hay uno en este proyecto). Sin
+    # esto, el usuario solo veía un spinner infinito sin ninguna señal
+    # de que algo se rompió ni forma de saber que puede reintentar
+    # (re-POSTear /validate SÍ funciona -- el bug era que nada se lo
+    # decía). Se detecta acá, en el polling, en vez de con un job
+    # aparte: si sigue "validating" pasados VALIDATION_STALE_MINUTES,
+    # se lo marca "failed" con un mensaje claro.
+    if module.status == ModuleStatus.validating and module.validation_started_at:
+        elapsed = datetime.utcnow() - module.validation_started_at
+        if elapsed > timedelta(minutes=VALIDATION_STALE_MINUTES):
+            module.status = ModuleStatus.failed
+            module.validation_error = (
+                "La validación no terminó en el tiempo esperado -- puede haber "
+                "pasado un reinicio del servidor. Volvé a intentar la validación."
+            )
+            db.commit()
+
     return ModuleValidateStatusResponse(
         status=module.status.value,
         rows_processed=module.rows_processed or 0,
@@ -503,6 +528,20 @@ def apply_module_fixes(
 
     module.confirmed_manual_fixes = fixes
     db.commit()
+
+    # Mismo bug de fondo que el de re-subir un archivo con el mismo
+    # nombre (ver CHANGELOG): _ensure_corrected_file cachea el .csv
+    # corregido en disco y lo devuelve tal cual si ya existe. Si el
+    # usuario ya había descargado el proyecto una vez (generando el
+    # cache) y después vuelve a confirmar fixes manuales DISTINTOS,
+    # sin esto la próxima descarga seguía sirviendo el corregido viejo
+    # -- silenciosamente ignorando los nuevos fixes que el usuario
+    # acaba de confirmar. Se borra el cache acá para forzar que se
+    # regenere con los fixes actualizados en la próxima descarga.
+    stale_corrected = Path(module.storage_path).with_suffix(".corrected.csv")
+    if stale_corrected.exists():
+        stale_corrected.unlink()
+
     return {"confirmed_count": len(fixes)}
 
 
@@ -601,13 +640,18 @@ def _ensure_corrected_file(module: ProjectModule, db: Session) -> Path:
 
     df.to_csv(corrected_path, index=False)
 
-    # Zero-retention: el original ya no se necesita una vez generado el
-    # corregido -- nunca debe persistir indefinidamente en disco.
-    original_path = Path(module.storage_path)
-    if original_path.exists():
-        original_path.unlink()
-    log_event("file_destroyed", project_id=module.project_id, module_id=module.id)
-
+    # A diferencia de una versión anterior, ya NO se borra el archivo
+    # original acá. Antes se borraba apenas se generaba el corregido
+    # ("zero-retention"), pero eso rompía la regeneración: tanto
+    # re-subir un archivo con el mismo nombre como confirmar NUEVOS
+    # fixes manuales invalidan el `.corrected.csv` (ver upload_module y
+    # apply_module_fixes) para forzar que se regenere en la próxima
+    # descarga -- pero sin el original en disco, esa regeneración
+    # fallaba con `FileNotFoundError` en vez de servir los datos
+    # correctos. Mantener el original vivo mientras el módulo exista es
+    # el precio de poder corregir esos bugs de datos correctamente; la
+    # limpieza de archivos abandonados (proyectos nunca descargados)
+    # queda como tarea de limpieza programada aparte, no acá.
     return corrected_path
 
 

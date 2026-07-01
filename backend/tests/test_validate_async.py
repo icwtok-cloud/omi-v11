@@ -85,3 +85,53 @@ class TestValidateAsync:
 
         assert status["status"] == "failed"
         assert status["error"] is not None
+
+    def test_validating_atascado_pasado_el_timeout_se_marca_failed(
+        self, client, db_session
+    ):
+        """Regresión P1: si el proceso muere (deploy, OOM) mientras un
+        módulo está 'validating', antes quedaba trabado ahí para
+        siempre -- el usuario solo veía un spinner infinito, sin señal
+        de error ni indicación de que podía reintentar. Simula ese
+        estado (started_at viejo) y confirma que el polling lo detecta
+        y lo pasa a failed con un mensaje claro."""
+        from datetime import datetime, timedelta
+        from app.models.db_models import ProjectModule, ModuleStatus
+
+        project_id, module_id = _create_module(client)
+
+        module = (
+            db_session.query(ProjectModule).filter(ProjectModule.id == module_id).first()
+        )
+        module.status = ModuleStatus.validating
+        module.validation_started_at = datetime.utcnow() - timedelta(minutes=30)
+        db_session.commit()
+
+        status = client.get(
+            f"/projects/{project_id}/modules/{module_id}/validate-status"
+        ).json()
+
+        assert status["status"] == "failed"
+        assert "reinicio" in status["error"] or "tiempo" in status["error"]
+
+    def test_validating_reciente_no_se_marca_failed(self, client, db_session):
+        """No hay que ser agresivo con el timeout -- una validación
+        recién arrancada (o un archivo grande que legítimamente tarda)
+        no debe marcarse como fallida antes de tiempo."""
+        from datetime import datetime, timedelta
+        from app.models.db_models import ProjectModule, ModuleStatus
+
+        project_id, module_id = _create_module(client)
+
+        module = (
+            db_session.query(ProjectModule).filter(ProjectModule.id == module_id).first()
+        )
+        module.status = ModuleStatus.validating
+        module.validation_started_at = datetime.utcnow() - timedelta(minutes=2)
+        db_session.commit()
+
+        status = client.get(
+            f"/projects/{project_id}/modules/{module_id}/validate-status"
+        ).json()
+
+        assert status["status"] == "validating"

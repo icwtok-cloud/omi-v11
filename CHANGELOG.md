@@ -8,6 +8,54 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — BUG P0: confirmar nuevos fixes manuales no invalidaba el corregido ya descargado + validaciones atascadas para siempre si el proceso se reinicia
+
+**P0 -- mismo bug de fondo que el de re-subir con el mismo nombre,
+esta vez disparado por el flujo de fixes manuales:** `apply_module_fixes`
+(`backend/app/api/projects.py`) guardaba `confirmed_manual_fixes` en
+la DB pero nunca invalidaba el `.corrected.csv` ya generado en disco.
+Secuencia real: validar → descargar (genera el cache) → volver y
+confirmar un fix manual NUEVO vía "Aplicar fix" → descargar de nuevo
+→ la segunda descarga servía en silencio el corregido VIEJO, sin el
+fix que el usuario acababa de confirmar. **Verificado que el test de
+regresión falla sin el fix** (revirtiendo el cambio temporalmente).
+
+**Fix, en dos partes:**
+1. `apply_module_fixes` ahora borra el `.corrected.csv` cacheado (si
+   existe) al confirmar fixes, igual que ya hacía `upload_module` al
+   re-subir.
+2. Esto exponía un problema más de fondo: `_ensure_corrected_file`
+   borraba el archivo ORIGINAL apenas generaba el corregido por primera
+   vez ("zero-retention"). Sin el original, invalidar el cache no
+   alcanzaba -- la regeneración fallaba con `FileNotFoundError` en vez
+   de servir los datos correctos. Se deja de borrar el original: ahora
+   persiste mientras el módulo exista, para que siempre se pueda
+   regenerar el corregido con los fixes más recientes. La limpieza de
+   archivos de proyectos abandonados (nunca descargados) queda como
+   tarea de limpieza programada aparte (backlog P2 -- no existe hoy
+   ningún cron de limpieza en este proyecto).
+
+**P1 -- validación trabada para siempre si el proceso se reinicia:**
+si Render reinicia/redeploya el proceso web mientras
+`_run_validation_job` corre en background (un archivo grande puede
+tardar minutos), el `except` que marca `status=failed` nunca llega a
+ejecutarse -- el módulo quedaba en "validating" indefinidamente, sin
+ningún cron que lo detecte, y el usuario solo veía un spinner infinito
+sin ninguna señal de error. Fix: `GET .../validate-status` ahora
+detecta si `validating` lleva más de 15 minutos desde
+`validation_started_at` y lo marca `failed` con un mensaje claro -- el
+frontend ya tenía un botón "Reintentar" para el estado `failed` (y
+otro por estancamiento del lado del cliente a los 10'), así que esto
+cierra el círculo sin tocar nada del lado del frontend.
+
+**Tests:** `test_confirmar_un_nuevo_fix_invalida_el_corregido_ya_generado`
+(`test_apply_fixes.py`, verificado que falla sin el fix),
+`test_validating_atascado_pasado_el_timeout_se_marca_failed` y
+`test_validating_reciente_no_se_marca_failed` (`test_validate_async.py`).
+96/96 backend pasan.
+
+**Rollback:** sin cambios de schema -- no aplica rollback de Alembic.
+
 ## 2026-07-01 — BUG P0: re-subir un archivo con el mismo nombre podía servir datos VIEJOS en la descarga + duplicados no detectaban mayúsculas/espacios
 
 **P0 -- corrupción de datos silenciosa, el más serio encontrado en toda
