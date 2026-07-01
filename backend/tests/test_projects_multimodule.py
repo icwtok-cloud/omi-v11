@@ -15,6 +15,14 @@ import pandas as pd
 
 CONTACTOS_CSV = "name,vat,email\nJuan Perez,20-12345678-9,juan@x.com\n"
 CRM_CSV = "name\nOportunidad 1\n"
+# Caso real reportado en producción: export de Odoo v14 con ";" como
+# separador (típico de Excel en configuración regional es-AR/es-ES) y un
+# valor con una coma adentro ("Cliente, VIP") -- con sep="," a secas,
+# pandas rompe con ParserError ("Expected N fields, saw N+1").
+CONTACTOS_SEMICOLON_CSV = (
+    "name;vat;email;Etiquetas\n"
+    "Juan Perez;20-12345678-9;juan@x.com;Cliente, VIP\n"
+)
 
 
 def _upload_module(
@@ -145,6 +153,28 @@ class TestPaisSeFijaAlAgregarUnModuloQueLoNecesita:
         # no hace falta mandarlo de nuevo.
         resp = _upload_module(client, project_id, "contactos", CONTACTOS_CSV)
         assert resp.status_code == 200
+
+
+class TestArchivoConSeparadorPuntoYComa:
+    """Reproduce un bug real reportado en producción: un export legítimo
+    de Odoo v14 (CSV con ';' como separador, típico de Excel en
+    configuración regional es-AR/es-ES) rompía con un 500 sin mensaje
+    claro -- pandas asumía ',' como separador y un valor con una coma
+    adentro ("Cliente, VIP") lo hacía fallar con ParserError."""
+
+    def test_archivo_con_punto_y_coma_se_valida_correctamente(self, client):
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+        module = _upload_module(
+            client, project_id, "contactos", CONTACTOS_SEMICOLON_CSV
+        ).json()
+
+        resp = client.post(
+            f"/projects/{project_id}/modules/{module['module_id']}/validate"
+        )
+        assert resp.status_code == 200
+        assert resp.json()["total_rows"] == 1
 
 
 class TestValidacionYReportePorModulo:

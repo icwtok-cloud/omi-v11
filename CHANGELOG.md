@@ -10,6 +10,68 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-06-30 — "Failed to fetch" con un CSV real de Odoo v14 (separador ';')
+
+**Síntoma reportado por el usuario:** subir un export real de contactos
+de Odoo v14 (`;` como separador, típico de un CSV guardado desde Excel
+en configuración regional es-AR/es-ES) hacía que la pantalla del
+proyecto mostrara literalmente "Failed to fetch" -- sin ningún mensaje
+útil, ni siquiera el genérico. La pregunta correcta del usuario: "¿es
+realmente incompatible? es un CSV real de Odoo, debería ser de los más
+compatibles" -- la respuesta es que el archivo estaba perfecto, el bug
+era nuestro.
+
+**Causa raíz, dos bugs distintos apilados:**
+
+1. `_read_tabular_file()` en `backend/app/api/projects.py` siempre
+   asumía `sep=","` para CSV. Este archivo usa `;` (y tiene un valor con
+   una coma adentro, la etiqueta `"Cliente, VIP"`), así que pandas
+   rompía con `pandas.errors.ParserError: Expected N fields, saw N+1` --
+   una excepción NO atrapada en ningún lado.
+2. Esa excepción no atrapada llegaba a `unhandled_exception_handler`
+   (`backend/app/core/error_handling.py`), que ya devolvía un JSON
+   prolijo con `support_id`... pero Starlette registra los handlers de
+   `add_exception_handler(Exception, ...)` en `ServerErrorMiddleware`,
+   que queda **por fuera** de `CORSMiddleware`. Esa respuesta nunca
+   llevaba el header `Access-Control-Allow-Origin`, así que el
+   navegador la bloqueaba antes de que el frontend pudiera leer nada --
+   de ahí el "Failed to fetch" genérico tapando un mensaje que en
+   realidad estaba bien escrito.
+
+**Fix:**
+
+- `_read_tabular_file()` ahora sniffea el separador real con
+  `csv.Sniffer()` sobre una muestra del archivo (`_detect_csv_separator()`),
+  en vez de asumir `,` siempre -- soporta `,`, `;`, tab y `|`. Cualquier
+  error de parseo restante (`ParserError`, `UnicodeDecodeError`,
+  `ValueError`) se envuelve en un `HTTPException(400, ...)` con un
+  mensaje accionable ("revisá que todas las filas tengan la misma
+  cantidad de columnas... probá guardarlo como CSV UTF-8"), en vez de
+  dejarlo propagar como 500 sin explicación.
+- `unhandled_exception_handler()` ahora setea `Access-Control-Allow-Origin`
+  y `Access-Control-Allow-Credentials` a mano en la respuesta, porque
+  `CORSMiddleware` nunca la toca. Esto es una corrección general -- de
+  ahora en más, CUALQUIER excepción no prevista (no solo esta) va a
+  llegarle al frontend como un mensaje legible en vez de "Failed to
+  fetch".
+
+**Tests:** `test_projects_multimodule.py::TestArchivoConSeparadorPuntoYComa`
+(1 caso, con el mismo patrón del archivo real reportado). 36/36 tests
+pasan.
+
+**Regla para no repetirlo:**
+> "Failed to fetch" en el navegador casi nunca significa "no se pudo
+> conectar" -- en este stack, con CORS configurado, generalmente
+> significa que el backend devolvió un error sin headers de CORS (o
+> crasheó antes de que el middleware corriera). Si aparece ese mensaje
+> genérico, lo primero es mirar los logs de Render buscando un
+> `UNHANDLED support_id=...`, no asumir un problema de red. Y antes de
+> asumir que un archivo real del cliente "no es compatible", probarlo
+> literalmente con el parser (pandas) antes que con hipótesis -- este
+> archivo era 100% válido, el bug estaba en la asunción de separador.
+
+---
+
 ## ⚠️ 2026-06-30 — Rediseño de schema: Project como contenedor multi-módulo
 
 **Contexto:** Fase 2 del roadmap de sesión. Antes, 1 Project = 1 archivo

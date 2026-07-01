@@ -19,6 +19,7 @@ Project, no por módulo individual.
 
 from __future__ import annotations
 
+import csv
 import uuid
 import zipfile
 from io import BytesIO
@@ -59,16 +60,46 @@ def get_available_combinations():
     return list_available_combinations()
 
 
+def _detect_csv_separator(path: Path) -> str:
+    """Muchos exports LatAm (sobre todo Excel guardado con configuración
+    regional es-AR/es-ES, donde "," es el separador decimal) usan ";" como
+    separador de columnas en vez de ",". Si asumimos "," siempre, un valor
+    con una coma adentro (ej. la etiqueta "Cliente, VIP" de un export real
+    de Odoo) rompe el parseo con "Expected N fields, saw N+1" -- justo el
+    caso de un archivo perfectamente válido que terminaba pareciendo
+    corrupto. Se sniffea el separador real de una muestra del archivo en
+    vez de asumirlo, sin perder la velocidad del engine C de pandas."""
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        sample = f.read(4096)
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+        return dialect.delimiter
+    except csv.Error:
+        return ","  # fallback: el default de siempre
+
+
 def _read_tabular_file(path: Path, original_filename: str) -> pd.DataFrame:
     suffix = Path(original_filename).suffix.lower()
-    if suffix == ".csv":
-        return pd.read_csv(path)
-    elif suffix in (".xlsx", ".xls"):
-        return pd.read_excel(path)
-    else:
+    try:
+        if suffix == ".csv":
+            return pd.read_csv(path, sep=_detect_csv_separator(path))
+        elif suffix in (".xlsx", ".xls"):
+            return pd.read_excel(path)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Formato '{suffix}' no soportado. Usá CSV o Excel (.xlsx).",
+            )
+    except HTTPException:
+        raise
+    except (pd.errors.ParserError, UnicodeDecodeError, ValueError) as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Formato '{suffix}' no soportado. Usá CSV o Excel (.xlsx).",
+            detail=(
+                "No pudimos leer tu archivo -- revisá que todas las filas "
+                "tengan la misma cantidad de columnas. Si lo exportaste "
+                "desde Excel, probá guardarlo de nuevo como 'CSV UTF-8'."
+            ),
         )
 
 

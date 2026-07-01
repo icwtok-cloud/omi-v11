@@ -15,6 +15,7 @@ import uuid
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from app.core.config import settings
 from app.core.safe_logging import logger
 
 
@@ -31,7 +32,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         f"exc_type={type(exc).__name__}\n{traceback.format_exc()}"
     )
 
-    return JSONResponse(
+    response = JSONResponse(
         status_code=500,
         content={
             "error": "internal_error",
@@ -39,3 +40,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             "support_id": support_id,
         },
     )
+    # Los handlers registrados con add_exception_handler(Exception, ...)
+    # corren en ServerErrorMiddleware, que Starlette monta POR FUERA de
+    # CORSMiddleware -- esta respuesta nunca pasa por CORSMiddleware, así
+    # que sin este header el navegador la bloquea antes de que el frontend
+    # pueda leer el mensaje (fetch() falla con "Failed to fetch" genérico,
+    # tapando el mensaje bien armado de arriba). Hay que setearlo a mano acá.
+    response.headers["Access-Control-Allow-Origin"] = settings.frontend_url
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
