@@ -29,6 +29,20 @@ export interface AvailableCombination {
   country: string | null; // null = módulo sin variación por país
 }
 
+export interface UserMe {
+  free_project_used: boolean;
+  has_active_subscription: boolean;
+  subscription_expires_at: string | null;
+  monthly_export_count: number;
+  monthly_export_limit: number;
+}
+
+export async function getUserMe(getToken: GetToken): Promise<UserMe> {
+  const res = await authedFetch("/users/me", getToken);
+  if (!res.ok) throw new Error("No se pudo cargar tu información de cuenta");
+  return res.json();
+}
+
 export async function getAvailableCombinations(
   getToken: GetToken
 ): Promise<AvailableCombination[]> {

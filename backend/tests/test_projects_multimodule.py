@@ -38,6 +38,16 @@ def _upload_module(
     )
 
 
+def _use_up_free_tier(db_session, test_user):
+    """Estos tests validan la acumulación de módulos / el tope de 8 / la
+    descarga en sí -- no la Fase 3 (cuota gratis de 1 módulo). Marcar
+    free_project_used=True de entrada evita que el tope del proyecto
+    gratis (ver TestCuotaFaseTres) interfiera con lo que estos tests
+    quieren probar."""
+    test_user.free_project_used = True
+    db_session.commit()
+
+
 class TestCrearProyectoYModulos:
     def test_crear_proyecto_vacio(self, client):
         resp = client.post("/projects", json={"odoo_version": "15.0", "odoo_country": "ar"})
@@ -57,7 +67,8 @@ class TestCrearProyectoYModulos:
         assert body["odoo_module"] == "contactos"
         assert body["status"] == "uploaded"
 
-    def test_acumular_dos_modulos_sin_perder_el_primero(self, client):
+    def test_acumular_dos_modulos_sin_perder_el_primero(self, client, db_session, test_user):
+        _use_up_free_tier(db_session, test_user)
         project_id = client.post(
             "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
         ).json()["project_id"]
@@ -69,7 +80,8 @@ class TestCrearProyectoYModulos:
         modules = {m["odoo_module"] for m in summary["modules"]}
         assert modules == {"contactos", "crm"}
 
-    def test_tope_de_8_modulos(self, client):
+    def test_tope_de_8_modulos(self, client, db_session, test_user):
+        _use_up_free_tier(db_session, test_user)
         project_id = client.post(
             "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
         ).json()["project_id"]
@@ -132,7 +144,10 @@ class TestPaisSeFijaAlAgregarUnModuloQueLoNecesita:
         assert resp.status_code == 400
         assert "país" in resp.json()["detail"]
 
-    def test_agregar_modulo_country_scoped_con_pais_fija_el_pais_del_proyecto(self, client):
+    def test_agregar_modulo_country_scoped_con_pais_fija_el_pais_del_proyecto(
+        self, client, db_session, test_user
+    ):
+        _use_up_free_tier(db_session, test_user)
         project_id = client.post(
             "/projects", json={"odoo_version": "15.0", "odoo_country": None}
         ).json()["project_id"]
@@ -203,6 +218,7 @@ class TestDescargaMultiModulo:
     ):
         from app.models.db_models import Project, ProjectStatus
 
+        _use_up_free_tier(db_session, test_user)
         project_id = client.post(
             "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
         ).json()["project_id"]
@@ -226,7 +242,12 @@ class TestDescargaMultiModulo:
         names = set(zf.namelist())
         assert names == {"contactos_corregido.csv", "crm_corregido.csv"}
 
-    def test_download_sin_pagar_devuelve_402(self, client):
+    def test_download_sin_pagar_devuelve_402(self, client, db_session, test_user):
+        # Este test prueba el bloqueo real de pago -- si fuera el
+        # primer proyecto de una cuenta nueva, la descarga sería gratis
+        # (ver TestCuotaFaseTres), así que hay que simular que la cuenta
+        # ya gastó su proyecto gratis para llegar al caso "sin pagar".
+        _use_up_free_tier(db_session, test_user)
         project_id = client.post(
             "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
         ).json()["project_id"]

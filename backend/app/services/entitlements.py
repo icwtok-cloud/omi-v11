@@ -15,6 +15,17 @@ from app.models.db_models import Payment, PaymentType, Project, ProjectStatus, U
 
 SUBSCRIPTION_DURATION_DAYS = 30
 
+# Tope de módulos del proyecto gratis -- 1 módulo, para poder probar que
+# la plataforma funciona de verdad antes de pagar. Se enforce en
+# app/api/projects.py (upload_module), no acá.
+FREE_TIER_MODULE_LIMIT = 1
+
+# Tope de proyectos EXPORTADOS por mes calendario para la suscripción --
+# ya no es "ilimitado" como antes de la Fase 3. Se resetea el día 1 de
+# cada mes (ver reset_monthly_counter_if_needed), no 30 días rodantes
+# desde que se suscribió (más simple de explicar y de implementar).
+SUBSCRIPTION_MONTHLY_EXPORT_LIMIT = 5
+
 
 def apply_payment_confirmation(db: Session, payment: Payment) -> None:
     if payment.payment_type == PaymentType.per_project:
@@ -58,3 +69,43 @@ def user_can_download(db: Session, project: Project) -> bool:
             return True
 
     return False
+
+
+def reset_monthly_counter_if_needed(user: User) -> None:
+    """Resetea monthly_export_count si cruzamos a un mes calendario
+    nuevo desde el último reset. No hace commit -- el caller es
+    responsable de persistir junto con el resto de los cambios de la
+    misma operación (ver can_export_project / el endpoint de download)."""
+    now = datetime.utcnow()
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if user.monthly_export_reset_at is None or user.monthly_export_reset_at < current_month_start:
+        user.monthly_export_count = 0
+        user.monthly_export_reset_at = current_month_start
+
+
+def can_export_project(db: Session, user: User, project: Project) -> tuple[bool, str | None]:
+    """Decide si ESTE export específico está permitido, y por qué vía
+    (proyecto pagado puntual / proyecto gratis / cuota de suscripción).
+    No incrementa ningún contador -- eso lo hace el caller (el endpoint
+    de download) recién si el export efectivamente se concreta, en el
+    mismo commit que el resto de sus side-effects (atómico, evita doble
+    conteo en un retry). Devuelve (permitido, mensaje_de_error_si_no)."""
+    if project.status == ProjectStatus.paid:
+        return True, None  # ya pagó este proyecto puntual -- exportes ilimitados de ESE proyecto
+
+    is_users_first_project = (
+        db.query(Project).filter(Project.owner_id == user.id).count() == 1
+    )
+    if not user.free_project_used and is_users_first_project and project.owner_id == user.id:
+        return True, None  # usa su proyecto gratis (1 vez por cuenta)
+
+    reset_monthly_counter_if_needed(user)
+    if user.has_active_subscription and user.subscription_expires_at and user.subscription_expires_at > datetime.utcnow():
+        if user.monthly_export_count < SUBSCRIPTION_MONTHLY_EXPORT_LIMIT:
+            return True, None
+        return False, (
+            f"Llegaste al límite de {SUBSCRIPTION_MONTHLY_EXPORT_LIMIT} "
+            "proyectos exportados este mes con tu suscripción."
+        )
+
+    return False, "Necesitás pagar este proyecto o tener una suscripción activa para descargarlo."

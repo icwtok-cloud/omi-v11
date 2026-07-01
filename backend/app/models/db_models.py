@@ -39,6 +39,19 @@ class User(Base):
     has_active_subscription = Column(Boolean, default=False)
     subscription_expires_at = Column(DateTime, nullable=True)
 
+    # Cuota gratis: se consume UNA sola vez, en el primer proyecto de la
+    # cuenta (ver can_export_project() en entitlements.py) -- 1 módulo,
+    # reporte + descarga incluidos, para poder probar que la plataforma
+    # funciona de verdad antes de pagar.
+    free_project_used = Column(Boolean, default=False)
+
+    # Cuota de suscripción: hasta 5 proyectos EXPORTADOS por mes
+    # calendario (no ilimitado). Se resetea comparando la fecha actual
+    # contra monthly_export_reset_at -- ver
+    # entitlements.reset_monthly_counter_if_needed().
+    monthly_export_count = Column(Integer, default=0)
+    monthly_export_reset_at = Column(DateTime, nullable=True)
+
     projects = relationship("Project", back_populates="owner")
     payments = relationship("Payment", back_populates="user")
 

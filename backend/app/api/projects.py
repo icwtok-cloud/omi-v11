@@ -39,7 +39,9 @@ from app.models.db_models import (
 )
 from app.services.rules_loader import load_rule_schema, list_available_combinations
 from app.services.validation_engine import validate_dataframe
-from app.services.entitlements import user_can_download
+from app.services.entitlements import (
+    user_can_download, can_export_project, FREE_TIER_MODULE_LIMIT,
+)
 from app.api.schemas import (
     ValidationReportResponse, AvailableCombination, ProjectCreateRequest,
     ProjectCreateResponse, ProjectSummaryResponse, ModuleSummaryResponse,
@@ -222,6 +224,25 @@ async def upload_module(
             detail=f"Este proyecto ya tiene el máximo de {MAX_MODULES_PER_PROJECT} módulos.",
         )
 
+    # Tope del proyecto gratis: 1 módulo. Se aplica solo si este es el
+    # proyecto elegible como gratis del usuario (su primer proyecto, y
+    # todavía no gastó su cuota gratis) -- si ya pagó algo o tiene
+    # suscripción, este chequeo ni se activa (el cobro real es al
+    # exportar, ver can_export_project(), esto es solo el tope
+    # intrínseco a qué significa "gratis").
+    if existing is None and not user.free_project_used:
+        is_users_first_project = (
+            db.query(Project).filter(Project.owner_id == user.id).count() == 1
+        )
+        if is_users_first_project and len(project.modules) >= FREE_TIER_MODULE_LIMIT:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Tu proyecto de prueba gratis permite un solo módulo -- "
+                    "pagá para agregar más."
+                ),
+            )
+
     module_id = existing.id if existing else str(uuid.uuid4())
     storage_path = UPLOAD_DIR / f"{project.id}_{module_id}_{file.filename}"
     storage_path.write_bytes(contents)
@@ -338,11 +359,9 @@ def download_project(
 ):
     project = _get_owned_project(project_id, user, db)
 
-    if not user_can_download(db, project):
-        raise HTTPException(
-            status_code=402,  # Payment Required
-            detail="Necesitás pagar este proyecto o tener una suscripción activa para descargarlo",
-        )
+    allowed, err = can_export_project(db, user, project)
+    if not allowed:
+        raise HTTPException(status_code=402, detail=err)  # Payment Required
 
     validated_modules = [m for m in project.modules if m.validation_report]
     if not validated_modules:
@@ -355,6 +374,22 @@ def download_project(
             zf.write(corrected_path, arcname=f"{module.odoo_module}_corregido.csv")
 
     zip_buffer.seek(0)
+
+    # El contador se incrementa EXACTAMENTE acá, en el mismo commit que
+    # el cambio de estado del proyecto -- atómico, evita doble conteo si
+    # el cliente reintenta la request. Solo cuenta si este export no
+    # estaba ya cubierto por un pago puntual (esos son ilimitados para
+    # SU proyecto). Misma condición que can_export_project(), en el
+    # mismo orden, para no divergir de lo que ya se autorizó arriba.
+    if project.status != ProjectStatus.paid:
+        is_users_first_project = (
+            db.query(Project).filter(Project.owner_id == user.id).count() == 1
+        )
+        if not user.free_project_used and is_users_first_project:
+            user.free_project_used = True
+        else:
+            user.monthly_export_count += 1
+
     project.status = ProjectStatus.exported
     db.commit()
 

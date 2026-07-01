@@ -57,6 +57,14 @@ class ValidationReportResponse(BaseModel):
     can_download: bool
 
 
+class UserMeResponse(BaseModel):
+    free_project_used: bool
+    has_active_subscription: bool
+    subscription_expires_at: str | None = None
+    monthly_export_count: int
+    monthly_export_limit: int
+
+
 class PaymentStartRequest(BaseModel):
     payment_type: str  # "per_project" | "subscription"
     network: str        # "polygon" | "base"

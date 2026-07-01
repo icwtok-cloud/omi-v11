@@ -10,6 +10,86 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-06-30 — Fase 3: nuevos tiers de precio + cuota aplicada al exportar
+
+**Qué cambia:** antes había dos planes (por proyecto $99, mensual $149
+"ilimitado"). Ahora hay tres:
+
+- **Gratis**: 1 proyecto, 1 módulo, reporte + descarga incluidos, una
+  vez por cuenta -- para poder probar que la plataforma funciona de
+  verdad antes de pagar.
+- **Por proyecto ($99)**: sin cambios en el precio, pero ahora cubre
+  hasta 8 módulos del mismo proyecto (consistente con el rediseño
+  multi-módulo de la Fase 2).
+- **Mensual ($149)**: ya NO es ilimitado -- hasta 5 proyectos
+  exportados por mes calendario.
+
+**Regla de negocio clave**: el cobro/cuota se aplica exactamente al
+EXPORTAR (descargar), no al crear un proyecto ni al validar módulos --
+el usuario puede subir y re-validar libremente sin gastar nada de su
+cuota.
+
+**Schema** (migración `0003_add_user_quota_fields.py`, aditiva, probada
+contra Postgres local igual que la 0002 -- ciclo completo
+upgrade→downgrade→upgrade limpio): `User` gana `free_project_used`
+(bool), `monthly_export_count` (int) y `monthly_export_reset_at`
+(datetime).
+
+**Lógica** (`backend/app/services/entitlements.py`):
+- `can_export_project(db, user, project)` decide si ESTE export
+  específico está permitido y por qué vía (proyecto ya pagado /
+  proyecto gratis / cuota de suscripción), sin incrementar nada --
+  el incremento real lo hace `GET /projects/{id}/download` en el mismo
+  commit que el cambio de estado del proyecto (atómico, evita doble
+  conteo en un retry).
+- `reset_monthly_counter_if_needed(user)` resetea el contador al cruzar
+  a un mes calendario nuevo (no 30 días rodantes desde que se
+  suscribió -- más simple de explicar y de implementar).
+- Regla del "proyecto gratis": es automáticamente el primer proyecto de
+  la cuenta (`count() == 1`), sin que el usuario elija nada explícito.
+  Un segundo proyecto NO es gratis aunque la cuota nunca se haya usado.
+- Tope de 1 módulo en el proyecto gratis, enforced en
+  `POST /projects/{id}/modules` -- deja de aplicar en cuanto
+  `free_project_used` pasa a `True` (ya no tiene sentido limitarlo, el
+  usuario paga o se suscribe para seguir agregando módulos a ESE
+  proyecto).
+
+**Nuevo endpoint** `GET /users/me` (`backend/app/api/users.py`):
+`{free_project_used, has_active_subscription, subscription_expires_at,
+monthly_export_count, monthly_export_limit}` -- para que el frontend
+sepa qué mostrar en el paywall sin duplicar la lógica de entitlements.
+
+**Frontend**: `PaywallPanel.tsx` agrega una tercera opción "Gratis · 1
+módulo" (visible solo si `!free_project_used`) que salta directo a la
+descarga sin pasar por USDC. La landing (`app/page.tsx`) muestra las 3
+cards de precio, con el copy de "Mensual" corregido (ya no dice
+"ilimitado").
+
+**Gap encontrado y anotado para después (no arreglado en esta sesión,
+para no mezclar scope)**: un usuario con suscripción activa y cuota
+disponible sigue viendo la pantalla de pago con USDC en vez de poder
+descargar directo -- el backend ya lo autorizaría, el frontend todavía
+no lo consulta antes de mostrar el flujo de pago. Ver chip de tarea
+spawneado en la sesión (`PaywallPanel no salta el pago para
+suscriptores con cuota`).
+
+**Tests**: `test_entitlements_quota.py` (14 casos nuevos: reset
+mensual, las 4 ramas de `can_export_project`, tope de módulo gratis,
+que un pago puntual no incremente ningún contador). Actualizados
+`test_projects_multimodule.py` (5 tests que acumulaban módulos sin
+pagar ahora simulan explícitamente que ya se usó la cuota gratis, ya
+que testean otra cosa). 51/51 tests pasan.
+
+**Regla para no repetirlo:**
+> Cuando se agrega un tope nuevo (como el de 1 módulo del proyecto
+> gratis acá), revisar qué tests existentes asumían el comportamiento
+> viejo ("todo gratis, sin límite") -- van a fallar de golpe y hay que
+> decidir, test por test, si el test necesita simular el estado
+> "ya gasté mi cuota" (porque prueba otra cosa) o si el test en
+> realidad está probando el tope nuevo y hay que dejarlo como está.
+
+---
+
 ## 2026-06-30 — Falso positivo de "faltan columnas obligatorias" + sin vista previa en el reporte
 
 **Síntomas reportados por el usuario (2 en la misma captura):**

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.error_handling import unhandled_exception_handler
-from app.api import projects, payments, webhooks
+from app.api import projects, payments, webhooks, users
 
 # El schema de la base ahora lo maneja Alembic (ver alembic/), no la app.
 # - En Render, el startCommand corre `alembic upgrade head` antes de
@@ -32,6 +32,7 @@ app.add_middleware(
 app.include_router(projects.router)
 app.include_router(payments.router)
 app.include_router(webhooks.router)
+app.include_router(users.router)
 
 
 @app.get("/health")

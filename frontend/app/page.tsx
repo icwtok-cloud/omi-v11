@@ -221,11 +221,28 @@ export default function LandingPage() {
             USDC en Polygon o Base, directo desde tu wallet. Sin tarjeta, sin intermediarios.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            <div className="bg-white border border-line rounded-xl p-7">
+              <p className="font-bold text-lg mb-1">Gratis</p>
+              <p className="font-extrabold text-4xl tracking-tight mb-1">USD 0</p>
+              <p className="text-sm text-graphite mb-6">1 proyecto, 1 módulo -- una vez por cuenta</p>
+              <ul className="space-y-2 text-sm mb-6">
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Reporte completo</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Descarga del archivo corregido incluida</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Sin tarjeta ni wallet</li>
+              </ul>
+              <Link
+                href="/app"
+                className="block text-center border border-line font-semibold rounded-md px-4 py-2.5 hover:bg-canvas transition-colors"
+              >
+                Probar gratis
+              </Link>
+            </div>
+
             <div className="bg-white border border-line rounded-xl p-7">
               <p className="font-bold text-lg mb-1">Por proyecto</p>
               <p className="font-extrabold text-4xl tracking-tight mb-1">USD 99</p>
-              <p className="text-sm text-graphite mb-6">Pago único por proyecto descargado</p>
+              <p className="text-sm text-graphite mb-6">Hasta 8 módulos, todo el proyecto junto</p>
               <ul className="space-y-2 text-sm mb-6">
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Reporte completo gratis, sin límite</li>
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Validaciones por módulo y versión</li>
@@ -245,10 +262,10 @@ export default function LandingPage() {
               </span>
               <p className="font-bold text-lg mb-1">Mensual</p>
               <p className="font-extrabold text-4xl tracking-tight mb-1">USD 149</p>
-              <p className="text-sm text-graphite mb-6">Proyectos ilimitados mientras esté activa</p>
+              <p className="text-sm text-graphite mb-6">Hasta 5 proyectos exportados por mes</p>
               <ul className="space-y-2 text-sm mb-6">
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Todo lo del plan por proyecto</li>
-                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Proyectos ilimitados por mes</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> 5 proyectos exportados por mes</li>
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Pensado para varios clientes a la vez</li>
               </ul>
               <Link

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useAccount, useConnect, useWriteContract, useSwitchChain } from "wagmi";
 import { polygon, base } from "wagmi/chains";
@@ -8,6 +8,7 @@ import { parseUnits } from "viem";
 import {
   startPayment,
   getPaymentStatus,
+  getUserMe,
   PaymentStartResult,
   downloadUrl,
 } from "@/lib/api";
@@ -21,6 +22,7 @@ const CHAIN_BY_NETWORK: Record<Network, typeof polygon | typeof base> = {
 };
 
 type Step = "choose" | "connect" | "confirm-wallet" | "waiting" | "confirmed" | "error";
+type PaymentType = "free" | "per_project" | "subscription";
 
 export function PaywallPanel({
   projectId,
@@ -39,12 +41,31 @@ export function PaywallPanel({
   const [step, setStep] = useState<Step>("choose");
   const [payment, setPayment] = useState<PaymentStartResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [paymentType, setPaymentType] = useState<"per_project" | "subscription">(
-    "per_project"
-  );
+  const [freeProjectAvailable, setFreeProjectAvailable] = useState(false);
+  const [paymentType, setPaymentType] = useState<PaymentType>("per_project");
+
+  useEffect(() => {
+    getUserMe(getToken)
+      .then((me) => {
+        setFreeProjectAvailable(!me.free_project_used);
+        if (!me.free_project_used) setPaymentType("free");
+      })
+      .catch(() => {
+        // si falla, simplemente no se ofrece la opción gratis -- no debe
+        // bloquear el resto del flujo de pago.
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleStartFlow() {
     setErrorMsg(null);
+    if (paymentType === "free") {
+      // El proyecto gratis no pasa por USDC -- el backend lo autoriza
+      // directo en GET /download (ver can_export_project() en
+      // entitlements.py). Acá solo mostramos el botón de descarga.
+      setStep("confirmed");
+      return;
+    }
     try {
       const result = await startPayment(getToken, paymentType, network, projectId);
       setPayment(result);
@@ -114,7 +135,9 @@ export function PaywallPanel({
   if (step === "confirmed") {
     return (
       <div className="border border-verify bg-verify-light rounded-lg p-6 text-center">
-        <p className="font-extrabold text-xl text-verify mb-3">Pago confirmado</p>
+        <p className="font-extrabold text-xl text-verify mb-3">
+          {paymentType === "free" ? "Descarga habilitada" : "Pago confirmado"}
+        </p>
         <a
           href={downloadUrl(projectId)}
           className="inline-block bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity"
@@ -135,6 +158,18 @@ export function PaywallPanel({
       {step === "choose" && (
         <>
           <div className="flex gap-2">
+            {freeProjectAvailable && (
+              <button
+                onClick={() => setPaymentType("free")}
+                className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
+                  paymentType === "free"
+                    ? "border-verify bg-verify-light text-verify"
+                    : "border-line text-graphite"
+                }`}
+              >
+                Gratis · 1 módulo
+              </button>
+            )}
             <button
               onClick={() => setPaymentType("per_project")}
               className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
@@ -157,30 +192,38 @@ export function PaywallPanel({
             </button>
           </div>
 
-          <div>
-            <p className="text-sm font-medium mb-2">Red</p>
-            <div className="flex gap-2">
-              {(["polygon", "base"] as Network[]).map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setNetwork(n)}
-                  className={`flex-1 rounded-md border px-4 py-2.5 text-sm font-medium capitalize transition-colors ${
-                    network === n
-                      ? "border-verify bg-verify-light text-verify"
-                      : "border-line text-graphite"
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
+          {paymentType === "free" ? (
+            <p className="text-xs text-graphite">
+              Tu proyecto de prueba gratis incluye 1 módulo, con reporte y
+              descarga -- una sola vez por cuenta. No hace falta wallet ni
+              pago para esto.
+            </p>
+          ) : (
+            <div>
+              <p className="text-sm font-medium mb-2">Red</p>
+              <div className="flex gap-2">
+                {(["polygon", "base"] as Network[]).map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setNetwork(n)}
+                    className={`flex-1 rounded-md border px-4 py-2.5 text-sm font-medium capitalize transition-colors ${
+                      network === n
+                        ? "border-verify bg-verify-light text-verify"
+                        : "border-line text-graphite"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <button
             onClick={handleStartFlow}
             className="w-full bg-ink text-paper rounded-full py-3 font-medium hover:opacity-90 transition-opacity"
           >
-            Continuar con USDC
+            {paymentType === "free" ? "Descargar gratis" : "Continuar con USDC"}
           </button>
         </>
       )}
