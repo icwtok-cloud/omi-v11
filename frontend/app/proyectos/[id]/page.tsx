@@ -96,7 +96,11 @@ export default function ProjectPage() {
   // con la respuesta tardía del polling de otro.
   const pollingModuleIdRef = useRef<string | null>(null);
 
-  const POLL_INTERVAL_MS = 1500;
+  // Backoff progresivo: arranca ágil (una validación chica termina en
+  // segundos) y se relaja hasta 5s para archivos grandes que tardan
+  // minutos -- pegarle al backend cada 1.5s durante 10 minutos es
+  // carga inútil sobre el dyno compartido de Render.
+  const POLL_INTERVALS_MS = [1500, 3000, 5000];
   const STALL_THRESHOLD_MS = 10 * 60 * 1000; // 10 min sin terminar -> se ofrece reintentar
 
   const loadModuleReport = useCallback(
@@ -113,7 +117,9 @@ export default function ProjectPage() {
 
         // Polling hasta que el módulo quede validated/failed, o se
         // detecte un estancamiento (más de 10' desde que arrancó sin
-        // terminar).
+        // terminar). El STALL_THRESHOLD_MS de abajo es también el tope
+        // duro del loop -- no puede quedar iterando para siempre.
+        let pollCount = 0;
         // eslint-disable-next-line no-constant-condition
         while (true) {
           if (pollingModuleIdRef.current !== moduleId) return; // se canceló (cambió de módulo)
@@ -140,7 +146,10 @@ export default function ProjectPage() {
             return;
           }
 
-          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+          const interval =
+            POLL_INTERVALS_MS[Math.min(pollCount, POLL_INTERVALS_MS.length - 1)];
+          pollCount++;
+          await new Promise((resolve) => setTimeout(resolve, interval));
         }
       } catch (e) {
         if (pollingModuleIdRef.current !== moduleId) return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useAccount, useConnect, useWriteContract, useSwitchChain } from "wagmi";
 import { polygon, base } from "wagmi/chains";
@@ -61,6 +61,19 @@ export function PaywallPanel({
   // curso en localStorage, scoped por proyecto, y se retoma al montar.
   const pendingPaymentKey = `omi_pending_payment_${projectId}`;
 
+  // El timer del polling de pago vive en un ref para poder cancelarlo
+  // al desmontar -- con el setInterval anterior, navegar fuera de la
+  // página durante la espera de confirmación dejaba el intervalo vivo
+  // para siempre, pegándole a /payments/{id}/status cada 8 segundos y
+  // llamando setState sobre un componente desmontado.
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current !== null) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     const stored = localStorage.getItem(pendingPaymentKey);
     if (!stored) return;
@@ -80,7 +93,7 @@ export function PaywallPanel({
           } else {
             setPayment(savedPayment);
             setStep("waiting");
-            pollPaymentStatus(savedPayment.payment_id);
+            pollPaymentStatus(savedPayment.payment_id, savedPayment.expires_at);
           }
         })
         .catch(() => {
@@ -171,7 +184,7 @@ export function PaywallPanel({
       });
 
       setStep("waiting");
-      pollPaymentStatus(payment.payment_id);
+      pollPaymentStatus(payment.payment_id, payment.expires_at);
     } catch (e) {
       setErrorMsg(
         e instanceof Error ? e.message : "No se pudo completar la transacción"
@@ -180,24 +193,52 @@ export function PaywallPanel({
     }
   }
 
-  function pollPaymentStatus(paymentId: string) {
-    const interval = setInterval(async () => {
+  // Confirmaciones on-chain tardan minutos, no segundos -- la escala de
+  // backoff es más lenta que la de polling de validación a propósito,
+  // pero sigue siendo backoff progresivo (no un intervalo fijo) para no
+  // pegarle a /payments/{id}/status a ritmo constante mientras el pago
+  // sigue pendiente.
+  const PAYMENT_POLL_INTERVALS_MS = [8000, 12000, 15000];
+
+  function pollPaymentStatus(paymentId: string, expiresAt: string) {
+    // setTimeout recursivo en vez de setInterval: no encola ticks si una
+    // consulta tarda más que el intervalo, y el ref permite cancelarlo
+    // al desmontar (cleanup en el useEffect de arriba).
+    let pollCount = 0;
+    const tick = async () => {
       try {
         const status = await getPaymentStatus(getToken, paymentId);
         if (status.status === "confirmed") {
-          clearInterval(interval);
           localStorage.removeItem(pendingPaymentKey);
           setStep("confirmed");
-        } else if (status.status === "expired") {
-          clearInterval(interval);
+          return;
+        }
+        if (status.status === "expired") {
           localStorage.removeItem(pendingPaymentKey);
           setErrorMsg("La ventana de pago expiró. Iniciá el pago de nuevo.");
           setStep("error");
+          return;
         }
       } catch {
         // un error transitorio de polling no debe interrumpir el intento
       }
-    }, 8000);
+      // Tope duro del loop: la expiración del propio pago (el backend
+      // lo marca "expired" al consultarlo pasada esa hora, pero si la
+      // red se cae y TODAS las consultas fallan, ese "expired" nunca
+      // llega -- sin este corte local el loop seguiría para siempre).
+      // Margen de 60s para que la última consulta vea el estado final.
+      if (Date.now() > new Date(expiresAt).getTime() + 60_000) {
+        localStorage.removeItem(pendingPaymentKey);
+        setErrorMsg("La ventana de pago expiró. Iniciá el pago de nuevo.");
+        setStep("error");
+        return;
+      }
+      const interval =
+        PAYMENT_POLL_INTERVALS_MS[Math.min(pollCount, PAYMENT_POLL_INTERVALS_MS.length - 1)];
+      pollCount++;
+      pollTimerRef.current = setTimeout(tick, interval);
+    };
+    pollTimerRef.current = setTimeout(tick, PAYMENT_POLL_INTERVALS_MS[0]);
   }
 
   if (step === "confirmed") {
