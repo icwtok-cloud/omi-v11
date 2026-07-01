@@ -212,6 +212,36 @@ class TestDescargaIncrementaElContadorCorrecto:
         db_session.refresh(test_user)
         assert test_user.monthly_export_count == 1
 
+    def test_download_bloquea_la_fila_del_usuario_para_evitar_doble_conteo(
+        self, client, db_session, test_user, monkeypatch
+    ):
+        """Regresión: dos requests concurrentes de /download no deben poder
+        leer la misma cuota disponible antes de que la primera confirme su
+        incremento (ver hallazgo P0 de la auditoría -- sin row lock, un
+        doble click o un retry podía saltarse el límite de exportes). Se
+        verifica que el endpoint efectivamente pide el lock (`with_for_update`)
+        sobre la fila del usuario antes de decidir si el export está permitido."""
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+        module = _upload_module(client, project_id, "contactos", CONTACTOS_CSV).json()
+        client.post(f"/projects/{project_id}/modules/{module['module_id']}/validate")
+
+        from sqlalchemy.orm.query import Query
+
+        original_with_for_update = Query.with_for_update
+        calls = []
+
+        def spy_with_for_update(self, *args, **kwargs):
+            calls.append(True)
+            return original_with_for_update(self, *args, **kwargs)
+
+        monkeypatch.setattr(Query, "with_for_update", spy_with_for_update)
+
+        resp = client.get(f"/projects/{project_id}/download")
+        assert resp.status_code == 200
+        assert len(calls) == 1
+
     def test_exportar_un_proyecto_ya_pagado_no_incrementa_ningun_contador(
         self, client, db_session, test_user
     ):

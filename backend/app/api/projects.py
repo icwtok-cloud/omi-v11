@@ -481,6 +481,17 @@ def download_project(
 ):
     project = _get_owned_project(project_id, user, db)
 
+    # Bloquea la fila del usuario ANTES de chequear/consumir cuota --
+    # sin esto, dos requests concurrentes (doble click, retry por
+    # timeout, o un abuso deliberado en paralelo) pueden leer la misma
+    # cuota "disponible" antes de que cualquiera de las dos confirme el
+    # incremento, resultando en más exports de los que la cuota permite.
+    # `with_for_update()` en Postgres (producción) toma un row lock real
+    # que hace esperar a la segunda request hasta que la primera
+    # comitea; en SQLite (tests) es un no-op inofensivo -- el motor ya
+    # serializa escrituras a nivel de archivo.
+    user = db.query(User).filter(User.id == user.id).with_for_update().first()
+
     allowed, err = can_export_project(db, user, project)
     if not allowed:
         raise HTTPException(status_code=402, detail=err)  # Payment Required

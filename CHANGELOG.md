@@ -8,6 +8,43 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — BUG P0: race condition en la cuota de exportes (bypass de pago)
+
+**Encontrado en auditoría, no reportado por usuarios:** `GET
+/projects/{id}/download` (`backend/app/api/projects.py`) chequeaba
+`can_export_project()` y recién después, en un paso separado sin lock,
+incrementaba `user.monthly_export_count` (o marcaba
+`user.free_project_used`) en el mismo commit. El comentario del código
+decía "atómico, evita doble conteo en un retry" pero no lo era: dos
+requests concurrentes a `/download` (doble click, retry por timeout de
+red, o abuso deliberado en paralelo) podían leer la misma cuota
+disponible (`monthly_export_count < 5` o `free_project_used == False`)
+ANTES de que cualquiera de las dos comiteara el incremento -- ambas
+pasaban, y el contador solo subía una vez (el incremento de Python
+`+=` se computa sobre un valor en memoria potencialmente stale, no es
+un `UPDATE ... SET count = count + 1` atómico de SQL). Resultado: un
+usuario podía obtener exportes ilimitados más allá de su cuota pagada
+o de su proyecto gratis con requests en paralelo -- un bypass de pago
+real en la única función que monetiza el producto.
+
+**Fix:** `download_project` ahora toma un row lock real sobre la fila
+del usuario (`db.query(User)...with_for_update()`) ANTES de llamar a
+`can_export_project()`, y lo mantiene hasta el `commit()` que persiste
+el incremento -- una segunda request concurrente queda bloqueada por
+Postgres hasta que la primera termina su transacción, y ve el contador
+ya actualizado. En SQLite (tests) `with_for_update()` es un no-op
+inofensivo (SQLite no soporta locking de filas, pero ya serializa
+escrituras a nivel de archivo), así que no rompe la suite existente.
+
+**Tests:** nuevo `test_download_bloquea_la_fila_del_usuario_para_evitar_doble_conteo`
+en `backend/tests/test_entitlements_quota.py` -- confirma que el
+endpoint efectivamente invoca `with_for_update()` antes de decidir si
+el export está permitido. 87/87 tests pasan.
+
+**Rollback:** sin cambios de schema -- no aplica rollback de Alembic.
+Revertir el commit alcanza (el `with_for_update()` es puramente lógica
+de aplicación, no toca la DB).
+
 ## 2026-07-01 — BUG P0: el botón de descarga no funcionaba (sin auth header) + reporte PDF
 
 **Bug encontrado de paso, no buscado:** al integrar el botón de
