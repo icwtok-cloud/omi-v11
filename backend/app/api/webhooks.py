@@ -60,7 +60,19 @@ async def clerk_webhook(
         clerk_id = data["id"]
         user = db.query(User).filter(User.id == clerk_id).first()
         if user:
-            db.delete(user)
+            # NO se borra la fila -- Project.owner_id y Payment.user_id
+            # son FK NOT NULL sin cascade (ver db_models.py), y este
+            # usuario puede tener proyectos o pagos (registros de
+            # facturación que no deberían desaparecer). Un
+            # `db.delete(user)` acá violaba la FK, tiraba un
+            # IntegrityError sin manejar, devolvía 500, y Clerk
+            # reintentaba el webhook indefinidamente -- de hecho el
+            # borrado de cuenta ni siquiera se completaba nunca. En vez
+            # de eso, se anonimiza: se borra el email (el único dato
+            # personal identificable en este modelo) y se preserva la
+            # fila para no romper la integridad referencial ni perder
+            # el historial de pagos/proyectos.
+            user.email = f"deleted-{clerk_id}@deleted.omi.lat"
             db.commit()
 
     return {"received": True}

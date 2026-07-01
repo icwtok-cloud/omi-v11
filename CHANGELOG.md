@@ -8,6 +8,51 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — BUG P0: borrar una cuenta de Clerk rompía el webhook + race condition en el monto único de pago
+
+**P0 #1 -- `user.deleted` nunca se completaba de verdad:**
+`backend/app/api/webhooks.py` hacía `db.delete(user)` directo apenas
+Clerk avisaba que se borró una cuenta. `Project.owner_id` y
+`Payment.user_id` son FK `NOT NULL` sin `ondelete` ni cascade
+configurado (`db_models.py:88,178`) -- así que borrar cualquier usuario
+que alguna vez creó un Proyecto o un Pago disparaba un
+`IntegrityError` sin manejar: 500 sin capturar, y Clerk reintentando el
+webhook para siempre. El borrado de cuenta **nunca se completaba**
+para ningún usuario real (todos tienen al menos un proyecto).
+
+**Fix:** en vez de borrar la fila, se anonimiza -- se reemplaza el
+email por un placeholder (`deleted-{clerk_id}@deleted.omi.lat`), el
+único dato personal identificable en este modelo, y se preserva la fila
+para no romper la integridad referencial ni perder el historial de
+pagos/proyectos (que además tiene valor contable).
+
+**P0 #2 -- race condition en el monto único de pago:**
+`generate_unique_amount()` (`backend/app/services/payment_matching.py`)
+hace un SELECT ("¿este monto ya está en uso?") y el INSERT llega
+después, en el caller (`payments.py`, `POST /payments/start`) -- sin
+nada que lo proteje a nivel de DB. Dos requests concurrentes podían
+elegir el mismo monto candidato antes de que cualquiera comiteara,
+resultando en dos Payments PENDING con el mismo
+`expected_amount_usd` -- rompiendo la premisa central del diseño (el
+monto único es lo que identifica a qué Payment corresponde una
+transferencia entrante on-chain).
+
+**Fix:** índice único PARCIAL sobre `expected_amount_usd` (solo para
+`status='pending'` -- migración `0005`, no rompe la reutilización
+legítima de montos una vez que un Payment se confirma o expira) +
+retry-on-conflict en `POST /payments/start` (hasta 5 intentos con un
+monto nuevo si choca contra el índice, en vez de un 500).
+
+**Migraciones de Alembic:** `0005_unique_pending_amount.py` (revises
+`0004`) -- `CREATE UNIQUE INDEX ix_payments_pending_amount_unique ON
+payments (expected_amount_usd) WHERE status = 'pending'`. **Rollback:**
+`alembic downgrade -1` desde `0005` (dropea el índice, no toca datos).
+
+**Tests:** 88/88 backend siguen pasando (los tests usan
+`Base.metadata.create_all`, no corren migraciones de Alembic
+directamente -- la sintaxis del índice parcial se verificó a mano
+contra SQLite antes de commitear).
+
 ## 2026-07-01 — BUG P0: upload de archivos podía agotar la memoria del dyno + defensa contra pago duplicado
 
 **P0 encontrado en auditoría:** `POST /projects/{id}/modules`

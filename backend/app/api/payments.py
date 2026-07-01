@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
@@ -50,19 +51,35 @@ def start_payment(
     else:
         base_price = settings.price_subscription_monthly_usd
 
-    amount = generate_unique_amount(db, base_price)
-
-    payment = Payment(
-        user_id=user.id,
-        project_id=body.project_id if body.payment_type == PaymentType.per_project.value else None,
-        payment_type=PaymentType(body.payment_type),
-        network=PaymentNetwork(body.network),
-        expected_amount_usd=amount,
-        status=PaymentStatus.pending,
-        expires_at=expiry_timestamp(),
-    )
-    db.add(payment)
-    db.commit()
+    # `generate_unique_amount` chequea contra pendientes ya comiteados,
+    # pero dos requests concurrentes podrían elegir el mismo candidato
+    # antes de que cualquiera de las dos comitee (TOCTOU). El índice
+    # único parcial sobre `expected_amount_usd` (migración 0005, solo
+    # para status='pending') es el backstop real a nivel de DB -- si
+    # igual choca, se reintenta con un monto nuevo en vez de romper el
+    # request del usuario con un 500.
+    for _ in range(5):
+        amount = generate_unique_amount(db, base_price)
+        payment = Payment(
+            user_id=user.id,
+            project_id=body.project_id if body.payment_type == PaymentType.per_project.value else None,
+            payment_type=PaymentType(body.payment_type),
+            network=PaymentNetwork(body.network),
+            expected_amount_usd=amount,
+            status=PaymentStatus.pending,
+            expires_at=expiry_timestamp(),
+        )
+        db.add(payment)
+        try:
+            db.commit()
+            break
+        except IntegrityError:
+            db.rollback()
+    else:
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo generar un monto de pago único, intentá de nuevo en unos segundos",
+        )
 
     return PaymentStartResponse(
         payment_id=payment.id,
