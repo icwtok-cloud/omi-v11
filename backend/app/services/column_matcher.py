@@ -86,15 +86,29 @@ def match_columns(
     modelo (ej. ["name", "email", "phone", ...]), tal como vienen del
     RuleSchema.
     """
+    return {col: field for col, (field, _confidence) in match_columns_with_confidence(
+        columns_seen, known_field_names, fuzzy_threshold
+    ).items()}
+
+
+def match_columns_with_confidence(
+    columns_seen: list[str],
+    known_field_names: list[str],
+    fuzzy_threshold: float = 0.82,
+) -> dict[str, tuple[str, str]]:
+    """Igual que `match_columns()`, pero devuelve además con qué nivel de
+    confianza se hizo el match: "exact" (nivel 1), "synonym" (nivel 2) o
+    "fuzzy" (nivel 3). Un match "fuzzy" es el único que vale la pena que
+    el usuario revise a ojo -- los otros dos son deterministas."""
     known_set = set(known_field_names)
-    result: dict[str, str] = {}
+    result: dict[str, tuple[str, str]] = {}
 
     for col in columns_seen:
         normalized_col = _normalize(col)
 
         # Nivel 1: exact match contra el nombre técnico tal cual.
         if col in known_set:
-            result[col] = col
+            result[col] = (col, "exact")
             continue
 
         # Nivel 2: diccionario de sinónimos.
@@ -105,7 +119,7 @@ def match_columns(
                 matched_field = field_name
                 break
         if matched_field:
-            result[col] = matched_field
+            result[col] = (matched_field, "synonym")
             continue
 
         # Nivel 3: fuzzy match contra el nombre técnico y sus sinónimos,
@@ -121,6 +135,6 @@ def match_columns(
                     best_score = score
                     best_field = field_name
         if best_field and best_score >= fuzzy_threshold:
-            result[col] = best_field
+            result[col] = (best_field, "fuzzy")
 
     return result

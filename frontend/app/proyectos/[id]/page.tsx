@@ -597,6 +597,7 @@ function ModuleReportView({
 
       <ColumnMappingPanel
         columnMapping={report.column_mapping}
+        columnMatchConfidence={report.column_match_confidence}
         unmatchedColumns={report.unmatched_columns}
       />
 
@@ -651,15 +652,24 @@ function ModuleReportView({
   );
 }
 
+const CONFIDENCE_BADGE: Record<string, { label: string; className: string }> = {
+  fuzzy: { label: "revisar", className: "text-alert bg-alert-light" },
+};
+
 function ColumnMappingPanel({
   columnMapping,
+  columnMatchConfidence,
   unmatchedColumns,
 }: {
   columnMapping: Record<string, string>;
+  columnMatchConfidence: Record<string, string>;
   unmatchedColumns: string[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const mappedEntries = Object.entries(columnMapping);
+  const fuzzyCount = mappedEntries.filter(
+    ([col]) => columnMatchConfidence[col] === "fuzzy"
+  ).length;
 
   if (mappedEntries.length === 0 && unmatchedColumns.length === 0) return null;
 
@@ -669,7 +679,14 @@ function ColumnMappingPanel({
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left"
       >
-        <span className="font-medium text-sm">Cómo interpretamos las columnas de tu archivo</span>
+        <span className="font-medium text-sm">
+          Cómo interpretamos las columnas de tu archivo
+          {fuzzyCount > 0 && (
+            <span className="ml-2 text-xs font-normal text-alert">
+              {fuzzyCount} {fuzzyCount === 1 ? "por confirmar" : "por confirmar"}
+            </span>
+          )}
+        </span>
         <span className="text-graphite text-xs">{expanded ? "▲" : "▼"}</span>
       </button>
       {expanded && (
@@ -680,12 +697,29 @@ function ColumnMappingPanel({
                 Columnas reconocidas ({mappedEntries.length})
               </p>
               <div className="space-y-1">
-                {mappedEntries.map(([col, field]) => (
-                  <p key={col} className="font-mono text-xs text-ink">
-                    "{col}" → <span className="text-verify">{field}</span>
-                  </p>
-                ))}
+                {mappedEntries.map(([col, field]) => {
+                  const confidence = columnMatchConfidence[col];
+                  const badge = CONFIDENCE_BADGE[confidence];
+                  return (
+                    <p key={col} className="font-mono text-xs text-ink flex items-center gap-2">
+                      <span>
+                        "{col}" → <span className="text-verify">{field}</span>
+                      </span>
+                      {badge && (
+                        <span className={`rounded px-1.5 py-0.5 ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      )}
+                    </p>
+                  );
+                })}
               </div>
+              {fuzzyCount > 0 && (
+                <p className="text-xs text-graphite italic mt-2">
+                  Las columnas marcadas "revisar" se asociaron por similitud de texto, no por
+                  nombre exacto ni sinónimo conocido -- confirmá que el campo elegido tenga sentido.
+                </p>
+              )}
             </div>
           )}
           {unmatchedColumns.length > 0 && (

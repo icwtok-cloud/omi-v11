@@ -10,6 +10,34 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Confidence score en el matching de columnas
+
+**Qué cambia:** `match_columns()` en
+`backend/app/services/column_matcher.py` se separó en
+`match_columns_with_confidence()`, que devuelve además con qué nivel
+se hizo cada match: `"exact"` (nombre técnico literal), `"synonym"`
+(diccionario de sinónimos en español) o `"fuzzy"` (similitud de texto,
+el único no-determinista). `match_columns()` se mantiene como wrapper
+compatible para no romper el único call site existente.
+`ValidationReport` expone el nuevo campo `column_match_confidence`
+(dict columna→nivel), propagado en el reporte serializado y en
+`ValidationReportResponse`. En el frontend, `ColumnMappingPanel` marca
+con un badge "revisar" las columnas que matchearon por fuzzy.
+
+**Por qué:** era el ítem #2 del roadmap nuevo acordado con el usuario
+("confidence score"). Un match "fuzzy" (ej. una variante de header no
+prevista en el diccionario de sinónimos) puede estar equivocado -- sin
+distinguirlo de un match exacto/sinónimo, el usuario no tenía forma de
+saber cuáles vale la pena revisar a ojo en el panel de mapeo de
+columnas (agregado hoy mismo, ver entrada anterior).
+
+**Tests:** `TestColumnMatchConfidence` en
+`backend/tests/test_validation_engine.py` (exact/synonym/fuzzy).
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — Mostrar el mapeo de columnas en el reporte (antes invisible)
 
 **Qué cambia:** nuevo panel colapsable "Cómo interpretamos las

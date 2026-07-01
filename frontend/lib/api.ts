@@ -154,6 +154,7 @@ export interface ValidationReport {
   structural_mismatch: boolean;
   matched_columns_count: number;
   column_mapping: Record<string, string>;
+  column_match_confidence: Record<string, "exact" | "synonym" | "fuzzy">;
   unmatched_columns: string[];
   preview_rows: Record<string, unknown>[];
   issues: ValidationIssue[];

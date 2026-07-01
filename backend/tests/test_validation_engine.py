@@ -213,6 +213,34 @@ class TestValidacionNormal:
         assert "name" not in report.columns_expected_missing
 
 
+class TestColumnMatchConfidence:
+    """column_match_confidence distingue exact/synonym/fuzzy -- solo el
+    fuzzy vale la pena que el usuario revise a ojo (los otros dos son
+    deterministas: nombre técnico exacto, o sinónimo conocido de antemano)."""
+
+    def test_header_tecnico_exacto_es_exact(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({"name": ["Juan Perez"], "email": ["juan@x.com"]})
+        report = validate_dataframe(df, schema)
+        assert report.column_match_confidence["name"] == "exact"
+
+    def test_sinonimo_conocido_es_synonym(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({"Nombre": ["Juan Perez"], "Correo": ["juan@x.com"]})
+        report = validate_dataframe(df, schema)
+        assert report.column_match_confidence["Nombre"] == "synonym"
+        assert report.column_match_confidence["Correo"] == "synonym"
+
+    def test_variante_no_prevista_es_fuzzy(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        # "Emails" (plural) no está en el diccionario de sinónimos (a
+        # diferencia de "Mail", que sí) -- solo matchea por similitud
+        # textual con "email", justo por encima del umbral fuzzy.
+        df = pd.DataFrame({"Emails": ["juan@x.com"], "name": ["Juan Perez"]})
+        report = validate_dataframe(df, schema)
+        assert report.column_match_confidence["Emails"] == "fuzzy"
+
+
 class TestMissingContactInfo:
     """email/phone no son `required` en el schema de Odoo (la falta de
     ambos no rompe la importación), pero un contacto sin ninguno de los

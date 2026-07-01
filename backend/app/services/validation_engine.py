@@ -25,7 +25,7 @@ import pandas as pd
 
 from app.services.rules_loader import RuleSchema
 from app.services import format_rules
-from app.services.column_matcher import match_columns
+from app.services.column_matcher import match_columns_with_confidence
 
 
 def _to_native(value: object) -> object:
@@ -68,6 +68,7 @@ class ValidationReport:
     structural_mismatch: bool = False
     matched_columns_count: int = 0
     column_mapping: dict = field(default_factory=dict)
+    column_match_confidence: dict = field(default_factory=dict)
     unmatched_columns: list[str] = field(default_factory=list)
     preview_rows: list[dict] = field(default_factory=list)
 
@@ -80,6 +81,7 @@ class ValidationReport:
             "structural_mismatch": self.structural_mismatch,
             "matched_columns_count": self.matched_columns_count,
             "column_mapping": self.column_mapping,
+            "column_match_confidence": self.column_match_confidence,
             "unmatched_columns": self.unmatched_columns,
             "preview_rows": self.preview_rows,
             "issues": [
@@ -147,7 +149,9 @@ def validate_dataframe(
     # fila. Si casi ninguna columna matchea, es más probable que el
     # archivo no corresponda al módulo/versión elegidos que que sea un
     # archivo perfecto.
-    column_mapping = match_columns(columns_seen, list(fields_by_name.keys()))
+    match_result = match_columns_with_confidence(columns_seen, list(fields_by_name.keys()))
+    column_mapping = {col: field_name for col, (field_name, _conf) in match_result.items()}
+    column_match_confidence = {col: conf for col, (_field_name, conf) in match_result.items()}
     matched_columns = list(column_mapping.keys())
     unmatched_columns = [c for c in columns_seen if c not in column_mapping]
     match_ratio = (len(matched_columns) / len(columns_seen)) if columns_seen else 0.0
@@ -188,6 +192,7 @@ def validate_dataframe(
             structural_mismatch=True,
             matched_columns_count=len(matched_columns),
             column_mapping=column_mapping,
+            column_match_confidence=column_match_confidence,
             unmatched_columns=unmatched_columns,
             preview_rows=preview_rows,
         )
@@ -329,6 +334,7 @@ def validate_dataframe(
         structural_mismatch=False,
         matched_columns_count=len(matched_columns),
         column_mapping=column_mapping,
+            column_match_confidence=column_match_confidence,
         unmatched_columns=unmatched_columns,
         preview_rows=preview_rows,
     )
