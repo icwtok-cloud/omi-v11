@@ -52,27 +52,76 @@ const PAIN_CARDS = [
   },
 ];
 
+const BEFORE_AFTER = {
+  before: [
+    "Emails, CUIT/RFC/RUT y otros formatos rotos",
+    "Duplicados entre filas o depósitos",
+    "Relaciones que no existen en tu Odoo (etapas, categorías, monedas)",
+    "Columnas obligatorias faltantes",
+    "Horas de limpieza manual en Excel, por las dudas",
+  ],
+  after: [
+    "Cada error identificado y agrupado por tipo",
+    "Fixes automáticos aplicados solos; el resto, marcado para revisión manual",
+    "Quality Score (0-100) que cuantifica qué tan lista está tu data",
+    "Reporte técnico en PDF con el detalle de cada corrección",
+    "Archivo corregido, listo para importar en el orden correcto",
+  ],
+};
+
 const STEPS = [
   {
     n: "01",
     title: "Subís tu archivo",
-    body: "CSV o Excel. Elegís el módulo y la versión de Odoo de tu implementación.",
+    body: "CSV o Excel. OMI detecta el módulo, la versión y -- si corresponde -- el país, y valida cada campo contra las reglas reales. En segundos, no horas.",
   },
   {
     n: "02",
-    title: "OMI analiza tus datos",
-    body: "Valida cada campo contra las reglas reales de esa versión. En segundos, no horas.",
+    title: "Revisás cada problema",
+    body: "Agrupado por tipo, con el fix automático ya aplicado o marcado para que decidas vos.",
   },
   {
     n: "03",
-    title: "Revisás cada problema",
-    body: "Aceptás el fix automático o corregís a mano. Con el antes y el después a la vista.",
+    title: "Importás sin sorpresas",
+    body: "Descargás el archivo corregido, con los headers exactos que tu versión de Odoo espera.",
+  },
+];
+
+const PERSONAS = [
+  {
+    title: "Partners y consultoras Odoo",
+    body: "Migrás datos de varios clientes a la vez. Necesitás un proceso repetible, no una planilla distinta por proyecto.",
   },
   {
-    n: "04",
-    title: "Descargás el archivo corregido",
-    body: "Listo para importar a Odoo, con los headers exactos que tu versión espera.",
+    title: "Implementadores independientes",
+    body: "Un Go Live fallido por datos rotos cae sobre vos, no sobre el cliente. Detectalo antes de que pase.",
   },
+  {
+    title: "Equipos internos de ERP",
+    body: "Migrás una sola vez, pero no podés permitirte un error en producción el día del corte.",
+  },
+  {
+    title: "Migraciones de gran volumen",
+    body: "Miles de filas por módulo -- imposible de revisar una por una a mano.",
+  },
+];
+
+const LATAM_COUNTRIES = [
+  { code: "ar", name: "Argentina" },
+  { code: "bo", name: "Bolivia" },
+  { code: "br", name: "Brasil" },
+  { code: "cl", name: "Chile" },
+  { code: "co", name: "Colombia" },
+  { code: "cr", name: "Costa Rica" },
+  { code: "do", name: "Rep. Dominicana" },
+  { code: "ec", name: "Ecuador" },
+  { code: "gt", name: "Guatemala" },
+  { code: "mx", name: "México" },
+  { code: "pa", name: "Panamá" },
+  { code: "pe", name: "Perú" },
+  { code: "py", name: "Paraguay" },
+  { code: "uy", name: "Uruguay" },
+  { code: "ve", name: "Venezuela" },
 ];
 
 const TRUST_POINTS = [
@@ -88,28 +137,56 @@ const TRUST_POINTS = [
     title: "Odoo 14 a 19",
     body: "Incluye versiones sin soporte oficial de Odoo -- las que tienen más urgencia de migrar.",
   },
+  {
+    title: "Reporte técnico y archivo listo",
+    body: "PDF con el detalle de cada corrección, y un ZIP numerado según el orden de importación recomendado.",
+  },
 ];
 
-const FAQS = [
+const DOUBTS = [
   {
-    q: "¿Qué formatos acepta?",
-    a: "CSV y Excel (.xlsx / .xls). El archivo puede tener cualquier nombre de columnas — OMI las mapea contra los campos reales de Odoo.",
+    q: "Ya tengo Odoo, ¿para qué necesito esto?",
+    a: "OMI no reemplaza a Odoo -- valida lo que le vas a dar de comer antes de que Odoo lo rechace o, peor, lo acepte mal.",
+  },
+  {
+    q: "Ya uso Excel para limpiar mis datos",
+    a: "Excel no sabe qué campos son obligatorios en tu versión de Odoo, ni qué etapas o categorías existen en tu instancia real. OMI valida contra esas reglas reales, no contra una checklist genérica.",
+  },
+  {
+    q: "Mis imports suelen funcionar",
+    a: "Suelen. El problema aparece en los que no -- y para entonces ya estás en producción. OMI te muestra los errores antes de ese momento.",
+  },
+  {
+    q: "No migro seguido, ¿vale la pena?",
+    a: "No hay curva de aprendizaje: subís el archivo y ves el reporte. La primera vez que evita un error en producción ya lo justifica.",
+  },
+  {
+    q: "No confío en los fixes automáticos",
+    a: "Ningún cambio se aplica sin que lo veas primero. Los automáticos quedan a la vista antes de exportar, y los que requieren criterio quedan marcados para que decidas vos.",
+  },
+  {
+    q: "No quiero que una IA le meta mano a mi contabilidad",
+    a: "OMI no usa IA. El motor es 100% determinístico -- las reglas se generan leyendo el código fuente real de Odoo, no un modelo que adivina.",
   },
   {
     q: "¿Mis datos se quedan guardados?",
     a: "No. El archivo original se elimina automáticamente apenas se genera tu archivo corregido. No queda nada guardado más de lo necesario para procesarlo.",
   },
   {
-    q: "¿Qué versiones de Odoo soporta?",
-    a: "De la 14 a la 19, incluyendo versiones que ya no tienen soporte oficial de Odoo — son justamente las que tienen más urgencia de migrar.",
-  },
-  {
     q: "¿Puedo usarlo sin ser técnico?",
     a: "Sí. No necesitás saber SQL ni Python. Subís el archivo, revisás cada problema en pantalla, y descargás el resultado.",
   },
   {
+    q: "¿Qué formatos acepta?",
+    a: "CSV y Excel (.xlsx / .xls). El archivo puede tener cualquier nombre de columnas -- OMI las mapea contra los campos reales de Odoo.",
+  },
+  {
+    q: "¿Qué versiones de Odoo soporta?",
+    a: "De la 14 a la 19, incluyendo versiones que ya no tienen soporte oficial -- son justamente las que tienen más urgencia de migrar.",
+  },
+  {
     q: "¿Cómo se paga?",
-    a: "En USDC, por Polygon o Base, directo desde tu wallet. Elegís por proyecto o suscripción mensual — sin tarjeta de crédito.",
+    a: "En USDC, por Polygon o Base, directo desde tu wallet. Elegís por proyecto o suscripción mensual -- sin tarjeta de crédito.",
   },
 ];
 
@@ -130,10 +207,12 @@ export default function LandingPage() {
             </div>
             <span className="font-extrabold text-lg tracking-tight">OMI Engine</span>
           </div>
-          <nav className="hidden md:flex items-center gap-8 text-sm text-graphite">
+          <nav className="hidden md:flex items-center gap-6 text-sm text-graphite">
             <a href="#como-funciona" className="hover:text-ink transition-colors">Cómo funciona</a>
             <a href="#modulos" className="hover:text-ink transition-colors">Módulos</a>
+            <a href="#latam" className="hover:text-ink transition-colors">LatAm</a>
             <a href="#precios" className="hover:text-ink transition-colors">Precios</a>
+            <a href="#partners" className="hover:text-ink transition-colors">Partners</a>
           </nav>
           <div className="flex items-center gap-4">
             <Link href="/app" className="text-sm font-medium text-graphite hover:text-ink transition-colors">
@@ -161,8 +240,9 @@ export default function LandingPage() {
               <span className="text-brand">sin sorpresas</span>
             </h1>
             <p className="text-graphite text-lg leading-relaxed max-w-xl mx-auto lg:mx-0 mb-8">
-              Analizá tus datos antes de importar. Detectá duplicados, campos vacíos,
-              CUIT inválidos y errores que Odoo va a rechazar — antes del Go Live.
+              Importar directo a Odoo es una apuesta: los datos rotos aparecen recién
+              en producción. OMI los analiza antes -- duplicados, campos vacíos,
+              CUIT/RFC/RUT inválidos y todo lo que Odoo va a rechazar -- antes del Go Live.
             </p>
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 mb-4">
               <Link
@@ -188,7 +268,7 @@ export default function LandingPage() {
       </section>
 
       <section className="border-t border-line py-12">
-        <div className="max-w-6xl mx-auto px-6 md:px-10 grid grid-cols-1 sm:grid-cols-3 gap-8">
+        <div className="max-w-6xl mx-auto px-6 md:px-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {TRUST_POINTS.map((point) => (
             <div key={point.title} className="text-center sm:text-left">
               <p className="font-bold text-sm mb-1.5">{point.title}</p>
@@ -207,8 +287,9 @@ export default function LandingPage() {
             La migración de datos rompe implementaciones
           </h2>
           <p className="text-graphite text-center max-w-xl mx-auto mb-14">
-            Seleccionás los módulos de tu implementación al crear el proyecto.
-            OMI aplica solo las validaciones relevantes a cada uno.
+            Cada fila rota que no ves hoy es un problema en producción mañana. Elegís
+            los módulos de tu implementación y OMI aplica solo las validaciones
+            relevantes a cada uno.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -230,7 +311,42 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="como-funciona" className="py-20">
+      <section className="border-t border-line py-20">
+        <div className="max-w-5xl mx-auto px-6 md:px-10">
+          <p className="text-xs font-semibold uppercase tracking-widest text-graphite text-center mb-3">
+            Antes / Después
+          </p>
+          <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight text-center mb-14">
+            De un CSV roto a un archivo listo para Odoo
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="border border-line rounded-xl p-7 bg-alert-light/40">
+              <p className="font-bold text-alert mb-4">Antes</p>
+              <ul className="space-y-2.5 text-sm">
+                {BEFORE_AFTER.before.map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="text-alert shrink-0">✕</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="border border-line rounded-xl p-7 bg-verify-light/40">
+              <p className="font-bold text-verify mb-4">Después</p>
+              <ul className="space-y-2.5 text-sm">
+                {BEFORE_AFTER.after.map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="text-verify shrink-0">✓</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="como-funciona" className="border-t border-line bg-white/60 py-20">
         <div className="max-w-6xl mx-auto px-6 md:px-10">
           <p className="text-xs font-semibold uppercase tracking-widest text-graphite text-center mb-3">
             Proceso
@@ -238,12 +354,90 @@ export default function LandingPage() {
           <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight text-center mb-14">
             Cómo funciona
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {STEPS.map((step) => (
               <div key={step.n}>
                 <p className="font-extrabold text-4xl text-line mb-3">{step.n}</p>
                 <p className="font-bold text-lg mb-2">{step.title}</p>
                 <p className="text-sm text-graphite leading-relaxed">{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-line py-20">
+        <div className="max-w-6xl mx-auto px-6 md:px-10">
+          <p className="text-xs font-semibold uppercase tracking-widest text-graphite text-center mb-3">
+            Para quién es
+          </p>
+          <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight text-center mb-14">
+            Pensado para quien migra datos a Odoo en serio
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {PERSONAS.map((persona) => (
+              <div key={persona.title} className="bg-white border border-line rounded-xl p-5">
+                <p className="font-bold mb-2">{persona.title}</p>
+                <p className="text-sm text-graphite leading-relaxed">{persona.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="latam" className="border-t border-line bg-white/60 py-20">
+        <div className="max-w-6xl mx-auto px-6 md:px-10">
+          <p className="text-xs font-semibold uppercase tracking-widest text-graphite text-center mb-3">
+            Localización
+          </p>
+          <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight text-center mb-4">
+            Hecho para implementaciones Odoo en Latinoamérica
+          </h2>
+          <p className="text-graphite text-center max-w-2xl mx-auto mb-10">
+            El formato de CUIT, RFC, RUT, RUC y equivalentes, los códigos postales,
+            las monedas y los datos de fábrica de Odoo cambian de país en país. OMI
+            valida Contactos, Contabilidad y Facturación contra las reglas reales de
+            cada uno -- no contra una checklist genérica.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2.5 mb-6">
+            {LATAM_COUNTRIES.map((country) => (
+              <span
+                key={country.code}
+                className={`font-mono text-xs rounded-full px-3 py-1.5 border ${
+                  country.code === "br"
+                    ? "border-brand text-brand font-semibold"
+                    : "border-line text-graphite"
+                }`}
+              >
+                {country.name}
+              </span>
+            ))}
+          </div>
+          <p className="text-sm text-graphite text-center max-w-xl mx-auto mb-2">
+            <span className="font-semibold text-ink">Brasil</span> ya tiene validación de
+            datos activa -- la interfaz de OMI está en español; soporte en portugués,
+            próximamente.
+          </p>
+          <p className="text-sm text-graphite text-center max-w-xl mx-auto">
+            El resto de los módulos (CRM, Ventas, Inventario, Productos, Compras) valida
+            contra las reglas de tu versión de Odoo sin importar el país.
+          </p>
+        </div>
+      </section>
+
+      <section className="border-t border-line py-20">
+        <div className="max-w-4xl mx-auto px-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-graphite text-center mb-3">
+            Antes de decidir
+          </p>
+          <h2 className="font-extrabold text-3xl tracking-tight text-center mb-12">
+            Las dudas más comunes antes de migrar
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {DOUBTS.map((doubt) => (
+              <div key={doubt.q} className="bg-white border border-line rounded-xl p-5">
+                <p className="font-bold mb-1.5">{doubt.q}</p>
+                <p className="text-sm text-graphite leading-relaxed">{doubt.a}</p>
               </div>
             ))}
           </div>
@@ -317,25 +511,68 @@ export default function LandingPage() {
               </Link>
             </div>
           </div>
+          <p className="text-sm text-graphite mt-8">
+            ¿Migrás con volumen real? Mirá el{" "}
+            <a href="#partners" className="text-brand font-medium hover:underline">
+              programa de partners
+            </a>
+            .
+          </p>
         </div>
       </section>
 
-      <section className="py-20">
-        <div className="max-w-3xl mx-auto px-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-graphite text-center mb-3">
-            FAQ
+      <section id="partners" className="border-t border-line py-20">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-graphite mb-3">
+            Programa de partners
           </p>
-          <h2 className="font-extrabold text-3xl tracking-tight text-center mb-12">
-            Preguntas frecuentes
+          <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight mb-4">
+            Para partners y consultoras que migran con volumen real
           </h2>
-          <div className="space-y-4">
-            {FAQS.map((faq) => (
-              <div key={faq.q} className="bg-white border border-line rounded-xl p-5">
-                <p className="font-bold mb-1.5">{faq.q}</p>
-                <p className="text-sm text-graphite leading-relaxed">{faq.a}</p>
-              </div>
-            ))}
+          <p className="text-graphite mb-10 max-w-xl mx-auto">
+            No es otro plan de autoservicio -- es una activación directa con el
+            equipo de OMI, pensada para quien necesita usar la herramienta muy por
+            encima de un proyecto suelto.
+          </p>
+          <div className="bg-white border border-line rounded-xl p-8 text-left max-w-xl mx-auto mb-8">
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-start gap-2">
+                <span className="text-verify shrink-0">✓</span> Membresía anual: USD 499/año
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-verify shrink-0">✓</span> 5.000.000 de eventos por año (1 evento = 1 fila analizada)
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-verify shrink-0">✓</span> Sin límite de proyectos ni exportes mientras dure la cuota
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-verify shrink-0">✓</span> Activación manual -- hablás directo con el equipo, no es autoservicio
+              </li>
+            </ul>
           </div>
+          <a
+            href="mailto:hello@alterego.lat?subject=Programa%20de%20Partners%20OMI"
+            className="inline-block bg-brand text-white font-semibold rounded-md px-6 py-3 hover:bg-brand-dark transition-colors"
+          >
+            Contactanos
+          </a>
+        </div>
+      </section>
+
+      <section className="border-t border-line bg-ink py-16">
+        <div className="max-w-2xl mx-auto px-6 text-center">
+          <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight text-white mb-4">
+            ¿Importás directo, o sabés antes qué se va a romper?
+          </h2>
+          <p className="text-white/70 mb-8">
+            Sin tarjeta, sin instalación. Subís un archivo y en segundos tenés el reporte completo.
+          </p>
+          <Link
+            href="/app"
+            className="inline-block bg-white text-ink font-semibold rounded-md px-8 py-3.5 hover:bg-canvas transition-colors"
+          >
+            Analizar mis datos gratis →
+          </Link>
         </div>
       </section>
 

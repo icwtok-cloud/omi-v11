@@ -263,19 +263,24 @@ function renderStepContent(index: number, active: boolean) {
       return (
         <div className="flex flex-col items-center gap-3">
           <p className="font-mono text-xs text-graphite">clientes_2026.csv</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-center">
             <FadeIn active={active} delay={100}>
               <span className="font-mono text-xs bg-canvas border border-line rounded-full px-3 py-1">
                 Odoo 17
               </span>
             </FadeIn>
-            <FadeIn active={active} delay={300}>
+            <FadeIn active={active} delay={280}>
+              <span className="font-mono text-xs bg-canvas border border-line rounded-full px-3 py-1">
+                Argentina
+              </span>
+            </FadeIn>
+            <FadeIn active={active} delay={460}>
               <span className="font-mono text-xs bg-brand text-white rounded-full px-3 py-1">
                 Módulo: Contactos
               </span>
             </FadeIn>
           </div>
-          <FadeIn active={active} delay={550}>
+          <FadeIn active={active} delay={700}>
             <p className="text-xs text-graphite flex items-center gap-1.5">
               <IconCheck className="w-3.5 h-3.5 text-verify shrink-0" />
               6 columnas mapeadas
@@ -354,12 +359,15 @@ function renderStepContent(index: number, active: boolean) {
       );
     case 6:
       return (
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2.5">
           <div className="w-12 h-12 rounded-lg bg-canvas border border-line flex items-center justify-center">
             <IconDownload className="w-5 h-5 text-brand" />
           </div>
           <p className="font-mono text-xs text-ink">clientes_2026_corregido.zip</p>
-          <FadeIn active={active} delay={200}>
+          <FadeIn active={active} delay={150}>
+            <p className="font-mono text-[11px] text-graphite">+ reporte_tecnico.pdf</p>
+          </FadeIn>
+          <FadeIn active={active} delay={350}>
             <span className="inline-flex items-center gap-1.5 font-mono text-xs text-verify">
               <IconCheck className="w-3.5 h-3.5 shrink-0" />
               Listo para importar a Odoo
