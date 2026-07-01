@@ -60,7 +60,7 @@ export function LocalizationPulse() {
         className="inline-flex items-center gap-2 font-mono text-xs"
         aria-hidden="true"
       >
-        <span className="text-base leading-none">{current.flag}</span>
+        <span className="text-sm leading-none">{current.flag}</span>
         <span className="font-semibold text-ink">{current.name}</span>
         <span className="text-graphite">· {current.addon}</span>
       </span>
