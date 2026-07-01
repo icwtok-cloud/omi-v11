@@ -24,6 +24,7 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
 from web3 import Web3
 
 from app.core.config import settings
@@ -112,7 +113,15 @@ class ChainListener:
             payment.tx_hash = tx_hash
             payment.network = self.network
             payment.confirmations_seen = confirmations
-            db.commit()
+            try:
+                db.commit()
+            except IntegrityError:
+                # El índice único de tx_hash (migración 0004) frenó una
+                # doble escritura -- otra instancia/loop ya está
+                # procesando esta misma transferencia. No es un error
+                # real, solo hay que abandonar este intento.
+                db.rollback()
+                return
 
             if confirmations >= settings.confirmations_required:
                 self._confirm_payment(db, payment)

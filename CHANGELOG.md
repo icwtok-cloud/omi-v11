@@ -8,6 +8,48 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — BUG P0: upload de archivos podía agotar la memoria del dyno + defensa contra pago duplicado
+
+**P0 encontrado en auditoría:** `POST /projects/{id}/modules`
+(`backend/app/api/projects.py`, `upload_module`) hacía `contents =
+await file.read()` -- leía el archivo COMPLETO a memoria ANTES de
+chequear el límite de tamaño (`max_upload_size_mb`, 25MB por defecto).
+Starlette/FastAPI no limitan el tamaño del body por defecto, así que un
+upload de varios GB (malicioso o por error) podía agotar la memoria
+del dyno web de Render antes de llegar siquiera al 413 -- y ese dyno
+sirve a TODOS los usuarios conectados en ese momento, no solo al que
+subió el archivo.
+
+**Fix:** se lee en chunks de 1MB con `file.read(chunk_size)` en un
+loop, cortando con 413 apenas se supera `max_upload_size_mb` sin seguir
+leyendo el resto del archivo.
+
+**Tests:** nuevo `test_archivo_que_supera_el_limite_se_rechaza_con_413`
+en `backend/tests/test_projects_multimodule.py` (baja el límite a ~1
+byte vía monkeypatch para no tener que generar un archivo real
+gigante).
+
+**Además, defensa en profundidad para pagos (P1, no explotado
+todavía):** el listener de pagos cripto
+(`backend/app/workers/payment_listener.py`) solo chequeaba "¿ya existe
+un Payment con este tx_hash?" a nivel de aplicación, sin ningún
+constraint de DB de respaldo. Hoy el listener corre secuencial y de a
+un solo proceso, así que el riesgo real es bajo, pero si en el futuro
+se escalara a más de un worker (o corriera una segunda instancia por
+error durante un deploy), dos instancias podrían procesar el mismo
+evento de blockchain y, para pagos de suscripción, duplicar la
+extensión de `subscription_expires_at` (60 días en vez de 30). Se
+agrega un índice único sobre `payments.tx_hash` (migración de Alembic
+`0004`, ver abajo) y un `try/except IntegrityError` en el listener que
+trata una colisión como "ya lo procesó otra instancia", no como error.
+
+**Migración de Alembic:** `0004_unique_tx_hash.py` (revises `0003`) --
+`CREATE UNIQUE INDEX ix_payments_tx_hash_unique ON payments (tx_hash)`.
+Es compatible con filas existentes: `tx_hash` es nullable y Postgres no
+considera dos NULLs iguales para un índice único, así que los Payments
+pendientes sin tx_hash todavía conviven sin problema. **Rollback:**
+`alembic downgrade -1` desde `0004` (dropea el índice, no toca datos).
+
 ## 2026-07-01 — BUG P0: race condition en la cuota de exportes (bypass de pago)
 
 **Encontrado en auditoría, no reportado por usuarios:** `GET

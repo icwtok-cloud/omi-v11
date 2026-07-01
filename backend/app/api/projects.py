@@ -206,13 +206,27 @@ async def upload_module(
 ):
     project = _get_owned_project(project_id, user, db)
 
+    # Se lee en chunks y se corta apenas se supera el límite, en vez de
+    # `file.read()` completo -- ese hubiera cargado el archivo entero en
+    # memoria ANTES de poder chequear el tamaño, permitiendo que un
+    # upload de varios GB agote la memoria del dyno compartido de Render
+    # (que también sirve a otros usuarios) antes de llegar al 413.
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
-    contents = await file.read()
-    if len(contents) > max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Archivo supera el máximo de {settings.max_upload_size_mb}MB",
-        )
+    chunk_size = 1024 * 1024
+    chunks = []
+    total_read = 0
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total_read += len(chunk)
+        if total_read > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Archivo supera el máximo de {settings.max_upload_size_mb}MB",
+            )
+        chunks.append(chunk)
+    contents = b"".join(chunks)
 
     suffix = Path(file.filename).suffix.lower()
     if suffix not in (".csv", ".xlsx", ".xls"):

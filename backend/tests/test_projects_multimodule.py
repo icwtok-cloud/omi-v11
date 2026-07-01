@@ -351,3 +351,22 @@ class TestDescargaMultiModulo:
 
         resp = client.get(f"/projects/{project_id}/download")
         assert resp.status_code == 402
+
+
+class TestLimiteDeTamanoDeArchivo:
+    def test_archivo_que_supera_el_limite_se_rechaza_con_413(self, client, monkeypatch):
+        """Regresión P0: antes se leía el archivo completo a memoria
+        (`file.read()`) ANTES de chequear el tamaño -- un upload de
+        varios GB podía agotar la memoria del dyno compartido antes de
+        llegar al 413. Ahora se lee en chunks y se corta apenas se
+        supera el límite. Se baja el límite a 1 byte para no tener que
+        generar un archivo real de gran tamaño en el test."""
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "max_upload_size_mb", 0.000001)  # ~1 byte
+
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+        resp = _upload_module(client, project_id, "contactos", CONTACTOS_CSV)
+        assert resp.status_code == 413
