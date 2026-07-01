@@ -186,6 +186,7 @@ def get_project(
                 odoo_module=m.odoo_module,
                 status=m.status.value,
                 total_issues=(m.validation_report or {}).get("total_issues"),
+                quality_score=(m.validation_report or {}).get("quality_score"),
                 missing_dependencies=missing_dependencies(m.odoo_module, modules_in_project),
             )
             for m in project.modules

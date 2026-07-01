@@ -113,6 +113,7 @@ export interface ModuleSummary {
   odoo_module: string;
   status: string;
   total_issues: number | null;
+  quality_score: number | null;
   missing_dependencies: string[];
 }
 
@@ -149,6 +150,7 @@ export interface ValidationReport {
   module_id: string;
   total_rows: number;
   total_issues: number;
+  quality_score: number;
   columns_seen: string[];
   columns_expected_missing: string[];
   structural_mismatch: boolean;

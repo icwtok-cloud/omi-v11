@@ -325,6 +325,45 @@ class TestNormalizacionNumericaRegional:
         assert issue.issue_type == "invalid_format"
 
 
+class TestQualityScore:
+    """quality_score resume el reporte en un número (0-100) -- 100 menos
+    el % de filas que tienen al menos un problema que requiere revisión
+    manual. Los fixes automáticos no restan porque ya están resueltos."""
+
+    def test_archivo_limpio_es_100(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame(
+            {"name": ["Juan Perez"], "vat": ["20-12345678-9"], "email": ["juan@x.com"]}
+        )
+        report = validate_dataframe(df, schema)
+        assert report.quality_score == 100
+
+    def test_mismatch_estructural_es_0(self):
+        schema = load_rule_schema("ventas", "15.0")
+        df = pd.DataFrame({"unrelated_col": ["x", "y"]})
+        report = validate_dataframe(df, schema)
+        assert report.quality_score == 0
+
+    def test_mitad_de_filas_con_problema_manual_es_50(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame(
+            {
+                "name": ["Juan Perez", "Maria Gomez"],
+                "email": ["esto-no-es-un-email", "maria@x.com"],
+            }
+        )
+        report = validate_dataframe(df, schema)
+        assert report.quality_score == 50
+
+    def test_fix_automatico_no_resta_puntaje(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame(
+            {"name": ["Juan Perez"], "mobile": ["(011) 1234-5678"]}
+        )
+        report = validate_dataframe(df, schema)
+        assert report.quality_score == 100
+
+
 class TestFixExplanation:
     def test_telefono_normalizable_trae_explicacion(self):
         issue = format_rules.check("mobile", "char", "(011) 1234-5678")

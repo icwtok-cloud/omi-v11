@@ -71,11 +71,13 @@ class ValidationReport:
     column_match_confidence: dict = field(default_factory=dict)
     unmatched_columns: list[str] = field(default_factory=list)
     preview_rows: list[dict] = field(default_factory=list)
+    quality_score: int = 100
 
     def to_dict(self) -> dict:
         return {
             "total_rows": self.total_rows,
             "total_issues": self.total_issues,
+            "quality_score": self.quality_score,
             "columns_seen": self.columns_seen,
             "columns_expected_missing": self.columns_expected_missing,
             "structural_mismatch": self.structural_mismatch,
@@ -98,6 +100,24 @@ class ValidationReport:
                 for i in self.issues
             ],
         }
+
+
+def _compute_quality_score(total_rows: int, issues: list[FieldIssue]) -> int:
+    """Un número único (0-100) que resume qué tan lista está la migración,
+    para que el usuario no tenga que leer todo el reporte para tener una
+    primera impresión. Se basa en la fracción de FILAS (no de issues
+    sueltos -- una fila con 3 problemas no debería pesar 3 veces más que
+    una con 1) que tienen al menos un problema que requiere revisión
+    manual (fix_is_automatic=False). Los que se corrigen solos no restan
+    -- ya están resueltos antes de que el usuario mire el reporte."""
+    if total_rows == 0:
+        return 100
+
+    rows_needing_manual_review = {
+        i.row_index for i in issues if not i.fix_is_automatic
+    }
+    manual_ratio = len(rows_needing_manual_review) / total_rows
+    return round((1 - manual_ratio) * 100)
 
 
 def _known_relation_values(schema: RuleSchema, comodel_name: str, override: dict | None) -> set[str] | None:
@@ -195,6 +215,7 @@ def validate_dataframe(
             column_match_confidence=column_match_confidence,
             unmatched_columns=unmatched_columns,
             preview_rows=preview_rows,
+            quality_score=0,  # las columnas no corresponden al módulo elegido
         )
 
     # --- 1. Columnas requeridas que ni siquiera están en el archivo ---
@@ -334,7 +355,8 @@ def validate_dataframe(
         structural_mismatch=False,
         matched_columns_count=len(matched_columns),
         column_mapping=column_mapping,
-            column_match_confidence=column_match_confidence,
+        column_match_confidence=column_match_confidence,
         unmatched_columns=unmatched_columns,
         preview_rows=preview_rows,
+        quality_score=_compute_quality_score(len(df), issues),
     )

@@ -10,6 +10,33 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Índice de calidad del archivo (quality_score)
+
+**Qué cambia:** nuevo `quality_score: int` (0-100) en `ValidationReport`
+(`backend/app/services/validation_engine.py`), calculado como
+`100 - % de filas con al menos un problema que requiere revisión
+manual`. Los fixes automáticos no restan puntaje (ya están resueltos).
+`structural_mismatch` da 0 directo (el archivo no corresponde al
+módulo). Se propaga en `ValidationReportResponse` y en
+`ModuleSummaryResponse` (para verlo en el resumen del proyecto sin
+abrir el reporte completo). En el frontend, nuevo badge "Calidad:
+X/100" en el header del reporte de cada módulo (verde ≥90, ámbar ≥60,
+rojo por debajo).
+
+**Por qué:** era el ítem #7 del roadmap nuevo acordado con el usuario
+("índice de calidad del archivo") -- un número único le da al usuario
+(pensando como Odoo Partner) una primera impresión del estado de la
+migración sin tener que leer fila por fila el reporte completo.
+
+**Tests:** `TestQualityScore` en
+`backend/tests/test_validation_engine.py` (archivo limpio = 100,
+mismatch estructural = 0, mitad de filas con problema manual = 50, fix
+automático no resta puntaje).
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — PaywallPanel no saltaba el pago para suscriptores con cuota disponible
 
 **Qué cambia:** `PaywallPanel.tsx` ahora consulta también

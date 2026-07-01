@@ -31,6 +31,7 @@ class ModuleSummaryResponse(BaseModel):
     odoo_module: str
     status: str
     total_issues: int | None = None
+    quality_score: int | None = None
     missing_dependencies: list[str] = []
 
 
@@ -61,6 +62,7 @@ class ValidationReportResponse(BaseModel):
     module_id: str
     total_rows: int
     total_issues: int
+    quality_score: int = 100
     columns_seen: list[str]
     columns_expected_missing: list[str]
     structural_mismatch: bool = False

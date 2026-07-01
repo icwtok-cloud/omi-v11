@@ -566,13 +566,16 @@ function ModuleReportView({
   return (
     <>
       <div className="mb-8">
-        <h2 className="font-extrabold text-2xl mb-4 tracking-tight">
-          {report.total_issues === 0
-            ? "Este módulo está listo para Odoo"
-            : `${report.total_issues} ${
-                report.total_issues === 1 ? "problema encontrado" : "problemas encontrados"
-              }`}
-        </h2>
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <h2 className="font-extrabold text-2xl tracking-tight">
+            {report.total_issues === 0
+              ? "Este módulo está listo para Odoo"
+              : `${report.total_issues} ${
+                  report.total_issues === 1 ? "problema encontrado" : "problemas encontrados"
+                }`}
+          </h2>
+          <QualityScoreBadge score={report.quality_score} />
+        </div>
         <div className="grid grid-cols-3 gap-3">
           <Stat label="Filas totales" value={report.total_rows} />
           <Stat label="Filas sin errores" value={Math.max(okRows, 0)} tone="verify" />
@@ -877,6 +880,16 @@ function IssueGroupList({
         );
       })}
     </section>
+  );
+}
+
+function QualityScoreBadge({ score }: { score: number }) {
+  const toneClass =
+    score >= 90 ? "text-verify bg-verify-light" : score >= 60 ? "text-brand bg-canvas" : "text-alert bg-alert-light";
+  return (
+    <span className={`font-mono text-sm font-medium rounded-full px-3 py-1 ${toneClass}`}>
+      Calidad: {score}/100
+    </span>
   );
 }
 
