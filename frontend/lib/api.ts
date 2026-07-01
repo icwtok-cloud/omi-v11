@@ -67,15 +67,20 @@ export interface ModuleUploadResult {
   status: string;
 }
 
-/** Sube (o re-sube, pisando el archivo anterior) un módulo dentro de un proyecto. */
+/** Sube (o re-sube, pisando el archivo anterior) un módulo dentro de un proyecto.
+ * `odooCountry` solo hace falta la primera vez que se agrega un módulo cuyas
+ * reglas varían por país y el proyecto todavía no tiene uno fijado -- una vez
+ * fijado a nivel proyecto, se ignora cualquier valor distinto que se mande. */
 export async function addModule(
   getToken: GetToken,
   projectId: string,
   odooModule: string,
-  file: File
+  file: File,
+  odooCountry?: string | null
 ): Promise<ModuleUploadResult> {
   const formData = new FormData();
   formData.append("odoo_module", odooModule);
+  if (odooCountry) formData.append("odoo_country", odooCountry);
   formData.append("file", file);
 
   const res = await authedFetch(`/projects/${projectId}/modules`, getToken, {

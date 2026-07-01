@@ -117,6 +117,37 @@ resultante coincide con lo esperado (`projectstatus` = `active/paid/exported`,
 > técnica conocida, no se tocó en esta sesión para no ampliar el
 > blast radius de este cambio.
 
+**Segundo bug encontrado en producción tras el deploy (reportado por el
+usuario con captura de pantalla):** con el proyecto ya migrado en vivo,
+se podía crear un proyecto y subir un primer módulo que no necesita
+país (ej. CRM), pero al agregar después un módulo country-scoped (ej.
+Contactos) el formulario de "Agregar módulo" no tenía selector de país
+-- el backend rechazaba con "El módulo 'contactos' requiere un país" y
+no había forma de resolverlo desde la UI. Causa: `odoo_country` es una
+propiedad del Project completo (una sola instancia de Odoo), pero el
+formulario de agregar módulo se diseñó asumiendo que ya estaría fijado
+desde la creación del proyecto, sin contemplar que el primer módulo
+elegido puede no necesitarlo.
+
+Fix: `POST /projects/{id}/modules` acepta ahora un `odoo_country`
+opcional que fija `project.odoo_country` la primera vez que hace falta
+(si el proyecto ya tiene país, se ignora cualquier valor distinto que
+venga en el request -- el país es del proyecto, no del módulo).
+`frontend/app/proyectos/[id]/page.tsx` muestra el selector de país en
+el formulario de "Agregar módulo" solo cuando el módulo elegido lo
+necesita Y el proyecto todavía no tiene uno fijado. Nuevos tests en
+`test_projects_multimodule.py` (`TestPaisSeFijaAlAgregarUnModuloQueLoNecesita`,
+3 casos). 35/35 tests pasan.
+
+**Regla para no repetirlo:**
+> Cuando un campo pasa de "por módulo" a "por proyecto" en un rediseño
+> de schema (como pasó acá con `odoo_country`), repasar CADA punto de
+> entrada donde antes se pedía ese campo (alta inicial, alta de un ítem
+> adicional) -- no alcanza con migrar el campo en la DB, hay que migrar
+> todos los flujos de UI que lo completan. El caso que se nos escapó fue
+> justo el más común en la práctica: la mayoría de los proyectos reales
+> van a mezclar al menos un módulo country-scoped con uno que no lo es.
+
 ---
 
 ## 2026-06-30 — Theming del modal de Clerk + explicación de fixes en el reporte

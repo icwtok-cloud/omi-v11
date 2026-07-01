@@ -29,6 +29,28 @@ const MODULE_LABELS: Record<string, string> = {
   compras: "Compras",
 };
 
+const COUNTRY_LABELS: Record<string, string> = {
+  ar: "Argentina",
+  bo: "Bolivia",
+  br: "Brasil",
+  cl: "Chile",
+  co: "Colombia",
+  cr: "Costa Rica",
+  do: "República Dominicana",
+  ec: "Ecuador",
+  gt: "Guatemala",
+  mx: "México",
+  pa: "Panamá",
+  pe: "Perú",
+  py: "Paraguay",
+  uy: "Uruguay",
+  ve: "Venezuela",
+};
+
+// Módulos cuyas reglas varían por país (deben mostrar selector de país) --
+// mismo set que en app/app/page.tsx.
+const COUNTRY_SCOPED_MODULES = new Set(["contactos", "contabilidad", "facturacion"]);
+
 export default function ProjectPage() {
   const params = useParams<{ id: string }>();
   const projectId = params.id;
@@ -56,6 +78,7 @@ export default function ProjectPage() {
   const [combinations, setCombinations] = useState<AvailableCombination[]>([]);
   const [showAddModule, setShowAddModule] = useState(false);
   const [addModuleName, setAddModuleName] = useState("");
+  const [addModuleCountry, setAddModuleCountry] = useState("");
   const [addModuleFile, setAddModuleFile] = useState<File | null>(null);
   const [addingModule, setAddingModule] = useState(false);
   const [addModuleError, setAddModuleError] = useState<string | null>(null);
@@ -151,11 +174,18 @@ export default function ProjectPage() {
     setAddingModule(true);
     setAddModuleError(null);
     try {
-      const result = await addModule(getToken, projectId, addModuleName, addModuleFile);
+      const result = await addModule(
+        getToken,
+        projectId,
+        addModuleName,
+        addModuleFile,
+        needsCountryForAddModule ? addModuleCountry : null
+      );
       const summary = await getProject(getToken, projectId);
       setProject(summary);
       setShowAddModule(false);
       setAddModuleName("");
+      setAddModuleCountry("");
       setAddModuleFile(null);
       selectModule(result.module_id);
     } catch (e) {
@@ -192,6 +222,22 @@ export default function ProjectPage() {
         .map((c) => c.module)
     )
   ).filter((m) => !usedModules.has(m));
+
+  // El país es una propiedad del proyecto (una sola instancia de Odoo) --
+  // si ya está fijado, no hace falta volver a pedirlo. Si no, y el módulo
+  // que se está por agregar lo necesita, hay que elegirlo acá.
+  const needsCountryForAddModule =
+    !project.odoo_country && COUNTRY_SCOPED_MODULES.has(addModuleName);
+  const addModuleCountryOptions = needsCountryForAddModule
+    ? combinations
+        .filter(
+          (c) =>
+            c.module === addModuleName && c.version === project.odoo_version && c.country
+        )
+        .map((c) => c.country as string)
+    : [];
+  const addModuleReady =
+    addModuleName && addModuleFile && (!needsCountryForAddModule || addModuleCountry);
 
   // El pago es a nivel proyecto: hace falta que TODOS los módulos con
   // fixes manuales seleccionados estén confirmados, no solo el que se
@@ -257,7 +303,10 @@ export default function ProjectPage() {
             <select
               className="border border-line rounded-md px-3 py-2.5 bg-white text-ink"
               value={addModuleName}
-              onChange={(e) => setAddModuleName(e.target.value)}
+              onChange={(e) => {
+                setAddModuleName(e.target.value);
+                setAddModuleCountry("");
+              }}
             >
               <option value="">Elegí un módulo</option>
               {addableModules.map((m) => (
@@ -276,6 +325,31 @@ export default function ProjectPage() {
               />
             </label>
           </div>
+
+          {needsCountryForAddModule && (
+            <div>
+              <label className="block text-sm font-medium mb-2" htmlFor="add-module-country">
+                País de localización
+                <span className="ml-2 text-xs font-normal text-graphite">
+                  Las reglas de {MODULE_LABELS[addModuleName] || addModuleName} varían según el país -- queda fijo para todo el proyecto
+                </span>
+              </label>
+              <select
+                id="add-module-country"
+                className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink"
+                value={addModuleCountry}
+                onChange={(e) => setAddModuleCountry(e.target.value)}
+              >
+                <option value="">Elegí un país</option>
+                {addModuleCountryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {COUNTRY_LABELS[c] || c.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {addModuleError && (
             <p className="text-alert text-sm bg-alert-light rounded-md px-4 py-2.5">
               {addModuleError}
@@ -283,7 +357,7 @@ export default function ProjectPage() {
           )}
           <button
             onClick={handleAddModule}
-            disabled={!addModuleName || !addModuleFile || addingModule}
+            disabled={!addModuleReady || addingModule}
             className="bg-brand text-white text-sm font-medium rounded-full px-5 py-2.5 disabled:opacity-40 hover:opacity-90 transition-opacity"
           >
             {addingModule ? "Subiendo..." : "Agregar y validar"}

@@ -144,6 +144,7 @@ def get_project(
 async def upload_module(
     project_id: str,
     odoo_module: str = Form(...),
+    odoo_country: str | None = Form(None),
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -166,12 +167,21 @@ async def upload_module(
         )
     _validate_file_signature(contents, suffix)
 
+    # El país es una propiedad del proyecto (una sola instancia de Odoo),
+    # no de cada módulo -- se fija con el primer módulo que lo necesite.
+    # Si el proyecto ya tiene país fijado, ese es el que manda (se ignora
+    # cualquier valor distinto que venga en este request).
+    effective_country = project.odoo_country or odoo_country
+
     # Validamos que la combinación módulo+versión+país exista ANTES de
     # guardar nada -- evita módulos huérfanos sin reglas contra qué validar.
     try:
-        load_rule_schema(odoo_module, project.odoo_version, project.odoo_country)
+        load_rule_schema(odoo_module, project.odoo_version, effective_country)
     except (FileNotFoundError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if project.odoo_country is None and effective_country:
+        project.odoo_country = effective_country
 
     existing = next((m for m in project.modules if m.odoo_module == odoo_module), None)
 

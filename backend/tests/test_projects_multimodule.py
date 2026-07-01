@@ -17,10 +17,15 @@ CONTACTOS_CSV = "name,vat,email\nJuan Perez,20-12345678-9,juan@x.com\n"
 CRM_CSV = "name\nOportunidad 1\n"
 
 
-def _upload_module(client, project_id, odoo_module, csv_content, filename="archivo.csv"):
+def _upload_module(
+    client, project_id, odoo_module, csv_content, filename="archivo.csv", odoo_country=None
+):
+    data = {"odoo_module": odoo_module}
+    if odoo_country:
+        data["odoo_country"] = odoo_country
     return client.post(
         f"/projects/{project_id}/modules",
-        data={"odoo_module": odoo_module},
+        data=data,
         files={"file": (filename, io.BytesIO(csv_content.encode()), "text/csv")},
     )
 
@@ -100,6 +105,46 @@ class TestCrearProyectoYModulos:
         assert len(summary["modules"]) == 1
         # el reporte viejo se descarta al re-subir
         assert summary["modules"][0]["total_issues"] is None
+
+
+class TestPaisSeFijaAlAgregarUnModuloQueLoNecesita:
+    """Reproduce un bug real reportado en producción: un proyecto creado
+    sin país (arrancó con un módulo que no lo necesita, ej. CRM) no podía
+    agregar después un módulo country-scoped (ej. contactos) porque no
+    había forma de indicar el país -- el formulario de 'agregar módulo'
+    no lo pedía y el backend no aceptaba fijarlo ahí."""
+
+    def test_agregar_modulo_country_scoped_sin_pais_en_el_proyecto_falla_sin_pais(self, client):
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": None}
+        ).json()["project_id"]
+        _upload_module(client, project_id, "crm", CRM_CSV)
+
+        resp = _upload_module(client, project_id, "contactos", CONTACTOS_CSV)
+        assert resp.status_code == 400
+        assert "país" in resp.json()["detail"]
+
+    def test_agregar_modulo_country_scoped_con_pais_fija_el_pais_del_proyecto(self, client):
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": None}
+        ).json()["project_id"]
+        _upload_module(client, project_id, "crm", CRM_CSV)
+
+        resp = _upload_module(client, project_id, "contactos", CONTACTOS_CSV, odoo_country="ar")
+        assert resp.status_code == 200
+
+        summary = client.get(f"/projects/{project_id}").json()
+        assert summary["odoo_country"] == "ar"
+
+    def test_una_vez_fijado_el_pais_no_hace_falta_repetirlo(self, client):
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+
+        # contactos es country-scoped, pero el proyecto ya tiene país --
+        # no hace falta mandarlo de nuevo.
+        resp = _upload_module(client, project_id, "contactos", CONTACTOS_CSV)
+        assert resp.status_code == 200
 
 
 class TestValidacionYReportePorModulo:
