@@ -931,12 +931,22 @@ function IssueGroupList({
   );
 }
 
+function qualityScoreLabel(score: number): string {
+  if (score >= 90) return "Excelente";
+  if (score >= 75) return "Bueno";
+  if (score >= 60) return "Necesita atención";
+  return "Riesgo alto de import";
+}
+
 function QualityScoreBadge({ score }: { score: number }) {
   const toneClass =
     score >= 90 ? "text-verify bg-verify-light" : score >= 60 ? "text-brand bg-canvas" : "text-alert bg-alert-light";
   return (
-    <span className={`font-mono text-sm font-medium rounded-full px-3 py-1 ${toneClass}`}>
-      Calidad: {score}/100
+    <span
+      className={`font-mono text-sm font-medium rounded-full px-3 py-1 ${toneClass}`}
+      title="Resume qué tan lista está esta data para Odoo, según los problemas encontrados y cuánto pesa cada tipo. Cuanto más bajo, más riesgo de que la importación falle o entre con datos incompletos."
+    >
+      {qualityScoreLabel(score)} · {score}/100
     </span>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ProductDemo } from "@/components/ProductDemo";
+import { LocalizationPulse } from "@/components/LocalizationPulse";
 
 const PAIN_CARDS = [
   {
@@ -54,7 +55,7 @@ const PAIN_CARDS = [
 
 const BEFORE_AFTER = {
   before: [
-    "Emails, CUIT/RFC/RUT y otros formatos rotos",
+    "Emails mal formados y otros formatos rotos",
     "Duplicados entre filas o depósitos",
     "Relaciones que no existen en tu Odoo (etapas, categorías, monedas)",
     "Columnas obligatorias faltantes",
@@ -162,7 +163,7 @@ const DOUBTS = [
   },
   {
     q: "No confío en los fixes automáticos",
-    a: "Ningún cambio se aplica sin que lo veas primero. Los automáticos quedan a la vista antes de exportar, y los que requieren criterio quedan marcados para que decidas vos.",
+    a: "Tu archivo original nunca se modifica. Las correcciones se aplican recién al generar el archivo de descarga -- podés ver cada cambio antes de exportar. Lo que sí requiere tu criterio (un precio en cero que podría ser real, por ejemplo) queda marcado para que decidas vos, no se corrige solo.",
   },
   {
     q: "No quiero que una IA le meta mano a mi contabilidad",
@@ -242,7 +243,8 @@ export default function LandingPage() {
             <p className="text-graphite text-lg leading-relaxed max-w-xl mx-auto lg:mx-0 mb-8">
               Importar directo a Odoo es una apuesta: los datos rotos aparecen recién
               en producción. OMI los analiza antes -- duplicados, campos vacíos,
-              CUIT/RFC/RUT inválidos y todo lo que Odoo va a rechazar -- antes del Go Live.
+              relaciones que no existen en tu Odoo y todo lo que la versión que
+              elegiste va a rechazar -- antes del Go Live.
             </p>
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 mb-4">
               <Link
@@ -393,12 +395,15 @@ export default function LandingPage() {
           <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight text-center mb-4">
             Hecho para implementaciones Odoo en Latinoamérica
           </h2>
-          <p className="text-graphite text-center max-w-2xl mx-auto mb-10">
-            El formato de CUIT, RFC, RUT, RUC y equivalentes, los códigos postales,
-            las monedas y los datos de fábrica de Odoo cambian de país en país. OMI
-            valida Contactos, Contabilidad y Facturación contra las reglas reales de
-            cada uno -- no contra una checklist genérica.
+          <p className="text-graphite text-center max-w-2xl mx-auto mb-6">
+            Cada país tiene su propio addon oficial de localización dentro de Odoo
+            (l10n_ar, l10n_mx, l10n_br...), con su propia estructura de campos. OMI
+            lee ese addon real para Contactos, Contabilidad y Facturación -- no
+            aplica la misma plantilla a todos los países.
           </p>
+          <div className="flex justify-center mb-10">
+            <LocalizationPulse />
+          </div>
           <div className="flex flex-wrap justify-center gap-2.5 mb-6">
             {LATAM_COUNTRIES.map((country) => (
               <span

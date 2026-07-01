@@ -47,12 +47,16 @@ export function IssueRow({
         )}
 
         {issue.fix_is_automatic ? (
-          <span className="font-mono text-xs text-verify whitespace-nowrap">
-            se corrige solo
+          <span
+            className="font-mono text-xs text-verify whitespace-nowrap"
+            title="Se corrige en el archivo que descargás al exportar -- tu archivo original nunca se modifica."
+          >
+            se corrige al exportar
           </span>
         ) : issue.suggested_fix !== null && issue.suggested_fix !== undefined ? (
           <button
             onClick={onToggleManualFix}
+            title="OMI sugiere este valor pero no lo aplica solo -- confirmalo si es correcto para este caso."
             className={`text-xs font-medium rounded-full px-3 py-1.5 whitespace-nowrap transition-colors ${
               manualFixApplied
                 ? "bg-verify text-white"
@@ -62,8 +66,11 @@ export function IssueRow({
             {manualFixApplied ? "Fix aplicado" : "Aplicar fix"}
           </button>
         ) : (
-          <span className="font-mono text-xs text-graphite whitespace-nowrap">
-            requiere revisión manual
+          <span
+            className="font-mono text-xs text-graphite whitespace-nowrap"
+            title="OMI no puede adivinar este valor sin arriesgar un dato de negocio real. Si lo dejás así, Odoo puede rechazar la fila o importarla con datos incompletos."
+          >
+            revisalo antes de exportar
           </span>
         )}
       </div>
