@@ -576,6 +576,16 @@ function ModuleReportView({
           </h2>
           <QualityScoreBadge score={report.quality_score} />
         </div>
+        {report.quality_score_breakdown.length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4">
+            {report.quality_score_breakdown.map((b) => (
+              <p key={b.issue_type} className="font-mono text-xs text-graphite">
+                -{b.points_deducted} {ISSUE_LABELS[b.issue_type] ?? b.issue_type} (
+                {b.rows_affected} {b.rows_affected === 1 ? "fila" : "filas"})
+              </p>
+            ))}
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-3">
           <Stat label="Filas totales" value={report.total_rows} />
           <Stat label="Filas sin errores" value={Math.max(okRows, 0)} tone="verify" />

@@ -151,6 +151,7 @@ export interface ValidationReport {
   total_rows: number;
   total_issues: number;
   quality_score: number;
+  quality_score_breakdown: { issue_type: string; rows_affected: number; points_deducted: number }[];
   columns_seen: string[];
   columns_expected_missing: string[];
   structural_mismatch: boolean;

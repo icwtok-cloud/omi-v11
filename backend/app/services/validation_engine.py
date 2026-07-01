@@ -72,12 +72,14 @@ class ValidationReport:
     unmatched_columns: list[str] = field(default_factory=list)
     preview_rows: list[dict] = field(default_factory=list)
     quality_score: int = 100
+    quality_score_breakdown: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
             "total_rows": self.total_rows,
             "total_issues": self.total_issues,
             "quality_score": self.quality_score,
+            "quality_score_breakdown": self.quality_score_breakdown,
             "columns_seen": self.columns_seen,
             "columns_expected_missing": self.columns_expected_missing,
             "structural_mismatch": self.structural_mismatch,
@@ -102,22 +104,68 @@ class ValidationReport:
         }
 
 
-def _compute_quality_score(total_rows: int, issues: list[FieldIssue]) -> int:
+# Orden de prioridad para atribuir una fila con VARIOS tipos de problema
+# a un solo issue_type en el desglose del quality_score -- sin esto, una
+# fila con 2 problemas restaría puntos dos veces en el desglose (una vez
+# por cada tipo), y la suma de las categorías no coincidiría con el
+# descuento total. Un problema estructural/de dato (falta un campo
+# obligatorio) importa más que uno de contactabilidad, por eso ese orden.
+_ISSUE_TYPE_PRIORITY = [
+    "missing_required",
+    "invalid_format",
+    "unknown_relation",
+    "duplicate",
+    "negative_value",
+    "missing_contact_info",
+]
+
+
+def _compute_quality_score(total_rows: int, issues: list[FieldIssue]) -> tuple[int, list[dict]]:
     """Un número único (0-100) que resume qué tan lista está la migración,
     para que el usuario no tenga que leer todo el reporte para tener una
-    primera impresión. Se basa en la fracción de FILAS (no de issues
-    sueltos -- una fila con 3 problemas no debería pesar 3 veces más que
-    una con 1) que tienen al menos un problema que requiere revisión
-    manual (fix_is_automatic=False). Los que se corrigen solos no restan
-    -- ya están resueltos antes de que el usuario mire el reporte."""
+    primera impresión, más un desglose de qué categorías restaron puntos
+    -- un número solo sirve para marketing, un número con desglose sirve
+    para priorizar el trabajo. Se basa en la fracción de FILAS (no de
+    issues sueltos -- una fila con 3 problemas no debería pesar 3 veces
+    más que una con 1) que tienen al menos un problema que requiere
+    revisión manual (fix_is_automatic=False). Los que se corrigen solos
+    no restan -- ya están resueltos antes de que el usuario mire el
+    reporte."""
     if total_rows == 0:
-        return 100
+        return 100, []
 
-    rows_needing_manual_review = {
-        i.row_index for i in issues if not i.fix_is_automatic
-    }
-    manual_ratio = len(rows_needing_manual_review) / total_rows
-    return round((1 - manual_ratio) * 100)
+    manual_issues_by_row: dict[int, list[FieldIssue]] = {}
+    for issue in issues:
+        if not issue.fix_is_automatic:
+            manual_issues_by_row.setdefault(issue.row_index, []).append(issue)
+
+    # Cada fila con problema manual se atribuye a UN SOLO issue_type (el
+    # de mayor prioridad que tenga esa fila), para que el desglose sume
+    # exactamente el descuento total -- no es doble conteo.
+    deduction_rows_by_type: dict[str, int] = {}
+    for row_issues in manual_issues_by_row.values():
+        types_in_row = {i.issue_type for i in row_issues}
+        primary_type = next(
+            (t for t in _ISSUE_TYPE_PRIORITY if t in types_in_row),
+            next(iter(types_in_row)),
+        )
+        deduction_rows_by_type[primary_type] = deduction_rows_by_type.get(primary_type, 0) + 1
+
+    manual_ratio = len(manual_issues_by_row) / total_rows
+    score = round((1 - manual_ratio) * 100)
+
+    breakdown = [
+        {
+            "issue_type": issue_type,
+            "rows_affected": count,
+            "points_deducted": round((count / total_rows) * 100),
+        }
+        for issue_type, count in sorted(
+            deduction_rows_by_type.items(), key=lambda kv: kv[1], reverse=True
+        )
+    ]
+
+    return score, breakdown
 
 
 def _known_relation_values(schema: RuleSchema, comodel_name: str, override: dict | None) -> set[str] | None:
@@ -346,6 +394,8 @@ def validate_dataframe(
     # --- 3. Duplicados (a nivel columna completa, no fila por fila) ---
     issues.extend(format_rules.check_duplicates(df, column_mapping))
 
+    quality_score, quality_score_breakdown = _compute_quality_score(len(df), issues)
+
     return ValidationReport(
         total_rows=len(df),
         total_issues=len(issues),
@@ -358,5 +408,6 @@ def validate_dataframe(
         column_match_confidence=column_match_confidence,
         unmatched_columns=unmatched_columns,
         preview_rows=preview_rows,
-        quality_score=_compute_quality_score(len(df), issues),
+        quality_score=quality_score,
+        quality_score_breakdown=quality_score_breakdown,
     )

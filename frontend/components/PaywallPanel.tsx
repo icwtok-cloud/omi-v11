@@ -172,6 +172,7 @@ export function PaywallPanel({
         >
           Descargar archivo corregido
         </a>
+        <PostDownloadChecklist />
       </div>
     );
   }
@@ -340,6 +341,52 @@ export function PaywallPanel({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+const POST_DOWNLOAD_CHECKLIST = [
+  "Backup de la base de Odoo antes de importar",
+  "Activar el modo desarrollador",
+  "Importar primero los módulos base (Contactos, Productos) antes que los que dependen de ellos",
+  "Verificar que los impuestos y listas de precio usados en el archivo existan en tu Odoo",
+  "Revisar que las compañías/multi-empresa estén bien asignadas",
+  "Hacer una prueba con un lote chico (50 registros) antes de importar todo",
+];
+
+function PostDownloadChecklist() {
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+
+  function toggle(i: number) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+  }
+
+  return (
+    <div className="mt-6 text-left border-t border-verify/30 pt-4">
+      <p className="text-xs font-medium text-graphite mb-2">
+        Antes de importar en Odoo, tené en cuenta:
+      </p>
+      <div className="space-y-1.5">
+        {POST_DOWNLOAD_CHECKLIST.map((item, i) => (
+          <label key={i} className="flex items-start gap-2 text-xs text-ink cursor-pointer">
+            <input
+              type="checkbox"
+              checked={checked.has(i)}
+              onChange={() => toggle(i)}
+              className="mt-0.5"
+            />
+            <span className={checked.has(i) ? "line-through text-graphite" : ""}>{item}</span>
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-graphite italic mt-2">
+        Esta checklist es una guía general -- no reemplaza el criterio de quien hace la
+        importación en tu Odoo.
+      </p>
     </div>
   );
 }

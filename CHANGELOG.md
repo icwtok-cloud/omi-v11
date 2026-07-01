@@ -8,6 +8,40 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — Desglose del Quality Score + checklist post-descarga
+
+**Qué cambia:**
+1. `_compute_quality_score()` (`backend/app/services/validation_engine.py`)
+   ahora devuelve también `quality_score_breakdown`: una lista de
+   `{issue_type, rows_affected, points_deducted}` que explica QUÉ restó
+   puntaje. Cada fila con problema manual se atribuye a un solo
+   `issue_type` (el de mayor prioridad, ver `_ISSUE_TYPE_PRIORITY`) para
+   que la suma del desglose coincida exactamente con el descuento total
+   -- una fila con 2 problemas distintos no debía restar doble. Se
+   muestra en el reporte, debajo del badge de calidad.
+2. Nuevo `PostDownloadChecklist` en `frontend/components/PaywallPanel.tsx`
+   -- una checklist estática (backup, modo desarrollador, orden de
+   importación, impuestos/listas de precio, multi-compañía, probar con
+   un lote chico) que aparece junto al botón de descarga.
+
+**Por qué:** ambos surgieron de la segunda auditoría de producto de
+esta sesión (persona "OMI Product Auditor" + refinamiento del usuario)
+-- "un número solo sirve para marketing, un número con desglose sirve
+para trabajar", y el momento de mayor riesgo real (la importación en
+Odoo) es justo donde el producto se desentendía sin dar ninguna guía.
+Se descartó explícitamente ir más allá (ej. conectarse a Odoo para
+ejecutar la importación) -- ver discusión en el mismo hilo: OMI prepara
+y valida, la importación sigue siendo responsabilidad del usuario/partner.
+
+**Tests:** `TestQualityScore` extendido en
+`backend/tests/test_validation_engine.py` (la suma del desglose
+coincide con el descuento total; una fila con 2 tipos de problema
+distintos se cuenta una sola vez).
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — Modal de Clerk seguía oscuro con el SO en modo oscuro
 
 **Qué cambia:** `frontend/app/globals.css` declara `color-scheme: light`

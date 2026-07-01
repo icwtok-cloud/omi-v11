@@ -63,6 +63,7 @@ class ValidationReportResponse(BaseModel):
     total_rows: int
     total_issues: int
     quality_score: int = 100
+    quality_score_breakdown: list[dict] = []
     columns_seen: list[str]
     columns_expected_missing: list[str]
     structural_mismatch: bool = False

@@ -363,6 +363,50 @@ class TestQualityScore:
         report = validate_dataframe(df, schema)
         assert report.quality_score == 100
 
+    def test_desglose_suma_el_mismo_descuento_que_el_score(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame(
+            {
+                "name": ["A", "B", "C", "D"],
+                "email": [
+                    "esto-no-es-un-email",
+                    "b@x.com",
+                    "c@x.com",
+                    "d@x.com",
+                ],
+                "vat": [
+                    "20-12345678-9",
+                    "20-12345678-9",
+                    "30-99999999-1",
+                    "40-11111111-1",
+                ],
+            }
+        )
+        report = validate_dataframe(df, schema)
+        total_deduction = 100 - report.quality_score
+        breakdown_sum = sum(b["points_deducted"] for b in report.quality_score_breakdown)
+        assert breakdown_sum == total_deduction
+
+    def test_una_fila_con_dos_problemas_se_cuenta_una_sola_vez_en_el_desglose(self):
+        # "A" tiene email inválido (invalid_format) Y vat duplicado con
+        # "B" (duplicate) -- si esa fila sumara puntos en las dos
+        # categorías, la suma del desglose superaría el descuento total.
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame(
+            {
+                "name": ["A", "B"],
+                "email": ["esto-no-es-un-email", "b@x.com"],
+                "vat": ["20-12345678-9", "20-12345678-9"],
+            }
+        )
+        report = validate_dataframe(df, schema)
+        total_rows_in_breakdown = sum(
+            b["rows_affected"] for b in report.quality_score_breakdown
+        )
+        # 2 filas con problema manual en total (A: email+dup, B: dup) --
+        # no 3, aunque A tenga 2 tipos de issue distintos.
+        assert total_rows_in_breakdown == 2
+
 
 class TestFixExplanation:
     def test_telefono_normalizable_trae_explicacion(self):
