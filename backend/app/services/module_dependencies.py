@@ -26,6 +26,16 @@ MODULE_DEPENDENCIES: dict[str, list[str]] = {
 }
 
 
+def missing_dependencies(odoo_module: str, odoo_modules_in_project: list[str]) -> list[str]:
+    """Dependencias conocidas de `odoo_module` que NO están (todavía) en
+    este proyecto -- ej. subir "ventas" sin "contactos" en el mismo
+    proyecto. Es informativo, no bloqueante: el usuario puede estar
+    migrando contactos por separado, o va a agregar el módulo después."""
+    deps = MODULE_DEPENDENCIES.get(odoo_module, [])
+    present = set(odoo_modules_in_project)
+    return [d for d in deps if d not in present]
+
+
 def import_order(odoo_modules: list[str]) -> list[str]:
     """Ordena una lista de módulos (los que efectivamente están en el
     proyecto) respetando dependencias -- un módulo nunca aparece antes

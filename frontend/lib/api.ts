@@ -113,6 +113,7 @@ export interface ModuleSummary {
   odoo_module: string;
   status: string;
   total_issues: number | null;
+  missing_dependencies: string[];
 }
 
 export interface ProjectSummary {

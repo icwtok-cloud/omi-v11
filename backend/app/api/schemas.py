@@ -31,6 +31,7 @@ class ModuleSummaryResponse(BaseModel):
     odoo_module: str
     status: str
     total_issues: int | None = None
+    missing_dependencies: list[str] = []
 
 
 class ProjectSummaryResponse(BaseModel):

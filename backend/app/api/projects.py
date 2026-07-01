@@ -41,7 +41,7 @@ from app.models.db_models import (
 )
 from app.services.rules_loader import load_rule_schema, list_available_combinations
 from app.services.validation_engine import validate_dataframe
-from app.services.module_dependencies import import_order
+from app.services.module_dependencies import import_order, missing_dependencies
 from app.services.entitlements import (
     user_can_download, can_export_project, FREE_TIER_MODULE_LIMIT,
 )
@@ -174,6 +174,7 @@ def get_project(
     db: Session = Depends(get_db),
 ):
     project = _get_owned_project(project_id, user, db)
+    modules_in_project = [m.odoo_module for m in project.modules]
     return ProjectSummaryResponse(
         project_id=project.id,
         odoo_version=project.odoo_version,
@@ -185,6 +186,7 @@ def get_project(
                 odoo_module=m.odoo_module,
                 status=m.status.value,
                 total_issues=(m.validation_report or {}).get("total_issues"),
+                missing_dependencies=missing_dependencies(m.odoo_module, modules_in_project),
             )
             for m in project.modules
         ],

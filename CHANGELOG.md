@@ -10,6 +10,28 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Aviso de dependencia faltante entre módulos del proyecto
+
+**Qué cambia:** `GET /projects/{id}` ahora incluye
+`missing_dependencies: string[]` por módulo -- las dependencias
+conocidas (ver `module_dependencies.py`) que NO están presentes en el
+mismo proyecto. En el frontend, si algún módulo tiene dependencias
+faltantes, se muestra un aviso no bloqueante debajo de las tabs de
+módulos (ej. "crm suele depender de contactos...").
+
+**Por qué:** extensión natural del fix de orden de importación en el
+ZIP (mismo día) -- si un usuario sube "ventas" sin haber subido
+"contactos" en el mismo proyecto, hoy no hay forma de que se entere
+antes de exportar. Es informativo, no bloqueante (puede estar migrando
+contactos por separado, o va a agregar el módulo después).
+
+**Tests:** `TestMissingDependenciesEnResumenDeProyecto` en
+`backend/tests/test_projects_multimodule.py`.
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — Orden de importación recomendado en el ZIP de descarga
 
 **Qué cambia:** nuevo `backend/app/services/module_dependencies.py`

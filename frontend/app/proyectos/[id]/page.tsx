@@ -350,6 +350,20 @@ export default function ProjectPage() {
         )}
       </div>
 
+      {project.modules
+        .filter((m) => m.missing_dependencies.length > 0)
+        .map((m) => (
+          <p
+            key={`dep-warning-${m.module_id}`}
+            className="text-xs text-graphite bg-canvas border border-line rounded-md px-4 py-2 mb-3"
+          >
+            <strong>{MODULE_LABELS[m.odoo_module] || m.odoo_module}</strong> suele depender de{" "}
+            {m.missing_dependencies.map((d) => MODULE_LABELS[d] || d).join(", ")} -- si esos
+            registros no existen todavía en tu Odoo, algunas relaciones de este módulo pueden
+            quedar vacías al importar. No es un error, es solo una recomendación de orden.
+          </p>
+        ))}
+
       {showAddModule && (
         <div className="mb-8 border border-line rounded-md p-5 bg-white space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

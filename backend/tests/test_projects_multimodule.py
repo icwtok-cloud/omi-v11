@@ -227,6 +227,34 @@ class TestArchivoConEncodingCP1252:
         assert report["preview_rows"][0]["name"] == "José Muñoz"
 
 
+class TestMissingDependenciesEnResumenDeProyecto:
+    """GET /projects/{id} expone missing_dependencies por módulo -- un
+    aviso informativo (no bloqueante) de que un módulo dependiente (ej.
+    "crm") no tiene su dependencia ("contactos") en el mismo proyecto."""
+
+    def test_modulo_dependiente_sin_su_dependencia_lista_el_faltante(self, client):
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+        _upload_module(client, project_id, "crm", CRM_CSV)
+
+        summary = client.get(f"/projects/{project_id}").json()
+        crm_module = next(m for m in summary["modules"] if m["odoo_module"] == "crm")
+        assert crm_module["missing_dependencies"] == ["contactos"]
+
+    def test_con_la_dependencia_presente_no_hay_faltantes(self, client, db_session, test_user):
+        _use_up_free_tier(db_session, test_user)
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+        _upload_module(client, project_id, "contactos", CONTACTOS_CSV)
+        _upload_module(client, project_id, "crm", CRM_CSV)
+
+        summary = client.get(f"/projects/{project_id}").json()
+        crm_module = next(m for m in summary["modules"] if m["odoo_module"] == "crm")
+        assert crm_module["missing_dependencies"] == []
+
+
 class TestValidacionYReportePorModulo:
     def test_validar_y_obtener_reporte_de_un_modulo(self, client):
         project_id = client.post(
