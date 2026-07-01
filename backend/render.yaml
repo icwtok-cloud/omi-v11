@@ -6,6 +6,14 @@ services:
     plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    # Antes no había healthCheckPath -- Render solo chequeaba que el
+    # proceso responda algo, sin verificar la DB. Con /health/ready
+    # (agregado en esta ronda de hardening), un deploy con
+    # DATABASE_URL mal, una migración que falló, o la DB caída nunca
+    # recibe tráfico real hasta que efectivamente puede hablar con
+    # Postgres -- antes ese deploy roto hubiera pasado el health check
+    # igual (que solo devolvía {"status":"ok"} sin tocar nada).
+    healthCheckPath: /health/ready
     envVars:
       - key: DATABASE_URL
         fromDatabase:

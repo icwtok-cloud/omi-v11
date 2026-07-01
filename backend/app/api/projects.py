@@ -20,6 +20,7 @@ Project, no por módulo individual.
 from __future__ import annotations
 
 import csv
+import time
 import uuid
 import zipfile
 from io import BytesIO
@@ -35,6 +36,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.database import get_db, SessionLocal
+from app.core.safe_logging import log_event
 from app.models.db_models import (
     Project, ProjectModule, ProjectStatus, ModuleStatus, MAX_MODULES_PER_PROJECT, User,
 )
@@ -62,6 +64,12 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # actualizar el status -- ver get_validate_status(). Generoso a
 # propósito: un archivo de 150.000 filas puede tardar minutos.
 VALIDATION_STALE_MINUTES = 15
+
+# A partir de cuántas filas se loguea el evento "LargeFileProcessed" --
+# puramente informativo/telemetría, no cambia ningún comportamiento.
+# 100k es el orden de magnitud que el producto menciona como caso de
+# uso real (migraciones de cientos de miles de registros).
+LARGE_FILE_ROW_THRESHOLD = 100_000
 
 
 @router.get("/available-combinations", response_model=list[AvailableCombination])
@@ -171,6 +179,11 @@ def create_project(
     db.add(project)
     db.commit()
 
+    log_event(
+        "ProjectCreated",
+        project_id=project.id, owner_id=user.id,
+        odoo_version=project.odoo_version, odoo_country=project.odoo_country,
+    )
     return ProjectCreateResponse(project_id=project.id, status=project.status.value)
 
 
@@ -334,6 +347,12 @@ async def upload_module(
 
     db.commit()
 
+    log_event(
+        "ModuleUploaded",
+        project_id=project.id, module_id=module.id,
+        odoo_module=odoo_module, file_size_bytes=len(contents),
+        is_reupload=existing is not None,
+    )
     return ModuleUploadResponse(
         project_id=project.id, module_id=module.id,
         odoo_module=module.odoo_module, status=module.status.value,
@@ -388,20 +407,42 @@ def _run_validation_job(module_id: str) -> None:
         project = db.query(Project).filter(Project.id == module.project_id).first()
         user = db.query(User).filter(User.id == project.owner_id).first()
 
+        log_event(
+            "ValidationStarted",
+            project_id=project.id, module_id=module.id, odoo_module=module.odoo_module,
+        )
+        started_at = time.perf_counter()
+
         try:
             schema = load_rule_schema(module.odoo_module, project.odoo_version, project.odoo_country)
             df = _read_tabular_file(Path(module.storage_path), module.original_filename)
+            row_count = len(df)
+
+            if row_count >= LARGE_FILE_ROW_THRESHOLD:
+                log_event(
+                    "LargeFileProcessed",
+                    project_id=project.id, module_id=module.id, rows=row_count,
+                )
+            if user.annual_event_limit is not None:
+                log_event(
+                    "PartnerValidation",
+                    project_id=project.id, module_id=module.id, owner_id=user.id, rows=row_count,
+                )
 
             # Solo aplica a socios con membresía anual (annual_event_limit
             # seteado) -- para cualquier otro usuario esto es un no-op.
             # Se chequea ANTES de correr la validación (que puede tardar
             # minutos en un archivo grande) para no gastar tiempo de CPU
             # en un intento que de todas formas se va a rechazar.
-            allowed, err = can_process_validation_events(user, len(df))
+            allowed, err = can_process_validation_events(user, row_count)
             if not allowed:
                 module.status = ModuleStatus.failed
                 module.validation_error = err
                 db.commit()
+                log_event(
+                    "ValidationFailed",
+                    project_id=project.id, module_id=module.id, error_type="AnnualQuotaExceeded",
+                )
                 return
 
             def _persist_progress(done: int, total: int) -> None:
@@ -420,10 +461,24 @@ def _run_validation_job(module_id: str) -> None:
                 reset_annual_events_if_needed(user)
                 user.annual_events_used += len(df)
             db.commit()
+
+            duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
+            rows_per_sec = round(row_count / max(duration_ms / 1000, 0.001), 1)
+            log_event(
+                "ValidationFinished",
+                project_id=project.id, module_id=module.id,
+                rows=row_count, issues=report.total_issues,
+                quality_score=report.quality_score,
+                duration_ms=duration_ms, rows_per_sec=rows_per_sec,
+            )
         except Exception as e:
             module.status = ModuleStatus.failed
             module.validation_error = str(e)
             db.commit()
+            log_event(
+                "ValidationFailed",
+                project_id=project.id, module_id=module.id, error_type=type(e).__name__,
+            )
     finally:
         db.close()
 
@@ -559,6 +614,10 @@ def apply_module_fixes(
     if stale_corrected.exists():
         stale_corrected.unlink()
 
+    log_event(
+        "ManualFixApplied",
+        project_id=project.id, module_id=module.id, fixes_count=len(fixes),
+    )
     return {"confirmed_count": len(fixes)}
 
 
@@ -604,6 +663,12 @@ def download_project(
             zf.write(corrected_path, arcname=f"{position:02d}_{module.odoo_module}_corregido.csv")
 
     zip_buffer.seek(0)
+    zip_size_bytes = zip_buffer.getbuffer().nbytes
+    log_event(
+        "ExportGenerated",
+        project_id=project.id, modules_count=len(validated_modules),
+        zip_size_bytes=zip_size_bytes,
+    )
 
     # El contador se incrementa EXACTAMENTE acá, en el mismo commit que
     # el cambio de estado del proyecto -- atómico, evita doble conteo si
@@ -623,6 +688,7 @@ def download_project(
     project.status = ProjectStatus.exported
     db.commit()
 
+    log_event("ExportDownloaded", project_id=project.id, zip_size_bytes=zip_size_bytes)
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",

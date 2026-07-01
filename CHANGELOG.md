@@ -8,6 +8,61 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — Observabilidad de producción: request ID, health/readiness real, telemetría de negocio
+
+**Qué cambia:**
+- **Correlation ID por request** (`app/main.py`): middleware nuevo que
+  genera un `request_id` por request, lo devuelve en el header
+  `X-Request-ID`, y loguea una línea de access log (`method`, `path`,
+  `status`, `duration_ms`) por cada request -- antes no existía NINGÚN
+  log de qué requests llegaban al backend, solo el handler de errores
+  no manejados logueaba algo. El `support_id` que ve el usuario en un
+  error 500 ahora reusa este mismo `request_id` en vez de generar uno
+  aparte, para que sea un solo ID de punta a punta.
+- **Header `X-Content-Type-Options: nosniff`** en todas las respuestas
+  -- barato, sin downside, protege los endpoints de descarga (ZIP/PDF)
+  contra MIME-sniffing.
+- **`/health/ready` (nuevo, además de `/health`)**: `/health` sigue
+  siendo liveness puro (el proceso responde). `/health/ready` además
+  verifica que puede hablar con Postgres (`SELECT 1`) -- antes
+  `/health` devolvía `{"status":"ok"}` SIEMPRE, incluso con la base
+  caída, así que un deploy con `DATABASE_URL` mal o Postgres caído
+  pasaba el health check igual. `render.yaml` ahora apunta
+  `healthCheckPath` a `/health/ready`, así Render no manda tráfico real
+  a una instancia nueva hasta que puede hablar con la DB de verdad.
+- **Telemetría de negocio** (`log_event`, que ya existía pero tenía
+  CERO call sites en toda la app): se instrumentan los eventos clave
+  del producto -- `ProjectCreated`, `ModuleUploaded`,
+  `ValidationStarted`/`ValidationFinished`/`ValidationFailed` (con
+  `rows`, `issues`, `quality_score`, `duration_ms`, `rows_per_sec`),
+  `LargeFileProcessed` (≥100k filas), `PartnerValidation` (cuentas con
+  membresía anual), `ManualFixApplied`, `ExportGenerated`/
+  `ExportDownloaded`, `PaymentStarted`/`PaymentConfirmed`, y en el
+  worker de pagos: `PaymentListenerStarted`,
+  `PaymentListenerPollError`, `UnmatchedPaymentReceived` (reemplazan
+  los `print()` sueltos que tenía ese worker, sin ninguna estructura).
+  Todos los campos loguean solo metadata (IDs, conteos, duraciones) --
+  respeta la regla existente de `safe_logging.py` de nunca loguear
+  contenido de archivo/fila/valor de campo.
+
+**Por qué:** antes de esta ronda, un problema en producción (una
+validación que tarda demasiado, un pago que no confirma, un archivo
+grande que falla) no dejaba NINGÚN rastro diagnosticable -- había que
+reproducir el bug a mano para entender qué pasó. Ahora cada evento de
+negocio importante queda en logs estructurados, correlacionables por
+`request_id`, y Render deja de creer que el backend está sano cuando
+en realidad no puede hablar con la base.
+
+**Tests:** nuevo `backend/tests/test_observability.py` (9 tests: header
+`X-Request-ID` presente y distinto por request, `nosniff` presente,
+`/health/ready` ok y 503 cuando la DB no responde, y que
+`ProjectCreated`/`ModuleUploaded`/`ValidationStarted`/
+`ValidationFinished`/`PaymentStarted` efectivamente se logueen).
+111/111 backend pasan.
+
+**Rollback:** sin cambios de schema -- no aplica rollback de Alembic.
+Revertir el commit alcanza.
+
 ## 2026-07-01 — Feature: membresía anual de partner (activación manual, no autoservicio)
 
 **Qué cambia:** nuevo modo de acceso para partners que quieren

@@ -20,7 +20,11 @@ from app.core.safe_logging import logger
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    support_id = str(uuid.uuid4())[:8]
+    # Reusa el request_id que ya generó el middleware de correlación
+    # (`app/main.py`) si está disponible -- así el mismo ID que aparece
+    # en el access log de esta request es el que el usuario ve en
+    # pantalla, sin tener dos IDs distintos para el mismo request.
+    support_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
 
     # El traceback completo va SOLO a los logs del proceso (stdout de Render),
     # nunca en la respuesta HTTP. Los logs del proceso pueden incluir datos

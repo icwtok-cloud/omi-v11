@@ -29,6 +29,7 @@ from web3 import Web3
 
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.core.safe_logging import log_event
 from app.models.db_models import Payment, PaymentStatus, PaymentNetwork
 from app.services.payment_matching import find_pending_payment_by_amount
 
@@ -104,9 +105,9 @@ class ChainListener:
                 # Llegó plata que no matchea ningún pago pendiente -- se
                 # registra en logs para revisión manual, no se pierde el
                 # dato, pero no se asocia a nada automáticamente.
-                print(
-                    f"[{self.network.value}] WARNING: tx {tx_hash} por "
-                    f"{amount_usd} USD no matchea ningún Payment pendiente"
+                log_event(
+                    "UnmatchedPaymentReceived",
+                    network=self.network.value, tx_hash=tx_hash, amount_usd=amount_usd,
                 )
                 return
 
@@ -147,7 +148,11 @@ class ChainListener:
         from app.services.entitlements import apply_payment_confirmation
         apply_payment_confirmation(db, payment)
 
-        print(f"[{self.network.value}] Payment {payment.id} confirmado (tx {payment.tx_hash})")
+        log_event(
+            "PaymentConfirmed",
+            payment_id=payment.id, user_id=payment.user_id,
+            payment_type=payment.payment_type.value, network=self.network.value,
+        )
 
 
 def run_forever():
@@ -156,7 +161,7 @@ def run_forever():
         ChainListener(PaymentNetwork.base, settings.base_rpc_url, settings.base_usdc_contract),
     ]
 
-    print(f"Listener cripto arrancado, redes: {[l.network.value for l in listeners]}")
+    log_event("PaymentListenerStarted", networks=[l.network.value for l in listeners])
 
     while True:
         for listener in listeners:
@@ -164,7 +169,10 @@ def run_forever():
                 listener.poll_once()
             except Exception as e:
                 # Un error transitorio de RPC no debe matar el worker entero.
-                print(f"[{listener.network.value}] error en poll: {e}")
+                log_event(
+                    "PaymentListenerPollError",
+                    network=listener.network.value, error_type=type(e).__name__,
+                )
         time.sleep(POLL_INTERVAL_SECONDS)
 
 

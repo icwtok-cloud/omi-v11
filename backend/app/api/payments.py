@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.safe_logging import log_event
 from app.models.db_models import (
     Payment, PaymentType, PaymentStatus, PaymentNetwork, Project, User
 )
@@ -99,6 +100,11 @@ def start_payment(
             detail="No se pudo generar un monto de pago único, intentá de nuevo en unos segundos",
         )
 
+    log_event(
+        "PaymentStarted",
+        payment_id=payment.id, user_id=user.id, payment_type=body.payment_type,
+        network=body.network, project_id=body.project_id,
+    )
     return PaymentStartResponse(
         payment_id=payment.id,
         receive_address=settings.payment_receive_address,
