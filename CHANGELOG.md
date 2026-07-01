@@ -10,6 +10,32 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Fallback de encoding cp1252 para CSV (LatAm/Excel Windows)
+
+**Qué cambia:** `_read_tabular_file()` en `backend/app/api/projects.py`
+ahora intenta leer el CSV como `utf-8-sig` primero (UTF-8 con o sin
+BOM) y, si eso falla con `UnicodeDecodeError`, reintenta con
+`cp1252` antes de dar error.
+
+**Por qué:** un export de Excel en Windows guardado como "CSV" (no
+explícitamente "CSV UTF-8") usa cp1252/Latin-1 por default -- muy
+común en archivos LatAm con acentos o "ñ". `_detect_csv_separator()`
+ya toleraba esto (`errors="replace"`, solo para sniffear el
+separador), pero `pd.read_csv()` no tenía encoding explícito y caía en
+el UTF-8 default de pandas, rompiendo con un mensaje genérico de
+"columnas desparejas" que no apuntaba al problema real.
+
+**Fix:** intento en cascada utf-8-sig → cp1252, y mensaje de error
+actualizado para mencionar encoding explícitamente si ambos fallan.
+
+**Tests:** `backend/tests/test_projects_multimodule.py::TestArchivoConEncodingCP1252`
+(CSV con "José Muñoz" codificado en cp1252 se valida y previsualiza
+correctamente).
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — Aviso no bloqueante: contacto sin email ni teléfono
 
 **Qué cambia:** nuevo `issue_type: "missing_contact_info"` en

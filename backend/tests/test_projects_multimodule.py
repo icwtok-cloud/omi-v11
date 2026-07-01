@@ -196,6 +196,37 @@ class TestArchivoConSeparadorPuntoYComa:
         assert report["total_rows"] == 1
 
 
+class TestArchivoConEncodingCP1252:
+    """Un export de Excel Windows guardado como 'CSV' (no 'CSV UTF-8')
+    usa cp1252/Latin-1 por default -- muy común en archivos LatAm con
+    acentos o ñ. Sin fallback de encoding, esto rompía con un mensaje
+    genérico de 'columnas desparejas' que no apuntaba al problema real."""
+
+    def test_archivo_cp1252_con_acentos_se_valida_correctamente(self, client):
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+
+        csv_bytes = "name,vat,email\nJosé Muñoz,20-12345678-9,jose@x.com\n".encode("cp1252")
+        resp = client.post(
+            f"/projects/{project_id}/modules",
+            data={"odoo_module": "contactos"},
+            files={"file": ("archivo.csv", io.BytesIO(csv_bytes), "text/csv")},
+        )
+        module = resp.json()
+
+        validate_resp = client.post(
+            f"/projects/{project_id}/modules/{module['module_id']}/validate"
+        )
+        assert validate_resp.status_code == 202
+
+        report = client.get(
+            f"/projects/{project_id}/modules/{module['module_id']}/report"
+        ).json()
+        assert report["total_rows"] == 1
+        assert report["preview_rows"][0]["name"] == "José Muñoz"
+
+
 class TestValidacionYReportePorModulo:
     def test_validar_y_obtener_reporte_de_un_modulo(self, client):
         project_id = client.post(

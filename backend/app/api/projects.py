@@ -86,7 +86,20 @@ def _read_tabular_file(path: Path, original_filename: str) -> pd.DataFrame:
     suffix = Path(original_filename).suffix.lower()
     try:
         if suffix == ".csv":
-            return pd.read_csv(path, sep=_detect_csv_separator(path))
+            sep = _detect_csv_separator(path)
+            try:
+                # La mayoría de los exports son UTF-8 (o UTF-8 con BOM,
+                # que "utf-8-sig" pela solo). "utf-8-sig" no rompe con
+                # archivos UTF-8 sin BOM, así que es un default seguro.
+                return pd.read_csv(path, sep=sep, encoding="utf-8-sig")
+            except UnicodeDecodeError:
+                # Un export de Excel Windows guardado como "CSV" (no "CSV
+                # UTF-8") usa cp1252/Latin-1 por default -- muy común en
+                # archivos LatAm con acentos/ñ. Sin este fallback, un
+                # archivo perfectamente válido rompía con un mensaje
+                # genérico de "columnas desparejas" que no apuntaba al
+                # problema real (encoding, no estructura).
+                return pd.read_csv(path, sep=sep, encoding="cp1252")
         elif suffix in (".xlsx", ".xls"):
             return pd.read_excel(path)
         else:
@@ -101,8 +114,10 @@ def _read_tabular_file(path: Path, original_filename: str) -> pd.DataFrame:
             status_code=400,
             detail=(
                 "No pudimos leer tu archivo -- revisá que todas las filas "
-                "tengan la misma cantidad de columnas. Si lo exportaste "
-                "desde Excel, probá guardarlo de nuevo como 'CSV UTF-8'."
+                "tengan la misma cantidad de columnas y que esté guardado "
+                "en un encoding de texto estándar (UTF-8 o Windows-1252). "
+                "Si lo exportaste desde Excel, probá guardarlo de nuevo "
+                "como 'CSV UTF-8'."
             ),
         )
 
