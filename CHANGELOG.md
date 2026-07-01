@@ -10,6 +10,27 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Mostrar el mapeo de columnas en el reporte (antes invisible)
+
+**Qué cambia:** nuevo panel colapsable "Cómo interpretamos las
+columnas de tu archivo" en `ModuleReportView`
+(`frontend/app/proyectos/[id]/page.tsx`), con dos listas: columnas
+reconocidas (`"Nombre" → name`) y columnas ignoradas (no matchean
+ningún campo conocido).
+
+**Por qué:** `column_mapping` y `unmatched_columns` ya venían del
+backend en el reporte desde el rediseño original -- pero nunca se
+mostraban en ningún lado del frontend. El usuario no tenía forma de
+confirmar que "Nombre" se interpretó como `name` y no, por ejemplo,
+quedó ignorado por un typo en el header. Era el ítem #3 del roadmap
+nuevo acordado con el usuario ("columnas no mapeadas explicadas") --
+resultó ser trabajo 100% de frontend, los datos ya estaban ahí.
+
+**Sin cambios de backend ni de schema** -- no aplica rollback de
+Alembic.
+
+---
+
 ## 2026-07-01 — Normalización numérica regional (decimal "," de LatAm/ES)
 
 **Qué cambia:** nuevo `_parse_regional_number()` en

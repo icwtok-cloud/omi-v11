@@ -595,6 +595,11 @@ function ModuleReportView({
         </div>
       )}
 
+      <ColumnMappingPanel
+        columnMapping={report.column_mapping}
+        unmatchedColumns={report.unmatched_columns}
+      />
+
       <DataPreview columns={report.columns_seen} rows={report.preview_rows} />
 
       <IssueGroupList
@@ -643,6 +648,58 @@ function ModuleReportView({
         </div>
       )}
     </>
+  );
+}
+
+function ColumnMappingPanel({
+  columnMapping,
+  unmatchedColumns,
+}: {
+  columnMapping: Record<string, string>;
+  unmatchedColumns: string[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const mappedEntries = Object.entries(columnMapping);
+
+  if (mappedEntries.length === 0 && unmatchedColumns.length === 0) return null;
+
+  return (
+    <div className="mb-8 border border-line rounded-md bg-white overflow-hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left"
+      >
+        <span className="font-medium text-sm">Cómo interpretamos las columnas de tu archivo</span>
+        <span className="text-graphite text-xs">{expanded ? "▲" : "▼"}</span>
+      </button>
+      {expanded && (
+        <div className="border-t border-line px-5 py-4 space-y-4">
+          {mappedEntries.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-graphite mb-2">
+                Columnas reconocidas ({mappedEntries.length})
+              </p>
+              <div className="space-y-1">
+                {mappedEntries.map(([col, field]) => (
+                  <p key={col} className="font-mono text-xs text-ink">
+                    "{col}" → <span className="text-verify">{field}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+          {unmatchedColumns.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-graphite mb-2">
+                Columnas ignoradas ({unmatchedColumns.length}) -- no matchean ningún campo
+                conocido, no se usan ni exportan
+              </p>
+              <p className="font-mono text-xs text-graphite">{unmatchedColumns.join(", ")}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
