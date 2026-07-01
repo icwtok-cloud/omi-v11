@@ -84,10 +84,23 @@ detectar el `render.yaml` automáticamente.
 ### 3. `frontend/` (Next.js, deploy en Vercel)
 
 Flujo de pantallas:
-1. `/` — elegir módulo + versión, subir archivo (requiere sesión de Clerk)
-2. `/proyectos/[id]` — reporte completo gratis (errores, fixes auto y
-   manuales) + panel de pago al final
-3. Pago confirmado → botón de descarga del archivo corregido
+1. `/app` — crear un Proyecto (versión + país de Odoo) y subir el
+   primer módulo (requiere sesión de Clerk)
+2. `/proyectos/[id]` — un Proyecto es un contenedor de hasta 8 módulos
+   (Contactos, CRM, Ventas, etc.), cada uno con su propio archivo,
+   reporte (errores, quality score, mapeo de columnas con nivel de
+   confianza, detección de External ID) y fixes manuales/automáticos.
+   Todo gratis de ver; también se puede descargar un reporte técnico
+   en PDF por módulo sin pagar.
+3. Pago (o proyecto gratis / cuota de suscripción disponible) →
+   descarga de un ZIP con el archivo corregido de cada módulo
+   validado, numerado según el orden de importación recomendado.
+
+**Tiers**: Gratis (1 módulo, una vez por cuenta, incluye descarga) ·
+$99 por proyecto (exportes ilimitados de ESE proyecto) · $149/mes
+(hasta 5 proyectos exportados por mes calendario). El cobro/consumo de
+cuota ocurre exactamente al exportar, no al validar ni al ver el
+reporte -- ver `can_export_project()` en `entitlements.py`.
 
 Correr en local:
 ```bash
