@@ -337,6 +337,58 @@ class TestDescargaMultiModulo:
         # que contactos va primero aunque se haya subido después.
         assert names == {"01_contactos_corregido.csv", "02_crm_corregido.csv"}
 
+    def test_re_subir_mismo_nombre_de_archivo_no_sirve_el_corregido_viejo(
+        self, client, db_session, test_user
+    ):
+        """Regresión P0 (auditoría): _ensure_corrected_file cachea el
+        archivo corregido en disco por storage_path, que se re-genera
+        igual si el nuevo upload tiene el MISMO nombre de archivo que el
+        anterior. Sin borrar ese cache al re-subir, una descarga después
+        de re-subir podía servir en silencio los datos del archivo
+        VIEJO -- corrupción de datos real en una herramienta de
+        migración."""
+        from app.models.db_models import Project, ProjectStatus
+
+        _use_up_free_tier(db_session, test_user)
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+        project = db_session.query(Project).filter(Project.id == project_id).first()
+        project.status = ProjectStatus.paid
+        db_session.commit()
+
+        original_csv = "name,vat,email\nCliente Viejo,20-11111111-1,viejo@x.com\n"
+        module = _upload_module(
+            client, project_id, "contactos", original_csv, filename="mismo_nombre.csv"
+        ).json()
+        client.post(f"/projects/{project_id}/modules/{module['module_id']}/validate")
+
+        first_download = client.get(f"/projects/{project_id}/download")
+        assert first_download.status_code == 200
+        zf = zipfile.ZipFile(io.BytesIO(first_download.content))
+        assert b"Cliente Viejo" in zf.read("01_contactos_corregido.csv")
+
+        # La primera descarga marca el proyecto como "exported" -- se
+        # vuelve a marcar "paid" para simular que este proyecto se
+        # compró para exportes ilimitados (no es lo que este test
+        # quiere probar, solo evita el 402 de cuota en la 2da descarga).
+        project.status = ProjectStatus.paid
+        db_session.commit()
+
+        # Re-sube un archivo TOTALMENTE distinto, mismo nombre de archivo.
+        nuevo_csv = "name,vat,email\nCliente Nuevo,30-22222222-2,nuevo@x.com\n"
+        module = _upload_module(
+            client, project_id, "contactos", nuevo_csv, filename="mismo_nombre.csv"
+        ).json()
+        client.post(f"/projects/{project_id}/modules/{module['module_id']}/validate")
+
+        second_download = client.get(f"/projects/{project_id}/download")
+        assert second_download.status_code == 200
+        zf2 = zipfile.ZipFile(io.BytesIO(second_download.content))
+        contenido = zf2.read("01_contactos_corregido.csv")
+        assert b"Cliente Nuevo" in contenido
+        assert b"Cliente Viejo" not in contenido
+
     def test_download_sin_pagar_devuelve_402(self, client, db_session, test_user):
         # Este test prueba el bloqueo real de pago -- si fuera el
         # primer proyecto de una cuenta nueva, la descarga sería gratis

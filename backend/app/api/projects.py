@@ -286,6 +286,25 @@ async def upload_module(
     if existing:
         # Re-subir el mismo módulo pisa la fila existente -- es un archivo
         # nuevo, así que se descarta cualquier reporte/fix viejo.
+        #
+        # RIESGO DE CORRUPCIÓN DE DATOS encontrado en auditoría: si el
+        # usuario re-sube un archivo con el MISMO nombre de archivo que
+        # el anterior, `storage_path` (línea de arriba) da exactamente
+        # la misma ruta que la vez pasada. `_ensure_corrected_file` cachea
+        # el archivo corregido en disco como
+        # `storage_path.with_suffix(".corrected.csv")` y lo devuelve tal
+        # cual si YA EXISTE, sin regenerarlo -- así que si quedó un
+        # .corrected.csv de una descarga anterior de este mismo módulo
+        # (incluso de un archivo con datos totalmente distintos), la
+        # próxima descarga serviría en silencio las correcciones del
+        # archivo VIEJO sobre el archivo NUEVO. Hay que borrar ese
+        # cache acá, en el momento del re-upload, no esperar a
+        # _ensure_corrected_file (que solo borra el original, nunca el
+        # corregido).
+        stale_corrected = Path(existing.storage_path).with_suffix(".corrected.csv")
+        if stale_corrected.exists():
+            stale_corrected.unlink()
+
         existing.original_filename = file.filename
         existing.storage_path = str(storage_path)
         existing.status = ModuleStatus.uploaded

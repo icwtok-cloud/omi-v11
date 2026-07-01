@@ -8,6 +8,49 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — BUG P0: re-subir un archivo con el mismo nombre podía servir datos VIEJOS en la descarga + duplicados no detectaban mayúsculas/espacios
+
+**P0 -- corrupción de datos silenciosa, el más serio encontrado en toda
+la sesión:** `_ensure_corrected_file` (`backend/app/api/projects.py`)
+cachea el archivo corregido en disco como
+`storage_path.with_suffix(".corrected.csv")` y lo devuelve tal cual si
+ya existe, sin regenerarlo. `storage_path` se arma como
+`f"{project.id}_{module_id}_{file.filename}"` -- si el usuario
+re-sube un archivo NUEVO para el mismo módulo pero con el MISMO NOMBRE
+DE ARCHIVO que la vez anterior (algo extremadamente común: re-exportar
+desde Odoo/Excel siempre genera "contactos.csv"), `storage_path` da
+IDÉNTICO al de antes. Si ya existía un `.corrected.csv` de una
+descarga previa de ese módulo bajo esa ruta, la próxima descarga
+servía en silencio los datos del archivo VIEJO en vez del nuevo -- en
+una herramienta cuyo propósito es preparar datos para importar a
+Odoo, esto es corrupción de datos real: el cliente podía terminar
+important registros de una versión anterior y descartada del archivo.
+
+**Fix:** al re-subir un módulo existente, se borra el
+`.corrected.csv` viejo (si existía) ANTES de sobreescribir
+`storage_path`, así `_ensure_corrected_file` se ve obligado a
+regenerarlo desde el archivo nuevo la próxima vez que se pida.
+
+**P1 -- detección de duplicados no ignoraba mayúsculas/espacios:**
+`check_duplicates()` (`backend/app/services/format_rules.py`)
+comparaba con `str(value).strip()` -- "ABC-123" y "abc-123" (típico en
+`default_code`/SKU) no se marcaban como duplicados, dejando pasar dos
+registros que Odoo terminaría tratando como entidades distintas. Fix:
+se normaliza a minúsculas y se colapsan espacios internos antes de
+comparar (el mensaje de error sigue mostrando el valor original, sin
+normalizar, para no confundir al usuario).
+
+**Tests:** nuevo
+`test_re_subir_mismo_nombre_de_archivo_no_sirve_el_corregido_viejo`
+(reproduce el bug end-to-end: sube, valida, paga, descarga, re-sube
+con MISMO nombre pero datos distintos, valida, descarga de nuevo,
+confirma que el contenido es el nuevo y no el viejo -- **verificado que
+falla sin el fix, revirtiendo el cambio temporalmente antes de
+commitear**) + `test_duplicado_se_detecta_ignorando_mayusculas_y_espacios`.
+93/93 backend pasan.
+
+**Rollback:** sin cambios de schema -- no aplica rollback de Alembic.
+
 ## 2026-07-01 — P1: pago no resumible si se cierra la pestaña + tope de pagos pendientes por usuario
 
 **P1 -- riesgo de doble pago real en USDC:** el estado del pago

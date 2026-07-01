@@ -104,6 +104,26 @@ class TestSerializacionDeReporte:
         assert len(dup_issues) == 1
         assert dup_issues[0].column == "CUIT"
 
+    def test_duplicado_se_detecta_ignorando_mayusculas_y_espacios(self):
+        """Riesgo real de migración: 'ABC-123' y 'abc-123' (o con espacios
+        de más) son el MISMO código para Odoo, pero antes del fix la
+        comparación era case-sensitive y con solo `.strip()` externo --
+        dos filas así pasaban como "no duplicadas" y ambas se importaban
+        como registros distintos. Test a nivel de unidad sobre
+        check_duplicates() directamente -- evita depender de a qué
+        modelo del schema de "productos" resuelve primary_model()."""
+        from app.services.format_rules import check_duplicates
+
+        df = pd.DataFrame(
+            {
+                "name": ["Producto A", "Producto B"],
+                "codigo": ["ABC-123", "  abc-123  "],
+            }
+        )
+        issues = check_duplicates(df, column_mapping={"codigo": "default_code"})
+        assert len(issues) == 1
+        assert issues[0].current_value == "abc-123"
+
 
 # ---------------------------------------------------------------------------
 # Bug #3 (2026-06-29): un archivo sin relación con el módulo elegido se

@@ -204,14 +204,20 @@ def check_duplicates(df: pd.DataFrame, column_mapping: dict[str, str]) -> list:
         for row_idx, value in df[col].items():
             if pd.isna(value) or str(value).strip() == "":
                 continue
-            key = str(value).strip()
+            original = str(value).strip()
+            # Se compara case-insensitive y con espacios internos
+            # colapsados -- sin esto, "ABC-123" vs "abc-123" (típico en
+            # default_code/SKU) o "CUIT" con espacios de más no se
+            # detectaban como duplicados, dejando pasar dos registros
+            # que Odoo terminaría tratando como entidades distintas.
+            key = " ".join(original.split()).lower()
             if key in seen:
                 issues.append(FieldIssue(
                     row_index=int(row_idx),
                     column=col,
                     issue_type="duplicate",
-                    message=f"'{key}' en '{col}' ya aparece en la fila {seen[key]}",
-                    current_value=key,
+                    message=f"'{original}' en '{col}' ya aparece en la fila {seen[key]}",
+                    current_value=original,
                     suggested_fix=None,
                     fix_is_automatic=False,
                 ))
