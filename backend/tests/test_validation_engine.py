@@ -261,3 +261,34 @@ class TestFixExplanation:
         assert len(mobile_issues) == 1
         assert mobile_issues[0]["fix_is_automatic"] is True
         assert mobile_issues[0]["fix_explanation"] is not None
+
+
+# ---------------------------------------------------------------------------
+# on_progress: callback de progreso para la Fase 4 (validación async +
+# polling desde el frontend) -- ver _run_validation_job() en
+# app/api/projects.py.
+# ---------------------------------------------------------------------------
+
+class TestOnProgressCallback:
+    def test_se_llama_con_pares_crecientes_y_termina_en_total(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        n = 1200  # > 500, para forzar más de un llamado con el step mínimo
+        df = pd.DataFrame(
+            {
+                "name": [f"Persona {i}" for i in range(n)],
+                "vat": ["20-12345678-9"] * n,
+                "email": ["ok@x.com"] * n,
+            }
+        )
+        calls = []
+        validate_dataframe(df, schema, on_progress=lambda done, total: calls.append((done, total)))
+
+        assert len(calls) >= 2
+        assert all(calls[i][0] < calls[i + 1][0] for i in range(len(calls) - 1))
+        assert calls[-1] == (n, n)
+
+    def test_sin_callback_no_rompe_nada(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({"name": ["Juan"], "vat": ["20-12345678-9"], "email": ["ok@x.com"]})
+        report = validate_dataframe(df, schema)  # sin on_progress
+        assert report.total_rows == 1

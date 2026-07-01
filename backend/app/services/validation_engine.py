@@ -19,6 +19,7 @@ Dos categorías de reglas, como quedó claro en el diseño:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Callable
 
 import pandas as pd
 
@@ -124,6 +125,7 @@ def validate_dataframe(
     df: pd.DataFrame,
     schema: RuleSchema,
     client_override: dict | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> ValidationReport:
     model = schema.primary_model()
     model_name = model["name"]
@@ -195,7 +197,12 @@ def validate_dataframe(
     # afecta a todas las filas igual)
 
     # --- 2. Validación fila por fila para las columnas que sí vinieron ---
-    for row_idx, row in df.iterrows():
+    # Progreso: se avisa cada `progress_step` filas (no en cada una) para
+    # no pagar el costo de un commit a DB por fila en archivos grandes --
+    # ver Fase 4 del roadmap / _run_validation_job() en app/api/projects.py.
+    total_rows = len(df)
+    progress_step = max(500, total_rows // 100) if total_rows else 1
+    for position, (row_idx, row) in enumerate(df.iterrows(), start=1):
         for col_name in columns_seen:
             mapped_field = column_mapping.get(col_name)
             if mapped_field is None:
@@ -273,6 +280,9 @@ def validate_dataframe(
                             "reemplazala por el valor correcto."
                         ) if selection_options else None,
                     ))
+
+        if on_progress and (position % progress_step == 0 or position == total_rows):
+            on_progress(position, total_rows)
 
     # --- 3. Duplicados (a nivel columna completa, no fila por fila) ---
     issues.extend(format_rules.check_duplicates(df, columns_seen))

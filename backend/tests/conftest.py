@@ -32,9 +32,14 @@ from app.models.db_models import User
 
 
 @pytest.fixture()
-def db_session():
-    """Una base SQLite en memoria, nueva en cada test -- así los tests
-    de API no dependen entre si ni tocan la base real de Render.
+def test_sessionmaker():
+    """El sessionmaker de la base sqlite en memoria de este test --
+    expuesto aparte (no solo la sesión ya abierta) para que `client`
+    pueda parchear con esto el `SessionLocal` que usan los background
+    tasks (ver `_run_validation_job` en app/api/projects.py), que abren
+    su PROPIA sesión con `SessionLocal()` en vez de la dependency
+    `get_db` -- sin este parche, apuntarían a la base real de
+    `DATABASE_URL` (un `test.db` vacío) en vez de a esta.
 
     `poolclass=StaticPool` es necesario acá: FastAPI corre los endpoints
     (incluso los `def` sync) en un thread del threadpool, distinto al
@@ -50,8 +55,15 @@ def db_session():
     )
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
+    return TestingSessionLocal
 
-    session = TestingSessionLocal()
+
+@pytest.fixture()
+def db_session(test_sessionmaker):
+    """Una sesión nueva por test contra la base en memoria de
+    `test_sessionmaker` -- así los tests de API no dependen entre sí ni
+    tocan la base real de Render."""
+    session = test_sessionmaker()
     try:
         yield session
     finally:
@@ -67,10 +79,11 @@ def test_user(db_session):
 
 
 @pytest.fixture()
-def client(db_session, test_user):
+def client(db_session, test_user, test_sessionmaker, monkeypatch):
     """TestClient con get_db y get_current_user overrideados -- evita
     pegarle a Clerk de verdad o a la base de Render en cada test de API."""
     from app.main import app
+    import app.api.projects as projects_module
 
     def _override_get_db():
         yield db_session
@@ -80,6 +93,12 @@ def client(db_session, test_user):
 
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_current_user] = _override_get_current_user
+
+    # _run_validation_job (background task de /validate) abre su propia
+    # sesión llamando a SessionLocal() directo, sin pasar por get_db --
+    # hay que parchear esa referencia para que apunte a la misma base en
+    # memoria de este test, si no "no such table" apenas corre en background.
+    monkeypatch.setattr(projects_module, "SessionLocal", test_sessionmaker)
 
     with TestClient(app) as c:
         yield c

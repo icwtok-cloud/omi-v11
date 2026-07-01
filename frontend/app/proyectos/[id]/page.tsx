@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
   runValidation,
+  getValidationStatus,
   getReport,
   applyFixes,
   getProject,
   addModule,
   getAvailableCombinations,
   ValidationReport,
+  ModuleValidateStatus,
   ManualFix,
   ProjectSummary,
   AvailableCombination,
@@ -59,11 +61,14 @@ export default function ProjectPage() {
 
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [loadingProject, setLoadingProject] = useState(true);
+  const [projectError, setProjectError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [reports, setReports] = useState<Record<string, ValidationReport>>({});
   const [loadingModuleId, setLoadingModuleId] = useState<string | null>(null);
+  const [validationStatus, setValidationStatus] = useState<ModuleValidateStatus | null>(null);
+  const [validationStalled, setValidationStalled] = useState(false);
 
   // Fixes manuales seleccionados/confirmados por módulo -- el pago se
   // habilita a nivel proyecto, así que hace falta confirmar los fixes de
@@ -84,18 +89,60 @@ export default function ProjectPage() {
   const [addingModule, setAddingModule] = useState(false);
   const [addModuleError, setAddModuleError] = useState<string | null>(null);
 
+  // Ref para poder abortar un polling en curso si el usuario cambia de
+  // módulo antes de que termine -- evita pisar el estado de un módulo
+  // con la respuesta tardía del polling de otro.
+  const pollingModuleIdRef = useRef<string | null>(null);
+
+  const POLL_INTERVAL_MS = 1500;
+  const STALL_THRESHOLD_MS = 10 * 60 * 1000; // 10 min sin terminar -> se ofrece reintentar
+
   const loadModuleReport = useCallback(
     async (moduleId: string, moduleStatus: string) => {
+      pollingModuleIdRef.current = moduleId;
       setLoadingModuleId(moduleId);
+      setValidationStalled(false);
+      setValidationStatus(null);
+      setError(null);
       try {
-        const report =
-          moduleStatus === "validated"
-            ? await getReport(getToken, projectId, moduleId)
-            : await runValidation(getToken, projectId, moduleId);
-        setReports((prev) => ({ ...prev, [moduleId]: report }));
+        if (moduleStatus !== "validated") {
+          await runValidation(getToken, projectId, moduleId);
+        }
+
+        // Polling hasta que el módulo quede validated/failed, o se
+        // detecte un estancamiento (más de 10' desde que arrancó sin
+        // terminar).
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          if (pollingModuleIdRef.current !== moduleId) return; // se canceló (cambió de módulo)
+
+          const status = await getValidationStatus(getToken, projectId, moduleId);
+          if (pollingModuleIdRef.current !== moduleId) return;
+          setValidationStatus(status);
+
+          if (status.status === "validated") {
+            const report = await getReport(getToken, projectId, moduleId);
+            if (pollingModuleIdRef.current !== moduleId) return;
+            setReports((prev) => ({ ...prev, [moduleId]: report }));
+            setLoadingModuleId(null);
+            return;
+          }
+          if (status.status === "failed") {
+            setError(status.error || "La validación falló -- probá subir el archivo de nuevo.");
+            setLoadingModuleId(null);
+            return;
+          }
+          if (status.started_at && Date.now() - new Date(status.started_at).getTime() > STALL_THRESHOLD_MS) {
+            setValidationStalled(true);
+            setLoadingModuleId(null);
+            return;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        }
       } catch (e) {
+        if (pollingModuleIdRef.current !== moduleId) return;
         setError(e instanceof Error ? e.message : "Error al validar el módulo");
-      } finally {
         setLoadingModuleId(null);
       }
     },
@@ -113,7 +160,7 @@ export default function ProjectPage() {
           loadModuleReport(first.module_id, first.status);
         }
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar el proyecto"))
+      .catch((e) => setProjectError(e instanceof Error ? e.message : "Error al cargar el proyecto"))
       .finally(() => setLoadingProject(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
@@ -130,6 +177,11 @@ export default function ProjectPage() {
     if (!reports[moduleId] && project) {
       const mod = project.modules.find((m) => m.module_id === moduleId);
       if (mod) loadModuleReport(moduleId, mod.status);
+    } else {
+      // ya tiene el reporte cacheado -- limpiar cualquier error/stall
+      // que haya quedado de un módulo anterior.
+      setError(null);
+      setValidationStalled(false);
     }
   }
 
@@ -204,11 +256,11 @@ export default function ProjectPage() {
     );
   }
 
-  if (error || !project) {
+  if (projectError || !project) {
     return (
       <main className="min-h-screen flex items-center justify-center px-6">
         <p className="text-alert bg-alert-light rounded-md px-5 py-3 text-sm">
-          {error || "No se pudo cargar el proyecto"}
+          {projectError || "No se pudo cargar el proyecto"}
         </p>
       </main>
     );
@@ -367,8 +419,38 @@ export default function ProjectPage() {
       )}
 
       {activeModuleId && loadingModuleId === activeModuleId && (
-        <div className="py-16 text-center">
-          <p className="font-mono text-sm text-graphite">Analizando tu archivo...</p>
+        <ValidationProgress status={validationStatus} />
+      )}
+
+      {activeModuleId && error && loadingModuleId !== activeModuleId && !validationStalled && (
+        <div className="py-10 text-center border border-alert bg-alert-light rounded-md">
+          <p className="text-alert font-medium mb-3">{error}</p>
+          <button
+            onClick={() => {
+              const mod = project.modules.find((m) => m.module_id === activeModuleId);
+              if (mod) loadModuleReport(activeModuleId, mod.status);
+            }}
+            className="bg-alert text-white text-sm font-medium rounded-full px-5 py-2"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      {activeModuleId && validationStalled && loadingModuleId !== activeModuleId && (
+        <div className="py-10 text-center border border-alert bg-alert-light rounded-md">
+          <p className="text-alert font-medium mb-3">
+            Parece que la validación se interrumpió -- probá de nuevo.
+          </p>
+          <button
+            onClick={() => {
+              const mod = project.modules.find((m) => m.module_id === activeModuleId);
+              if (mod) loadModuleReport(activeModuleId, mod.status);
+            }}
+            className="bg-alert text-white text-sm font-medium rounded-full px-5 py-2"
+          >
+            Reintentar
+          </button>
         </div>
       )}
 
@@ -693,6 +775,65 @@ function Stat({
     <div className="border border-line rounded-md px-4 py-3 bg-white">
       <p className={`font-mono text-2xl ${toneClass}`}>{value}</p>
       <p className="text-xs text-graphite mt-1">{label}</p>
+    </div>
+  );
+}
+
+const REASSURING_MESSAGES = [
+  "Revisando cada fila contra las reglas de Odoo...",
+  "Buscando duplicados y valores fuera de rango...",
+  "Esto puede tardar unos minutos con archivos grandes -- no cierres esta pestaña.",
+  "Chequeando relaciones contra los datos conocidos de tu versión de Odoo...",
+];
+
+function ValidationProgress({ status }: { status: ModuleValidateStatus | null }) {
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageIndex((i) => (i + 1) % REASSURING_MESSAGES.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!status?.started_at) return;
+    const startedAt = new Date(status.started_at).getTime();
+    const tick = () => setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [status?.started_at]);
+
+  const hasProgress = status && status.rows_total !== null && status.rows_total > 0;
+  const percent = hasProgress
+    ? Math.min(100, Math.round((status!.rows_processed / status!.rows_total!) * 100))
+    : null;
+
+  return (
+    <div className="py-16 text-center max-w-md mx-auto">
+      <p className="font-mono text-sm text-ink mb-3">
+        {hasProgress
+          ? `Fila ${status!.rows_processed.toLocaleString()} de ${status!.rows_total!.toLocaleString()}`
+          : "Analizando tu archivo..."}
+      </p>
+
+      {percent !== null && (
+        <div className="w-full h-2 bg-line rounded-full overflow-hidden mb-3">
+          <div
+            className="h-full bg-verify transition-all duration-500"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
+
+      <p className="text-xs text-graphite mb-1">{REASSURING_MESSAGES[messageIndex]}</p>
+      <p className="text-xs text-graphite">
+        {elapsedSeconds < 60
+          ? `${elapsedSeconds}s transcurridos`
+          : `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s transcurridos`}
+      </p>
     </div>
   );
 }

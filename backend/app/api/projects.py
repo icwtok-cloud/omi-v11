@@ -26,13 +26,15 @@ from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from datetime import datetime
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.core.safe_logging import log_event
 from app.models.db_models import (
     Project, ProjectModule, ProjectStatus, ModuleStatus, MAX_MODULES_PER_PROJECT, User,
@@ -45,7 +47,7 @@ from app.services.entitlements import (
 from app.api.schemas import (
     ValidationReportResponse, AvailableCombination, ProjectCreateRequest,
     ProjectCreateResponse, ProjectSummaryResponse, ModuleSummaryResponse,
-    ModuleUploadResponse,
+    ModuleUploadResponse, ModuleValidateStartResponse, ModuleValidateStatusResponse,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -279,8 +281,83 @@ async def upload_module(
     )
 
 
-@router.post("/{project_id}/modules/{module_id}/validate", response_model=ValidationReportResponse)
+@router.post(
+    "/{project_id}/modules/{module_id}/validate",
+    response_model=ModuleValidateStartResponse,
+    status_code=202,
+)
 def validate_module(
+    project_id: str,
+    module_id: str,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Dispara la validación en background y devuelve 202 de inmediato --
+    no bloquea la request esperando a que termine (puede tardar minutos
+    en un archivo de 150.000 filas). El frontend hace polling a
+    GET .../validate-status hasta que status pase a "validated"/"failed".
+    Ver _run_validation_job() más abajo."""
+    project = _get_owned_project(project_id, user, db)
+    module = _get_project_module(project, module_id)
+
+    module.status = ModuleStatus.validating
+    module.rows_processed = 0
+    module.rows_total = None
+    module.validation_started_at = datetime.utcnow()
+    module.validation_error = None
+    db.commit()
+
+    background_tasks.add_task(_run_validation_job, module_id)
+
+    return ModuleValidateStartResponse(
+        project_id=project.id, module_id=module.id, status=module.status.value,
+    )
+
+
+def _run_validation_job(module_id: str) -> None:
+    """Corre en background, DESPUÉS de que la response 202 ya se mandó --
+    abre su propia sesión de DB porque no puede reusar la del request
+    (esa ya se cerró). Nunca debe dejar un módulo trabado en
+    "validating": cualquier excepción se captura y se guarda en
+    validation_error con status=failed."""
+    db = SessionLocal()
+    try:
+        module = db.query(ProjectModule).filter(ProjectModule.id == module_id).first()
+        if not module:
+            return
+        project = db.query(Project).filter(Project.id == module.project_id).first()
+
+        try:
+            schema = load_rule_schema(module.odoo_module, project.odoo_version, project.odoo_country)
+            df = _read_tabular_file(Path(module.storage_path), module.original_filename)
+
+            def _persist_progress(done: int, total: int) -> None:
+                module.rows_processed = done
+                module.rows_total = total
+                db.commit()
+
+            report = validate_dataframe(
+                df, schema, client_override=module.client_config_override,
+                on_progress=_persist_progress,
+            )
+
+            module.validation_report = report.to_dict()
+            module.status = ModuleStatus.validated
+            db.commit()
+        except Exception as e:
+            module.status = ModuleStatus.failed
+            module.validation_error = str(e)
+            db.commit()
+    finally:
+        db.close()
+
+
+@router.get(
+    "/{project_id}/modules/{module_id}/validate-status",
+    response_model=ModuleValidateStatusResponse,
+)
+def get_validate_status(
     project_id: str,
     module_id: str,
     user: User = Depends(get_current_user),
@@ -289,20 +366,14 @@ def validate_module(
     project = _get_owned_project(project_id, user, db)
     module = _get_project_module(project, module_id)
 
-    schema = load_rule_schema(module.odoo_module, project.odoo_version, project.odoo_country)
-    df = _read_tabular_file(Path(module.storage_path), module.original_filename)
-
-    report = validate_dataframe(df, schema, client_override=module.client_config_override)
-
-    module.validation_report = report.to_dict()
-    module.status = ModuleStatus.validated
-    db.commit()
-
-    return ValidationReportResponse(
-        project_id=project.id,
-        module_id=module.id,
-        can_download=(False if report.structural_mismatch else user_can_download(db, project)),
-        **report.to_dict(),
+    return ModuleValidateStatusResponse(
+        status=module.status.value,
+        rows_processed=module.rows_processed or 0,
+        rows_total=module.rows_total,
+        started_at=(
+            module.validation_started_at.isoformat() if module.validation_started_at else None
+        ),
+        error=module.validation_error,
     )
 
 

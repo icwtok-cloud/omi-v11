@@ -10,6 +10,84 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-06-30 — Fase 4: progreso real de validación (async + polling)
+
+**Qué cambia:** antes, `POST /validate` corría el motor de validación
+100% sincrónico -- la request HTTP quedaba colgada hasta terminar, y el
+frontend solo mostraba "Analizando tu archivo..." estático, sin ninguna
+señal de que no se había colgado con un archivo de 150.000 filas.
+
+**Backend:**
+- `validate_dataframe()` (`validation_engine.py`) gana un parámetro
+  `on_progress: Callable[[int, int], None] | None` -- se llama cada
+  `max(500, total//100)` filas (no en cada una, para no pagar un
+  commit a DB por fila) y una vez más al terminar.
+- `POST /projects/{id}/modules/{mid}/validate` ahora es asíncrono:
+  marca `status=validating`, dispara `_run_validation_job()` vía
+  `BackgroundTasks` de FastAPI, y devuelve `202` de inmediato (antes
+  devolvía `200` con el reporte completo -- rompe cualquier cliente que
+  esperara la forma vieja).
+- `_run_validation_job()` corre después de que la response ya se
+  mandó, abre su PROPIA sesión de DB (`SessionLocal()`, no puede reusar
+  la del request), persiste `rows_processed`/`rows_total` en cada
+  callback de progreso, y en cualquier excepción deja
+  `status=failed` + `validation_error` -- nunca un módulo trabado en
+  "validating" para siempre.
+- Nuevo `GET /projects/{id}/modules/{mid}/validate-status` ->
+  `{status, rows_processed, rows_total, started_at, error}`, para que
+  el frontend haga polling.
+
+**Frontend** (`proyectos/[id]/page.tsx`): el párrafo estático se
+reemplaza por `<ValidationProgress>`, que hace polling cada 1.5s y
+muestra "Fila X de Y" + barra de progreso + mensajes rotativos
+tranquilizadores + tiempo transcurrido. Si `status` da `failed`, o pasan
+más de 10 minutos sin terminar (estancamiento), se ofrece un botón
+"Reintentar" que vuelve a llamar a validate (idempotente).
+
+**Bug de test encontrado y arreglado de paso** (más sutil que el de
+`StaticPool` de la Fase 2, mismo tipo de familia): `_run_validation_job`
+abre su propia sesión de DB, que en los tests apuntaba al motor real de
+`DATABASE_URL` (un `test.db` vacío) en vez de a la base en memoria del
+fixture -- se agregó `test_sessionmaker` (fixture nuevo, expone el
+sessionmaker en vez de solo la sesión ya abierta) y `client` ahora
+parchea `app.api.projects.SessionLocal` con él. Un segundo bug de test,
+específico de este parche: si el test consulta un objeto por la MISMA
+sesión (`db_session`) que después usa el endpoint, el identity map de
+SQLAlchemy devuelve el objeto cacheado en vez de releer lo que el
+background job (con su propia sesión) commiteó -- hace falta
+`db_session.expire_all()` DESPUÉS de disparar la validación y ANTES
+del chequeo final. No aplica a producción (cada request tiene su propia
+sesión, sin identity map compartido).
+
+**Bug pre-existente encontrado de paso (no de esta fase, pero
+relacionado) y arreglado**: la página del proyecto usaba el mismo
+estado `error` tanto para "no se pudo cargar el proyecto" (error de
+página completa) como para "falló la validación de este módulo" --
+cualquier fallo de un módulo tiraba abajo toda la pantalla del
+proyecto en vez de mostrarse inline. Separado en `projectError` (guard
+de página completa) y `error` (inline, con botón de reintentar, dentro
+del módulo activo). Se notó más con esta fase porque ahora los fallos
+de validación son explícitos y visibles (antes, una excepción
+sincrónica simplemente colgaba la request).
+
+**Tests**: `TestOnProgressCallback` (2 casos) en `test_validation_engine.py`,
+nuevo `test_validate_async.py` (3 casos: 202 inmediato, status final
+validated con rows completos, path de excepción a failed). 56/56 tests
+pasan.
+
+**Regla para no repetirlo:**
+> Cualquier código que abra su propia sesión de DB fuera del ciclo
+> normal de `Depends(get_db)` (background tasks, workers, jobs) necesita
+> su propio mecanismo de test explícito -- no alcanza con el fixture
+> `client` existente, hay que exponer el sessionmaker (no solo la
+> sesión) para poder parchear hacia dónde apunta ese código. Y si en un
+> test se toca el mismo objeto desde dos sesiones distintas (la del
+> fixture y la de un job en background), expirar explícitamente antes
+> de volver a leer -- si no, el identity map de SQLAlchemy miente con
+> total confianza.
+
+---
+
 ## 2026-06-30 — Fase 3: nuevos tiers de precio + cuota aplicada al exportar
 
 **Qué cambia:** antes había dos planes (por proyecto $99, mensual $149

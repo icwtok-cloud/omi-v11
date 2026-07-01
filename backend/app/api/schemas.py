@@ -41,6 +41,20 @@ class ProjectSummaryResponse(BaseModel):
     modules: list[ModuleSummaryResponse] = []
 
 
+class ModuleValidateStartResponse(BaseModel):
+    project_id: str
+    module_id: str
+    status: str
+
+
+class ModuleValidateStatusResponse(BaseModel):
+    status: str
+    rows_processed: int
+    rows_total: int | None = None
+    started_at: str | None = None
+    error: str | None = None
+
+
 class ValidationReportResponse(BaseModel):
     project_id: str
     module_id: str

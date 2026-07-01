@@ -188,8 +188,12 @@ class TestArchivoConSeparadorPuntoYComa:
         resp = client.post(
             f"/projects/{project_id}/modules/{module['module_id']}/validate"
         )
-        assert resp.status_code == 200
-        assert resp.json()["total_rows"] == 1
+        assert resp.status_code == 202
+
+        report = client.get(
+            f"/projects/{project_id}/modules/{module['module_id']}/report"
+        ).json()
+        assert report["total_rows"] == 1
 
 
 class TestValidacionYReportePorModulo:
@@ -202,7 +206,7 @@ class TestValidacionYReportePorModulo:
         validate_resp = client.post(
             f"/projects/{project_id}/modules/{module['module_id']}/validate"
         )
-        assert validate_resp.status_code == 200
+        assert validate_resp.status_code == 202
         assert validate_resp.json()["module_id"] == module["module_id"]
 
         report_resp = client.get(

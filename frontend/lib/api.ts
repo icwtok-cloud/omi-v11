@@ -159,17 +159,48 @@ export interface ValidationReport {
   can_download: boolean;
 }
 
+export interface ModuleValidateStart {
+  project_id: string;
+  module_id: string;
+  status: string;
+}
+
+/** Dispara la validación en background -- devuelve apenas el backend
+ * confirma que arrancó (202), no espera a que termine. El reporte
+ * completo se pide después con getReport(), una vez que
+ * getValidationStatus() indique status "validated". */
 export async function runValidation(
   getToken: GetToken,
   projectId: string,
   moduleId: string
-): Promise<ValidationReport> {
+): Promise<ModuleValidateStart> {
   const res = await authedFetch(
     `/projects/${projectId}/modules/${moduleId}/validate`,
     getToken,
     { method: "POST" }
   );
-  if (!res.ok) throw new Error("No se pudo validar el archivo");
+  if (!res.ok) throw new Error("No se pudo iniciar la validación");
+  return res.json();
+}
+
+export interface ModuleValidateStatus {
+  status: "uploaded" | "validating" | "validated" | "failed";
+  rows_processed: number;
+  rows_total: number | null;
+  started_at: string | null;
+  error: string | null;
+}
+
+export async function getValidationStatus(
+  getToken: GetToken,
+  projectId: string,
+  moduleId: string
+): Promise<ModuleValidateStatus> {
+  const res = await authedFetch(
+    `/projects/${projectId}/modules/${moduleId}/validate-status`,
+    getToken
+  );
+  if (!res.ok) throw new Error("No se pudo consultar el estado de la validación");
   return res.json();
 }
 
