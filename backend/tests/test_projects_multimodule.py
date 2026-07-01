@@ -275,7 +275,10 @@ class TestDescargaMultiModulo:
 
         zf = zipfile.ZipFile(io.BytesIO(resp.content))
         names = set(zf.namelist())
-        assert names == {"contactos_corregido.csv", "crm_corregido.csv"}
+        # Numerado según el orden de importación recomendado (ver
+        # module_dependencies.py): "crm" depende de "contactos", así
+        # que contactos va primero aunque se haya subido después.
+        assert names == {"01_contactos_corregido.csv", "02_crm_corregido.csv"}
 
     def test_download_sin_pagar_devuelve_402(self, client, db_session, test_user):
         # Este test prueba el bloqueo real de pago -- si fuera el

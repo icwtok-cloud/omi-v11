@@ -10,6 +10,38 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Orden de importación recomendado en el ZIP de descarga
+
+**Qué cambia:** nuevo `backend/app/services/module_dependencies.py`
+con un mapa estático de dependencias entre los 6 módulos que soporta
+OMI hoy (`contactos`, `productos` sin dependencias; `crm` depende de
+`contactos`; `inventario` de `productos`; `ventas`/`compras` de
+`contactos` y `productos`). `GET /projects/{id}/download` ahora ordena
+los archivos del ZIP según ese orden topológico y los numera
+(`01_contactos_corregido.csv`, `02_crm_corregido.csv`, ...) en vez de
+alfabético.
+
+**Por qué:** era el ítem #1 del roadmap nuevo acordado con el usuario
+("dependencias entre módulos") y también el ítem 11 del backlog
+("dependencias/orden de importación multi-archivo dentro del ZIP").
+Importar "ventas" antes que "contactos" en Odoo hace que cada pedido
+con un partner nuevo se rechace o importe con la relación vacía,
+porque ese contacto todavía no existe -- el orden alfabético del ZIP no
+reflejaba esto para nada, y un Odoo Partner tenía que darse cuenta solo.
+
+**Alcance de esta primera versión:** solo reordena/numera los archivos
+del ZIP -- no bloquea ni advierte todavía si falta un módulo del que
+otro depende (ej. subir "ventas" sin "contactos" en el mismo proyecto).
+Eso queda para una iteración futura si se valida que hace falta.
+
+**Tests:** `backend/tests/test_module_dependencies.py` (orden
+topológico, múltiples dependientes, módulo sin mapear no rompe) +
+`TestDescargaMultiModulo` actualizado para verificar el numerado.
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — Fallback de encoding cp1252 para CSV (LatAm/Excel Windows)
 
 **Qué cambia:** `_read_tabular_file()` en `backend/app/api/projects.py`

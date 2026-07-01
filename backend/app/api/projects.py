@@ -41,6 +41,7 @@ from app.models.db_models import (
 )
 from app.services.rules_loader import load_rule_schema, list_available_combinations
 from app.services.validation_engine import validate_dataframe
+from app.services.module_dependencies import import_order
 from app.services.entitlements import (
     user_can_download, can_export_project, FREE_TIER_MODULE_LIMIT,
 )
@@ -453,11 +454,19 @@ def download_project(
     if not validated_modules:
         raise HTTPException(status_code=400, detail="Este proyecto todavía no tiene ningún módulo validado")
 
+    # Se numeran los archivos según el orden de importación recomendado
+    # (ver module_dependencies.py) -- importar "ventas" antes que
+    # "contactos" hace que Odoo rechace o vacíe relaciones a contactos
+    # que todavía no existen. El orden alfabético no refleja esto.
+    modules_by_name = {m.odoo_module: m for m in validated_modules}
+    ordered_names = import_order(list(modules_by_name.keys()))
+
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for module in validated_modules:
+        for position, odoo_module in enumerate(ordered_names, start=1):
+            module = modules_by_name[odoo_module]
             corrected_path = _ensure_corrected_file(module, db)
-            zf.write(corrected_path, arcname=f"{module.odoo_module}_corregido.csv")
+            zf.write(corrected_path, arcname=f"{position:02d}_{module.odoo_module}_corregido.csv")
 
     zip_buffer.seek(0)
 
