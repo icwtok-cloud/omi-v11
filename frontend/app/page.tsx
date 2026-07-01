@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProductDemo } from "@/components/ProductDemo";
 
 const PAIN_CARDS = [
   {
@@ -74,6 +75,21 @@ const STEPS = [
   },
 ];
 
+const TRUST_POINTS = [
+  {
+    title: "100% determinístico",
+    body: "Reglas generadas leyendo el código fuente real de Odoo. Sin IA, sin resultados que cambian entre corridas.",
+  },
+  {
+    title: "Tus datos no quedan guardados",
+    body: "El archivo original se borra automáticamente apenas se genera tu archivo corregido.",
+  },
+  {
+    title: "Odoo 14 a 19",
+    body: "Incluye versiones sin soporte oficial de Odoo -- las que tienen más urgencia de migrar.",
+  },
+];
+
 const FAQS = [
   {
     q: "¿Qué formatos acepta?",
@@ -100,6 +116,12 @@ const FAQS = [
 export default function LandingPage() {
   return (
     <main className="min-h-screen">
+      <a
+        href="#contenido"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-brand focus:text-white focus:font-medium focus:rounded-md focus:px-4 focus:py-2"
+      >
+        Saltar al contenido principal
+      </a>
       <header className="border-b border-line">
         <div className="max-w-6xl mx-auto px-6 md:px-10 py-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -127,34 +149,53 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className="max-w-3xl mx-auto px-6 text-center pt-20 pb-16">
-        <span className="inline-flex items-center gap-2 text-xs font-medium text-graphite border border-line rounded-full px-3 py-1.5 mb-6">
-          <span className="w-1.5 h-1.5 rounded-full bg-verify" />
-          Para implementadores y consultoras Odoo
-        </span>
-        <h1 className="font-extrabold text-4xl md:text-6xl leading-[1.05] tracking-tight mb-6">
-          Migrá a Odoo<br />
-          <span className="text-brand">sin sorpresas</span>
-        </h1>
-        <p className="text-graphite text-lg leading-relaxed max-w-xl mx-auto mb-8">
-          Analizá tus datos antes de importar. Detectá duplicados, campos vacíos,
-          CUIT inválidos y errores que Odoo va a rechazar — antes del Go Live.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
-          <Link
-            href="/app"
-            className="bg-brand text-white font-semibold rounded-md px-6 py-3 hover:bg-brand-dark transition-colors"
-          >
-            Analizar mis datos gratis →
-          </Link>
-          <a
-            href="#como-funciona"
-            className="border border-line font-medium rounded-md px-6 py-3 hover:bg-white transition-colors"
-          >
-            Ver cómo funciona
-          </a>
+      <section id="contenido" className="max-w-6xl mx-auto px-6 md:px-10 pt-16 pb-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-10 items-center">
+          <div className="text-center lg:text-left">
+            <span className="inline-flex items-center gap-2 text-xs font-medium text-graphite border border-line rounded-full px-3 py-1.5 mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-verify" />
+              Para implementadores y consultoras Odoo
+            </span>
+            <h1 className="font-extrabold text-4xl md:text-5xl xl:text-6xl leading-[1.05] tracking-tight mb-6">
+              Migrá a Odoo<br />
+              <span className="text-brand">sin sorpresas</span>
+            </h1>
+            <p className="text-graphite text-lg leading-relaxed max-w-xl mx-auto lg:mx-0 mb-8">
+              Analizá tus datos antes de importar. Detectá duplicados, campos vacíos,
+              CUIT inválidos y errores que Odoo va a rechazar — antes del Go Live.
+            </p>
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 mb-4">
+              <Link
+                href="/app"
+                className="bg-brand text-white font-semibold rounded-md px-6 py-3 hover:bg-brand-dark transition-colors"
+              >
+                Analizar mis datos gratis →
+              </Link>
+              <a
+                href="#como-funciona"
+                className="border border-line font-medium rounded-md px-6 py-3 hover:bg-white transition-colors"
+              >
+                Ver cómo funciona
+              </a>
+            </div>
+            <p className="text-sm text-graphite">Sin tarjeta. Sin instalación. Resultados en segundos.</p>
+          </div>
+
+          <div>
+            <ProductDemo />
+          </div>
         </div>
-        <p className="text-sm text-graphite">Sin tarjeta. Sin instalación. Resultados en segundos.</p>
+      </section>
+
+      <section className="border-t border-line py-12">
+        <div className="max-w-6xl mx-auto px-6 md:px-10 grid grid-cols-1 sm:grid-cols-3 gap-8">
+          {TRUST_POINTS.map((point) => (
+            <div key={point.title} className="text-center sm:text-left">
+              <p className="font-bold text-sm mb-1.5">{point.title}</p>
+              <p className="text-sm text-graphite leading-relaxed">{point.body}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section id="modulos" className="border-t border-line bg-white/60 py-20">
