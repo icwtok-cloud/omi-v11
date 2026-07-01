@@ -80,12 +80,42 @@ pasan.
 > revisiones (`alembic history`) aunque no se haya podido correr contra
 > Postgres real antes del deploy.
 
-**Pendiente:** esta migración no se pudo probar de punta a punta contra
-un Postgres real antes de pushear (localmente solo hay SQLite para
-tests) -- se pusheó confiando en que no hay datos que perder y en que
-`alembic downgrade -1` sirve de red de seguridad si Render falla al
-correr `alembic upgrade head` en el deploy. Si el deploy falla, revisar
-los logs de Render del servicio `omi-backend` primero.
+**Actualización -- el primer intento falló en Render, ya arreglado y
+reprobado:** el primer push de esta migración rompió el deploy con
+`psycopg2.errors.DuplicateObject: type "modulestatus" already exists`.
+Causa: `op.create_table()` de Alembic crea automáticamente cualquier
+tipo `Enum` que aparezca en sus columnas -- si ADEMÁS se llama
+`enum.create(bind, checkfirst=True)` a mano antes de `create_table`
+(como hacía esta migración, siguiendo el patrón del baseline `0001`),
+la creación automática de `create_table` NO respeta ese `checkfirst` y
+revienta contra un tipo que ya existe, en la misma transacción. Fix:
+sacar la llamada manual a `.create()` y dejar que `create_table` sea el
+único que cree el tipo. El `downgrade()` tenía además un bug separado
+(`Enum.create()` no acepta un kwarg `name`).
+
+Se instaló Postgres local (Homebrew, sin Docker disponible), se
+reconstruyó a mano el schema que YA existe en Render (el que describe
+el baseline `0001`, vía SQL directo -- no ejecutando `0001.upgrade()`,
+que tiene el mismo bug pero nunca corre en prod porque ahí se usa
+`alembic stamp head`), se stampeó en `0001`, y se corrió el ciclo
+completo `upgrade → downgrade → upgrade` contra ese Postgres real antes
+de reintentar el push. Los tres pasos corrieron limpios y el schema
+resultante coincide con lo esperado (`projectstatus` = `active/paid/exported`,
+`modulestatus` = `uploaded/validating/validated/failed`, tabla
+`project_modules` con el `UNIQUE(project_id, odoo_module)`).
+
+**Regla para no repetirlo (actualiza la de arriba):**
+> Nunca llamar a mano `enum.create(bind, checkfirst=True)` para un tipo
+> que también se usa como tipo de columna dentro del mismo
+> `op.create_table()` -- Alembic ya lo crea solo. Y antes de pushear
+> cualquier migración con DDL de Postgres (enums, ALTER TYPE), probarla
+> contra un Postgres real (Homebrew/Docker/lo que haya a mano) en vez
+> de confiar en que "la cadena de revisiones es válida" (`alembic
+> history`) es suficiente -- eso no ejecuta ni una sola línea de SQL.
+> El baseline `0001` tiene el mismo bug latente (nunca se manifestó
+> porque en prod se usa `stamp`, no `upgrade`) -- queda como deuda
+> técnica conocida, no se tocó en esta sesión para no ampliar el
+> blast radius de este cambio.
 
 ---
 

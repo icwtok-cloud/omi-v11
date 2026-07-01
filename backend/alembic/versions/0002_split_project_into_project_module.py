@@ -44,8 +44,12 @@ def upgrade() -> None:
     bind = op.get_bind()
 
     # --- 1. project_modules: tabla nueva con todo lo que antes vivía en projects ---
-    module_status_enum.create(bind, checkfirst=True)
-
+    # OJO: no llamar a module_status_enum.create() a mano acá. op.create_table
+    # ya crea el tipo Enum automáticamente como parte de la creación de la
+    # tabla -- si además lo creamos manualmente antes, la creación automática
+    # de create_table lo intenta crear DE NUEVO en la misma transacción y
+    # revienta con "type already exists" (no respeta checkfirst en ese
+    # camino). Dejar que create_table sea el único que lo cree.
     op.create_table(
         "project_modules",
         sa.Column("id", sa.String(), primary_key=True),
@@ -101,8 +105,13 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
 
-    # Revertir el enum de status primero (mismo patrón: tipo nuevo -> migrar -> dropear viejo)
-    old_project_status_enum.create(bind, checkfirst=True, name="projectstatus_old")
+    # Revertir el enum de status primero (mismo patrón: tipo nuevo -> migrar -> dropear viejo).
+    # Enum.create() no acepta un kwarg `name` -- hay que instanciar un
+    # Enum nuevo con ese nombre en vez de reusar old_project_status_enum.
+    project_status_old_enum = sa.Enum(
+        "uploaded", "validated", "paid", "downloaded", name="projectstatus_old"
+    )
+    project_status_old_enum.create(bind, checkfirst=True)
     op.execute("ALTER TABLE projects ALTER COLUMN status DROP DEFAULT")
     op.execute(
         "ALTER TABLE projects ALTER COLUMN status TYPE projectstatus_old "
