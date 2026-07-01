@@ -27,6 +27,21 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+/* Llama la atención una sola vez sobre un botón recién aparecido (ej.
+   "Descargar reporte") sin quedar en loop infinito -- 2 iteraciones y
+   termina asentado en scale(1), así no queda "respirando" para siempre
+   ni se congela a mitad de gesto para quien usa prefers-reduced-motion
+   (la regla de abajo ya fuerza animation-iteration-count: 1). */
+@keyframes attention-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;

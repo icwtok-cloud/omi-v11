@@ -591,8 +591,20 @@ function ModuleReportView({
                 setPdfError(e instanceof Error ? e.message : "No se pudo descargar el PDF")
               )
             }
-            className="font-mono text-xs text-graphite border border-line rounded-full px-3 py-1 hover:border-ink hover:text-ink transition-colors ml-auto"
+            className="flex items-center gap-1.5 font-mono text-xs text-brand border border-brand rounded-full pl-2.5 pr-3.5 py-1.5 bg-white hover:bg-brand hover:text-white transition-colors ml-auto animate-[attention-pulse_1.4s_ease-in-out_2]"
           >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-3.5 h-3.5 shrink-0"
+            >
+              <path d="M12 3v11M12 14l-3.5-3.5M12 14l3.5-3.5" />
+              <path d="M4.5 15.5V17a2 2 0 002 2h11a2 2 0 002-2v-1.5" />
+            </svg>
             Descargar reporte (PDF)
           </button>
         </div>
