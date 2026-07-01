@@ -50,6 +50,35 @@ PRICE_FIELDS = {"list_price", "price_unit", "price_subtotal", "amount_total"}
 STOCK_FIELDS = {"quantity", "qty_available"}
 
 
+def _parse_regional_number(value) -> float:
+    """Un CSV/Excel exportado con configuración regional es-AR/es-ES
+    escribe los números con "," como separador decimal y "." como
+    separador de miles (ej. "1.234,56" para mil doscientos treinta y
+    cuatro con 56 centavos). `float()` a secas no entiende ese formato y
+    tira ValueError -- un precio perfectamente válido terminaba
+    reportado como "no es un número válido", el mismo tipo de falso
+    positivo que ya se arregló para el separador de columnas y el
+    encoding del archivo."""
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    text = str(value).strip()
+    if "," in text and "." in text:
+        # El separador que aparece más a la derecha es el decimal real
+        # -- "1.234,56" (LatAm/ES) vs "1,234.56" (EE.UU.).
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    elif text.count(",") == 1:
+        # Solo coma, una sola vez: asumimos separador decimal LatAm/ES
+        # ("1234,56"). Si hubiera más de una coma es un formato ambiguo
+        # que preferimos dejar fallar antes que adivinar mal.
+        text = text.replace(",", ".")
+
+    return float(text)
+
+
 def _clean_phone(value: str) -> str:
     """Sugerencia simple de normalización: deja solo dígitos y el +
     inicial si existe."""
@@ -100,7 +129,7 @@ def check(column: str, field_type: str, value) -> FormatIssue | None:
 
     elif column in PRICE_FIELDS:
         try:
-            numeric = float(value)
+            numeric = _parse_regional_number(value)
             if numeric == 0:
                 return FormatIssue(
                     issue_type="invalid_format",
@@ -126,7 +155,7 @@ def check(column: str, field_type: str, value) -> FormatIssue | None:
 
     elif column in STOCK_FIELDS:
         try:
-            numeric = float(value)
+            numeric = _parse_regional_number(value)
             if numeric < 0:
                 return FormatIssue(
                     issue_type="negative_value",

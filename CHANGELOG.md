@@ -10,6 +10,32 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Normalización numérica regional (decimal "," de LatAm/ES)
+
+**Qué cambia:** nuevo `_parse_regional_number()` en
+`backend/app/services/format_rules.py`, usado en vez de `float()` a
+secas para validar `PRICE_FIELDS` y `STOCK_FIELDS`. Entiende
+"1.234,56" (miles con punto, decimal con coma -- formato es-AR/es-ES) y
+"1,234.56" (formato EE.UU.), decidiendo cuál separador es el decimal
+según cuál aparece más a la derecha.
+
+**Por qué:** mismo patrón de bug que ya se arregló para el separador
+de CSV y el encoding del archivo -- un archivo exportado con
+configuración regional LatAm escribe los precios como "1.234,56", y
+`float("1.234,56")` tira `ValueError`. Un precio perfectamente válido
+se reportaba como "no es un número válido para 'list_price'", un falso
+positivo justo en el caso más común (nadie exporta con formato
+numérico de EE.UU. desde una PC configurada en español).
+
+**Tests:** `TestNormalizacionNumericaRegional` en
+`backend/tests/test_validation_engine.py` (formato LatAm con miles,
+solo decimal, formato EE.UU., negativo en formato LatAm, texto
+realmente inválido sigue siendo error).
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — Aviso de dependencia faltante entre módulos del proyecto
 
 **Qué cambia:** `GET /projects/{id}` ahora incluye

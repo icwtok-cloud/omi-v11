@@ -251,6 +251,35 @@ class TestMissingContactInfo:
 # manual-con-sugerencia) antes de que el usuario lo aplique en el reporte.
 # ---------------------------------------------------------------------------
 
+class TestNormalizacionNumericaRegional:
+    """Un export con configuración regional es-AR/es-ES escribe "1.234,56"
+    (punto de miles, coma decimal) -- float() a secas rompe con eso y
+    un precio válido terminaba reportado como 'no es un número válido'."""
+
+    def test_precio_formato_latam_con_miles_y_decimal_no_es_falso_positivo(self):
+        issue = format_rules.check("list_price", "float", "1.234,56")
+        assert issue is None
+
+    def test_precio_formato_latam_solo_decimal_no_es_falso_positivo(self):
+        issue = format_rules.check("list_price", "float", "1234,56")
+        assert issue is None
+
+    def test_precio_formato_us_con_miles_sigue_funcionando(self):
+        issue = format_rules.check("list_price", "float", "1,234.56")
+        assert issue is None
+
+    def test_precio_negativo_formato_latam_se_detecta_igual(self):
+        issue = format_rules.check("list_price", "float", "-1.234,56")
+        assert issue is not None
+        assert issue.issue_type == "negative_value"
+        assert issue.suggested_fix == 1234.56
+
+    def test_texto_no_numerico_sigue_siendo_error(self):
+        issue = format_rules.check("list_price", "float", "no-es-un-numero")
+        assert issue is not None
+        assert issue.issue_type == "invalid_format"
+
+
 class TestFixExplanation:
     def test_telefono_normalizable_trae_explicacion(self):
         issue = format_rules.check("mobile", "char", "(011) 1234-5678")
