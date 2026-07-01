@@ -10,6 +10,29 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — PaywallPanel no saltaba el pago para suscriptores con cuota disponible
+
+**Qué cambia:** `PaywallPanel.tsx` ahora consulta también
+`has_active_subscription` y `monthly_export_count`/`monthly_export_limit`
+de `GET /users/me` -- si el usuario ya tiene una suscripción activa con
+cuota disponible este mes, el panel muestra directo la opción
+"Tu suscripción (X/5)" y un botón "Descargar" que salta el flujo de
+USDC (igual que ya pasaba con el proyecto gratis), en vez de ofrecerle
+pagar $149 de nuevo por una suscripción que ya tiene.
+
+**Por qué:** gap real detectado y anotado como tarea aparte a mitad de
+esta sesión (spawn_task) mientras se armaba el rediseño de tiers de
+precio (Fase 3) -- el backend (`can_export_project()`) ya autorizaba
+la descarga gratis para un suscriptor con cuota, pero el frontend
+siempre mostraba el flujo completo de pago con wallet, sin detectar
+que ya estaba cubierto. Un suscriptor activo podía terminar pagando
+(o intentando pagar) por algo que ya tenía incluido.
+
+**Sin cambios de backend ni de schema** -- no aplica rollback de
+Alembic.
+
+---
+
 ## 2026-07-01 — Detección de duplicados no funcionaba con headers en español
 
 **Qué cambia:** `check_duplicates()` en

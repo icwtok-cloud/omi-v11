@@ -22,7 +22,11 @@ const CHAIN_BY_NETWORK: Record<Network, typeof polygon | typeof base> = {
 };
 
 type Step = "choose" | "connect" | "confirm-wallet" | "waiting" | "confirmed" | "error";
-type PaymentType = "free" | "per_project" | "subscription";
+// "subscription_covered" = ya tiene una suscripción activa con cuota
+// disponible este mes -- no hay que iniciar un pago nuevo, solo usar
+// la cuota que ya pagó. "subscription" = arrancar una suscripción
+// nueva (todavía no tiene una, o se le venció).
+type PaymentType = "free" | "per_project" | "subscription" | "subscription_covered";
 
 export function PaywallPanel({
   projectId,
@@ -42,27 +46,47 @@ export function PaywallPanel({
   const [payment, setPayment] = useState<PaymentStartResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [freeProjectAvailable, setFreeProjectAvailable] = useState(false);
+  const [subscriptionCoveredInfo, setSubscriptionCoveredInfo] = useState<{
+    used: number;
+    limit: number;
+  } | null>(null);
   const [paymentType, setPaymentType] = useState<PaymentType>("per_project");
 
   useEffect(() => {
     getUserMe(getToken)
       .then((me) => {
         setFreeProjectAvailable(!me.free_project_used);
-        if (!me.free_project_used) setPaymentType("free");
+        const subscriptionHasQuota =
+          me.has_active_subscription && me.monthly_export_count < me.monthly_export_limit;
+        if (subscriptionHasQuota) {
+          setSubscriptionCoveredInfo({
+            used: me.monthly_export_count,
+            limit: me.monthly_export_limit,
+          });
+        }
+        // Prioridad: proyecto gratis (una sola vez, no requiere wallet) >
+        // suscripción ya pagada con cuota disponible (tampoco requiere
+        // wallet, ya la pagó) > pagar por proyecto como default.
+        if (!me.free_project_used) {
+          setPaymentType("free");
+        } else if (subscriptionHasQuota) {
+          setPaymentType("subscription_covered");
+        }
       })
       .catch(() => {
-        // si falla, simplemente no se ofrece la opción gratis -- no debe
-        // bloquear el resto del flujo de pago.
+        // si falla, simplemente no se ofrece la opción gratis/cubierta --
+        // no debe bloquear el resto del flujo de pago.
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleStartFlow() {
     setErrorMsg(null);
-    if (paymentType === "free") {
-      // El proyecto gratis no pasa por USDC -- el backend lo autoriza
+    if (paymentType === "free" || paymentType === "subscription_covered") {
+      // Ninguno de los dos pasa por USDC -- el backend ya lo autoriza
       // directo en GET /download (ver can_export_project() en
-      // entitlements.py). Acá solo mostramos el botón de descarga.
+      // entitlements.py), sea por el proyecto gratis o por la cuota de
+      // una suscripción ya pagada. Acá solo mostramos el botón de descarga.
       setStep("confirmed");
       return;
     }
@@ -136,7 +160,11 @@ export function PaywallPanel({
     return (
       <div className="border border-verify bg-verify-light rounded-lg p-6 text-center">
         <p className="font-extrabold text-xl text-verify mb-3">
-          {paymentType === "free" ? "Descarga habilitada" : "Pago confirmado"}
+          {paymentType === "free"
+            ? "Descarga habilitada"
+            : paymentType === "subscription_covered"
+            ? "Cubierto por tu suscripción"
+            : "Pago confirmado"}
         </p>
         <a
           href={downloadUrl(projectId)}
@@ -180,16 +208,29 @@ export function PaywallPanel({
             >
               Por proyecto · $99
             </button>
-            <button
-              onClick={() => setPaymentType("subscription")}
-              className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
-                paymentType === "subscription"
-                  ? "border-verify bg-verify-light text-verify"
-                  : "border-line text-graphite"
-              }`}
-            >
-              Mensual · $149
-            </button>
+            {subscriptionCoveredInfo ? (
+              <button
+                onClick={() => setPaymentType("subscription_covered")}
+                className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
+                  paymentType === "subscription_covered"
+                    ? "border-verify bg-verify-light text-verify"
+                    : "border-line text-graphite"
+                }`}
+              >
+                Tu suscripción ({subscriptionCoveredInfo.used}/{subscriptionCoveredInfo.limit})
+              </button>
+            ) : (
+              <button
+                onClick={() => setPaymentType("subscription")}
+                className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
+                  paymentType === "subscription"
+                    ? "border-verify bg-verify-light text-verify"
+                    : "border-line text-graphite"
+                }`}
+              >
+                Mensual · $149
+              </button>
+            )}
           </div>
 
           {paymentType === "free" ? (
@@ -197,6 +238,12 @@ export function PaywallPanel({
               Tu proyecto de prueba gratis incluye 1 módulo, con reporte y
               descarga -- una sola vez por cuenta. No hace falta wallet ni
               pago para esto.
+            </p>
+          ) : paymentType === "subscription_covered" && subscriptionCoveredInfo ? (
+            <p className="text-xs text-graphite">
+              Ya tenés una suscripción activa -- usaste{" "}
+              {subscriptionCoveredInfo.used} de {subscriptionCoveredInfo.limit} exportaciones
+              este mes. No hace falta pagar de nuevo ni conectar wallet para este proyecto.
             </p>
           ) : (
             <div>
@@ -223,7 +270,9 @@ export function PaywallPanel({
             onClick={handleStartFlow}
             className="w-full bg-ink text-paper rounded-full py-3 font-medium hover:opacity-90 transition-opacity"
           >
-            {paymentType === "free" ? "Descargar gratis" : "Continuar con USDC"}
+            {paymentType === "free" || paymentType === "subscription_covered"
+              ? "Descargar"
+              : "Continuar con USDC"}
           </button>
         </>
       )}
