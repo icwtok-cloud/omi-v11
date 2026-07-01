@@ -8,6 +8,36 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — P1: el JWKS de Clerk se cacheaba para siempre — una rotación de claves tumbaba el login de todos
+
+**Qué cambia:** `_get_jwks()` (`app/core/auth.py`) cacheaba el JWKS de
+Clerk en una variable global, poblada una sola vez, sin TTL ni
+invalidación. Si Clerk rota sus claves de firma (algo que hacen
+periódicamente, es una práctica de seguridad estándar), cualquier
+token nuevo firmado con la clave nueva no encontraba su `kid` en el
+cache viejo -- el `next()` que busca la clave tira `StopIteration`,
+capturado como 401 genérico ("Token de sesión inválido"). **Todos los
+logins nuevos habrían empezado a fallar, indefinidamente, hasta
+reiniciar el proceso a mano** (lo único que repuebla el cache es un
+restart). Fix: si el `kid` no está en el JWKS cacheado, se refresca
+una vez antes de rechazar el token -- si la clave es simplemente
+nueva, se encuentra; si el token es realmente inválido, ahí sí se
+rechaza.
+
+**Por qué:** encontrado en la ronda 2 de hardening operacional (Phase
+5, JWT handling) -- es el tipo de falla que es imposible de reproducir
+en desarrollo (Clerk no rota claves todos los días) pero causa una
+caída total de autenticación en producción el día que sí rota.
+
+**Tests:** nuevo `backend/tests/test_auth_jwks.py` (3 tests: el cache
+se reusa entre tokens con el mismo `kid`, un `kid` desconocido
+refresca el JWKS una vez y encuentra la clave nueva, un `kid` que no
+existe en NINGÚN JWKS sigue devolviendo 401 limpio -- **verificado que
+el test de rotación falla sin el fix**, revirtiéndolo temporalmente
+antes de commitear). 114/114 backend pasan.
+
+**Rollback:** sin cambios de schema -- no aplica rollback de Alembic.
+
 ## 2026-07-01 — P1: el worker de pagos podía quedar trabado para siempre si un RPC provider se cuelga
 
 **Qué cambia:** `ChainListener` (`app/workers/payment_listener.py`)

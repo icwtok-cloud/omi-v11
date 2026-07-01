@@ -24,27 +24,49 @@ security = HTTPBearer()
 _jwks_cache: dict | None = None
 
 
-def _get_jwks() -> dict:
+def _fetch_jwks() -> dict:
+    # Clerk publica el JWKS en una URL bien conocida derivada del
+    # publishable key -- en producción, Clerk te da la URL exacta
+    # en el dashboard (Configure > JWT templates / API keys).
+    resp = httpx.get(
+        f"https://api.clerk.com/v1/jwks",
+        headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
+        timeout=5.0,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _get_jwks(force_refresh: bool = False) -> dict:
     global _jwks_cache
-    if _jwks_cache is None:
-        # Clerk publica el JWKS en una URL bien conocida derivada del
-        # publishable key -- en producción, Clerk te da la URL exacta
-        # en el dashboard (Configure > JWT templates / API keys).
-        resp = httpx.get(
-            f"https://api.clerk.com/v1/jwks",
-            headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
-            timeout=5.0,
-        )
-        resp.raise_for_status()
-        _jwks_cache = resp.json()
+    if _jwks_cache is None or force_refresh:
+        _jwks_cache = _fetch_jwks()
     return _jwks_cache
 
 
+def _find_key(jwks: dict, kid: str) -> dict | None:
+    return next((k for k in jwks["keys"] if k["kid"] == kid), None)
+
+
 def _verify_clerk_token(token: str) -> dict:
-    jwks = _get_jwks()
     try:
         unverified_header = jwt.get_unverified_header(token)
-        key = next(k for k in jwks["keys"] if k["kid"] == unverified_header["kid"])
+        kid = unverified_header["kid"]
+
+        jwks = _get_jwks()
+        key = _find_key(jwks, kid)
+        if key is None:
+            # El cache quedaba para SIEMPRE una vez poblado -- si Clerk
+            # rota sus claves de firma (lo hacen periódicamente), todo
+            # login nuevo empezaba a fallar con 401 hasta reiniciar el
+            # proceso a mano (una caída total de autenticación
+            # silenciosa). Antes de rechazar el token, se refresca el
+            # JWKS una vez por si la clave es simplemente nueva.
+            jwks = _get_jwks(force_refresh=True)
+            key = _find_key(jwks, kid)
+            if key is None:
+                raise KeyError(f"kid '{kid}' no encontrado en el JWKS de Clerk")
+
         public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key)
         payload = jwt.decode(token, public_key, algorithms=["RS256"], options={"verify_aud": False})
         return payload
