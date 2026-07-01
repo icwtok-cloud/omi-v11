@@ -9,13 +9,41 @@ class AvailableCombination(BaseModel):
     country: str | None = None  # None = módulo sin variación por país
 
 
+class ProjectCreateRequest(BaseModel):
+    odoo_version: str
+    odoo_country: str | None = None
+
+
 class ProjectCreateResponse(BaseModel):
     project_id: str
     status: str
 
 
+class ModuleUploadResponse(BaseModel):
+    project_id: str
+    module_id: str
+    odoo_module: str
+    status: str
+
+
+class ModuleSummaryResponse(BaseModel):
+    module_id: str
+    odoo_module: str
+    status: str
+    total_issues: int | None = None
+
+
+class ProjectSummaryResponse(BaseModel):
+    project_id: str
+    odoo_version: str
+    odoo_country: str | None = None
+    status: str
+    modules: list[ModuleSummaryResponse] = []
+
+
 class ValidationReportResponse(BaseModel):
     project_id: str
+    module_id: str
     total_rows: int
     total_issues: int
     columns_seen: list[str]

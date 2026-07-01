@@ -1,43 +1,122 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { runValidation, applyFixes, ValidationReport, ManualFix } from "@/lib/api";
+import {
+  runValidation,
+  getReport,
+  applyFixes,
+  getProject,
+  addModule,
+  getAvailableCombinations,
+  ValidationReport,
+  ManualFix,
+  ProjectSummary,
+  AvailableCombination,
+} from "@/lib/api";
 import { IssueRow } from "@/components/IssueRow";
 import { PaywallPanel } from "@/components/PaywallPanel";
 
+const MODULE_LABELS: Record<string, string> = {
+  contactos: "Contactos",
+  crm: "CRM",
+  ventas: "Ventas",
+  facturacion: "Facturación",
+  inventario: "Inventario",
+  productos: "Productos",
+  contabilidad: "Contabilidad",
+  compras: "Compras",
+};
+
 export default function ProjectPage() {
   const params = useParams<{ id: string }>();
+  const projectId = params.id;
   const { getToken } = useAuth();
 
-  const [report, setReport] = useState<ValidationReport | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [project, setProject] = useState<ProjectSummary | null>(null);
+  const [loadingProject, setLoadingProject] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [manualFixesApplied, setManualFixesApplied] = useState<Set<number>>(new Set());
 
-  // Estado del guardado de fixes contra el backend
+  const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  const [reports, setReports] = useState<Record<string, ValidationReport>>({});
+  const [loadingModuleId, setLoadingModuleId] = useState<string | null>(null);
+
+  // Fixes manuales seleccionados/confirmados por módulo -- el pago se
+  // habilita a nivel proyecto, así que hace falta confirmar los fixes de
+  // TODOS los módulos que tengan alguno seleccionado, no solo el que se
+  // está viendo en este momento.
+  const [manualFixesByModule, setManualFixesByModule] = useState<Record<string, Set<number>>>({});
+  const [confirmedSnapshotByModule, setConfirmedSnapshotByModule] = useState<
+    Record<string, Set<number> | null>
+  >({});
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
-  // Snapshot de los índices que estaban marcados la última vez que se confirmó.
-  // Si manualFixesApplied cambia después de confirmar, hay que confirmar de nuevo.
-  const [confirmedSnapshot, setConfirmedSnapshot] = useState<Set<number> | null>(null);
+
+  const [combinations, setCombinations] = useState<AvailableCombination[]>([]);
+  const [showAddModule, setShowAddModule] = useState(false);
+  const [addModuleName, setAddModuleName] = useState("");
+  const [addModuleFile, setAddModuleFile] = useState<File | null>(null);
+  const [addingModule, setAddingModule] = useState(false);
+  const [addModuleError, setAddModuleError] = useState<string | null>(null);
+
+  const loadModuleReport = useCallback(
+    async (moduleId: string, moduleStatus: string) => {
+      setLoadingModuleId(moduleId);
+      try {
+        const report =
+          moduleStatus === "validated"
+            ? await getReport(getToken, projectId, moduleId)
+            : await runValidation(getToken, projectId, moduleId);
+        setReports((prev) => ({ ...prev, [moduleId]: report }));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Error al validar el módulo");
+      } finally {
+        setLoadingModuleId(null);
+      }
+    },
+    [getToken, projectId]
+  );
 
   useEffect(() => {
-    if (!params.id) return;
-    runValidation(getToken, params.id)
-      .then(setReport)
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al validar"))
-      .finally(() => setLoading(false));
-  }, [params.id, getToken]);
+    if (!projectId) return;
+    getProject(getToken, projectId)
+      .then((summary) => {
+        setProject(summary);
+        if (summary.modules.length > 0) {
+          const first = summary.modules[0];
+          setActiveModuleId(first.module_id);
+          loadModuleReport(first.module_id, first.status);
+        }
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar el proyecto"))
+      .finally(() => setLoadingProject(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
-  function toggleManualFix(index: number) {
-    setManualFixesApplied((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
+  useEffect(() => {
+    getAvailableCombinations(getToken)
+      .then(setCombinations)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function selectModule(moduleId: string) {
+    setActiveModuleId(moduleId);
+    if (!reports[moduleId] && project) {
+      const mod = project.modules.find((m) => m.module_id === moduleId);
+      if (mod) loadModuleReport(moduleId, mod.status);
+    }
+  }
+
+  function toggleManualFix(moduleId: string, index: number) {
+    setManualFixesByModule((prev) => {
+      const current = new Set(prev[moduleId] ?? []);
+      if (current.has(index)) current.delete(index);
+      else current.add(index);
+      return { ...prev, [moduleId]: current };
     });
+    setConfirmedSnapshotByModule((prev) => ({ ...prev, [moduleId]: null }));
   }
 
   function setsAreEqual(a: Set<number>, b: Set<number>) {
@@ -46,18 +125,20 @@ export default function ProjectPage() {
     return true;
   }
 
-  async function handleConfirmFixes() {
+  async function handleConfirmFixes(moduleId: string) {
+    const report = reports[moduleId];
     if (!report) return;
     setConfirming(true);
     setConfirmError(null);
     try {
+      const selected = manualFixesByModule[moduleId] ?? new Set<number>();
       const fixes: ManualFix[] = report.issues
         .map((issue, idx) => ({ issue, idx }))
-        .filter(({ idx }) => manualFixesApplied.has(idx))
+        .filter(({ idx }) => selected.has(idx))
         .map(({ issue }) => ({ row_index: issue.row_index, column: issue.column }));
 
-      await applyFixes(getToken, report.project_id, fixes);
-      setConfirmedSnapshot(new Set(manualFixesApplied));
+      await applyFixes(getToken, projectId, moduleId, fixes);
+      setConfirmedSnapshotByModule((prev) => ({ ...prev, [moduleId]: new Set(selected) }));
     } catch (e) {
       setConfirmError(e instanceof Error ? e.message : "No se pudieron guardar las correcciones");
     } finally {
@@ -65,29 +146,222 @@ export default function ProjectPage() {
     }
   }
 
-  if (loading) {
+  async function handleAddModule() {
+    if (!addModuleName || !addModuleFile) return;
+    setAddingModule(true);
+    setAddModuleError(null);
+    try {
+      const result = await addModule(getToken, projectId, addModuleName, addModuleFile);
+      const summary = await getProject(getToken, projectId);
+      setProject(summary);
+      setShowAddModule(false);
+      setAddModuleName("");
+      setAddModuleFile(null);
+      selectModule(result.module_id);
+    } catch (e) {
+      setAddModuleError(e instanceof Error ? e.message : "No se pudo subir el módulo");
+    } finally {
+      setAddingModule(false);
+    }
+  }
+
+  if (loadingProject) {
     return (
       <main className="min-h-screen flex items-center justify-center">
-        <p className="font-mono text-sm text-graphite">Analizando tu archivo...</p>
+        <p className="font-mono text-sm text-graphite">Cargando tu proyecto...</p>
       </main>
     );
   }
 
-  if (error || !report) {
+  if (error || !project) {
     return (
       <main className="min-h-screen flex items-center justify-center px-6">
         <p className="text-alert bg-alert-light rounded-md px-5 py-3 text-sm">
-          {error || "No se pudo cargar el reporte"}
+          {error || "No se pudo cargar el proyecto"}
         </p>
       </main>
     );
   }
 
+  const activeReport = activeModuleId ? reports[activeModuleId] : null;
+  const usedModules = new Set(project.modules.map((m) => m.odoo_module));
+  const addableModules = Array.from(
+    new Set(
+      combinations
+        .filter((c) => c.version === project.odoo_version)
+        .map((c) => c.module)
+    )
+  ).filter((m) => !usedModules.has(m));
+
+  // El pago es a nivel proyecto: hace falta que TODOS los módulos con
+  // fixes manuales seleccionados estén confirmados, no solo el que se
+  // está viendo ahora.
+  const modulesWithSelection = Object.entries(manualFixesByModule).filter(
+    ([, set]) => set.size > 0
+  );
+  const hasManualFixesSelected = modulesWithSelection.length > 0;
+  const allSelectedConfirmed = modulesWithSelection.every(([moduleId, set]) => {
+    const snapshot = confirmedSnapshotByModule[moduleId];
+    return snapshot !== null && snapshot !== undefined && setsAreEqual(snapshot, set);
+  });
+  const readyForPayment = !hasManualFixesSelected || allSelectedConfirmed;
+
+  return (
+    <main className="min-h-screen px-6 md:px-12 py-10 max-w-4xl mx-auto">
+      <header className="mb-6">
+        <p className="font-mono text-xs uppercase tracking-widest text-verify mb-2">
+          Tu proyecto · Odoo {project.odoo_version}
+          {project.odoo_country ? ` · ${project.odoo_country.toUpperCase()}` : ""}
+        </p>
+        <h1 className="font-extrabold text-3xl mb-2 tracking-tight">
+          {project.modules.length} de 8 módulos cargados
+        </h1>
+        <p className="text-graphite text-sm">
+          Subí y validá un módulo por vez -- nada se pierde entre uno y otro.
+          Pagás y descargás todo junto cuando termines.
+        </p>
+      </header>
+
+      {/* Tabs de módulos */}
+      <div className="flex flex-wrap gap-2 mb-8">
+        {project.modules.map((m) => (
+          <button
+            key={m.module_id}
+            onClick={() => selectModule(m.module_id)}
+            className={`text-sm font-medium rounded-full px-4 py-2 transition-colors ${
+              activeModuleId === m.module_id
+                ? "bg-ink text-paper"
+                : "border border-line text-graphite hover:border-ink hover:text-ink"
+            }`}
+          >
+            {MODULE_LABELS[m.odoo_module] || m.odoo_module}
+            {typeof m.total_issues === "number" && (
+              <span className="ml-2 opacity-70">{m.total_issues}</span>
+            )}
+          </button>
+        ))}
+
+        {addableModules.length > 0 && (
+          <button
+            onClick={() => setShowAddModule((v) => !v)}
+            className="text-sm font-medium rounded-full px-4 py-2 border border-dashed border-line text-graphite hover:border-verify hover:text-verify transition-colors"
+          >
+            + Agregar módulo
+          </button>
+        )}
+      </div>
+
+      {showAddModule && (
+        <div className="mb-8 border border-line rounded-md p-5 bg-white space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <select
+              className="border border-line rounded-md px-3 py-2.5 bg-white text-ink"
+              value={addModuleName}
+              onChange={(e) => setAddModuleName(e.target.value)}
+            >
+              <option value="">Elegí un módulo</option>
+              {addableModules.map((m) => (
+                <option key={m} value={m}>
+                  {MODULE_LABELS[m] || m}
+                </option>
+              ))}
+            </select>
+            <label className="border border-line rounded-md px-3 py-2.5 text-center cursor-pointer text-sm text-graphite hover:border-verify">
+              {addModuleFile ? addModuleFile.name : "Elegir archivo CSV/Excel"}
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={(e) => setAddModuleFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+          {addModuleError && (
+            <p className="text-alert text-sm bg-alert-light rounded-md px-4 py-2.5">
+              {addModuleError}
+            </p>
+          )}
+          <button
+            onClick={handleAddModule}
+            disabled={!addModuleName || !addModuleFile || addingModule}
+            className="bg-brand text-white text-sm font-medium rounded-full px-5 py-2.5 disabled:opacity-40 hover:opacity-90 transition-opacity"
+          >
+            {addingModule ? "Subiendo..." : "Agregar y validar"}
+          </button>
+        </div>
+      )}
+
+      {activeModuleId && loadingModuleId === activeModuleId && (
+        <div className="py-16 text-center">
+          <p className="font-mono text-sm text-graphite">Analizando tu archivo...</p>
+        </div>
+      )}
+
+      {activeModuleId && activeReport && loadingModuleId !== activeModuleId && (
+        <ModuleReportView
+          report={activeReport}
+          manualFixesApplied={manualFixesByModule[activeModuleId] ?? new Set()}
+          confirmedSnapshot={confirmedSnapshotByModule[activeModuleId] ?? null}
+          confirming={confirming}
+          confirmError={confirmError}
+          onToggle={(idx) => toggleManualFix(activeModuleId, idx)}
+          onConfirm={() => handleConfirmFixes(activeModuleId)}
+        />
+      )}
+
+      <div className="mt-10">
+        {readyForPayment ? (
+          <PaywallPanel
+            projectId={project.project_id}
+            priceLabel="Descargá todos los módulos validados, listos para importar a Odoo."
+          />
+        ) : (
+          <p className="text-graphite text-sm text-center py-4 border border-line rounded-md bg-white">
+            Confirmá tus correcciones manuales en cada módulo para continuar con el pago.
+          </p>
+        )}
+      </div>
+    </main>
+  );
+}
+
+const ISSUE_LABELS: Record<string, string> = {
+  missing_required: "Campo obligatorio vacío",
+  invalid_format: "Formato inválido",
+  unknown_relation: "No existe en Odoo",
+  duplicate: "Duplicado",
+  negative_value: "Valor negativo",
+};
+
+function ModuleReportView({
+  report,
+  manualFixesApplied,
+  confirmedSnapshot,
+  confirming,
+  confirmError,
+  onToggle,
+  onConfirm,
+}: {
+  report: ValidationReport;
+  manualFixesApplied: Set<number>;
+  confirmedSnapshot: Set<number> | null;
+  confirming: boolean;
+  confirmError: string | null;
+  onToggle: (idx: number) => void;
+  onConfirm: () => void;
+}) {
+  function setsAreEqual(a: Set<number>, b: Set<number>) {
+    if (a.size !== b.size) return false;
+    for (const v of a) if (!b.has(v)) return false;
+    return true;
+  }
+
   const okRows = report.total_rows - new Set(report.issues.map((i) => i.row_index)).size;
   const autoFixable = report.issues.filter((i) => i.fix_is_automatic).length;
+  const hasManualFixesSelected = manualFixesApplied.size > 0;
+  const fixesAreConfirmed =
+    confirmedSnapshot !== null && setsAreEqual(confirmedSnapshot, manualFixesApplied);
 
-  // Agrupa issues por tipo+columna para no mostrar N filas individuales
-  // cuando hay miles de errores del mismo tipo (ej. 20.000 teléfonos mal formateados).
   type IssueGroup = {
     key: string;
     issue_type: string;
@@ -108,8 +382,6 @@ export default function ProjectPage() {
         column: issue.column,
         fix_is_automatic: issue.fix_is_automatic,
         has_suggested_fix: issue.suggested_fix !== null && issue.suggested_fix !== undefined,
-        // Es igual para todo el grupo (mismo issue_type+columna), alcanza
-        // con tomarlo del primer issue.
         fix_explanation: issue.fix_explanation,
         indices: [],
       };
@@ -119,34 +391,22 @@ export default function ProjectPage() {
     groupMap.get(key)!.indices.push(idx);
   });
 
-  const hasManualFixesSelected = manualFixesApplied.size > 0;
-  const fixesAreConfirmed =
-    confirmedSnapshot !== null && setsAreEqual(confirmedSnapshot, manualFixesApplied);
-
-  // Si no hay fixes manuales seleccionados, no hace falta confirmar nada:
-  // se puede pasar directo al pago.
-  const readyForPayment = !hasManualFixesSelected || fixesAreConfirmed;
-
   return (
-    <main className="min-h-screen px-6 md:px-12 py-10 max-w-4xl mx-auto">
-      <header className="mb-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-verify mb-2">
-          Reporte de validación
-        </p>
-        <h1 className="font-extrabold text-3xl mb-4 tracking-tight">
+    <>
+      <div className="mb-8">
+        <h2 className="font-extrabold text-2xl mb-4 tracking-tight">
           {report.total_issues === 0
-            ? "Tu archivo está listo para Odoo"
+            ? "Este módulo está listo para Odoo"
             : `${report.total_issues} ${
                 report.total_issues === 1 ? "problema encontrado" : "problemas encontrados"
               }`}
-        </h1>
-
+        </h2>
         <div className="grid grid-cols-3 gap-3">
           <Stat label="Filas totales" value={report.total_rows} />
           <Stat label="Filas sin errores" value={Math.max(okRows, 0)} tone="verify" />
           <Stat label="Se corrigen solas" value={autoFixable} tone="brand" />
         </div>
-      </header>
+      </div>
 
       {report.columns_expected_missing.length > 0 && (
         <div className="mb-8 border border-alert bg-alert-light rounded-md px-5 py-4">
@@ -163,23 +423,11 @@ export default function ProjectPage() {
         groups={issueGroups}
         allIssues={report.issues}
         manualFixesApplied={manualFixesApplied}
-        onToggle={(idx) => {
-          toggleManualFix(idx);
-          setConfirmedSnapshot(null);
-        }}
-        onToggleGroup={(indices) => {
-          setManualFixesApplied((prev) => {
-            const next = new Set(prev);
-            const allOn = indices.every((i) => prev.has(i));
-            indices.forEach((i) => (allOn ? next.delete(i) : next.add(i)));
-            return next;
-          });
-          setConfirmedSnapshot(null);
-        }}
+        onToggle={onToggle}
       />
 
       {hasManualFixesSelected && (
-        <div className="mb-12 border border-line rounded-md px-5 py-4 bg-white">
+        <div className="mb-8 border border-line rounded-md px-5 py-4 bg-white">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <p className="font-medium text-ink mb-1">
@@ -198,7 +446,7 @@ export default function ProjectPage() {
               </p>
             </div>
             <button
-              onClick={handleConfirmFixes}
+              onClick={onConfirm}
               disabled={confirming || fixesAreConfirmed}
               className={`text-sm font-medium rounded-full px-4 py-2 whitespace-nowrap transition-colors ${
                 fixesAreConfirmed
@@ -213,41 +461,18 @@ export default function ProjectPage() {
                 : "Confirmar correcciones"}
             </button>
           </div>
-          {confirmError && (
-            <p className="text-alert text-sm mt-3">{confirmError}</p>
-          )}
+          {confirmError && <p className="text-alert text-sm mt-3">{confirmError}</p>}
         </div>
       )}
-
-      {readyForPayment ? (
-        <PaywallPanel
-          projectId={report.project_id}
-          priceLabel="Descargá el archivo corregido, listo para importar a Odoo."
-        />
-      ) : (
-        <p className="text-graphite text-sm text-center py-4 border border-line rounded-md bg-white">
-          Confirmá tus correcciones manuales para continuar con el pago.
-        </p>
-      )}
-    </main>
+    </>
   );
 }
-
-
-const ISSUE_LABELS: Record<string, string> = {
-  missing_required: "Campo obligatorio vacío",
-  invalid_format: "Formato inválido",
-  unknown_relation: "No existe en Odoo",
-  duplicate: "Duplicado",
-  negative_value: "Valor negativo",
-};
 
 function IssueGroupList({
   groups,
   allIssues,
   manualFixesApplied,
   onToggle,
-  onToggleGroup,
 }: {
   groups: Array<{
     key: string;
@@ -261,7 +486,6 @@ function IssueGroupList({
   allIssues: import("@/lib/api").ValidationIssue[];
   manualFixesApplied: Set<number>;
   onToggle: (idx: number) => void;
-  onToggleGroup: (indices: number[]) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -273,11 +497,20 @@ function IssueGroupList({
     });
   }
 
+  function onToggleGroup(indices: number[]) {
+    const allOn = indices.every((i) => manualFixesApplied.has(i));
+    indices.forEach((i) => {
+      const isOn = manualFixesApplied.has(i);
+      if (allOn && isOn) onToggle(i);
+      if (!allOn && !isOn) onToggle(i);
+    });
+  }
+
   if (groups.length === 0) {
     return (
       <section className="mb-6">
         <p className="text-graphite text-sm py-8 text-center">
-          No encontramos errores. Tu archivo está listo para descargar.
+          No encontramos errores en este módulo. Está listo para descargar.
         </p>
       </section>
     );
@@ -293,7 +526,6 @@ function IssueGroupList({
 
         return (
           <div key={g.key} className="border border-line rounded-md bg-white overflow-hidden">
-            {/* Cabecera del grupo */}
             <div className="flex items-center gap-3 px-4 py-3">
               <button
                 onClick={() => toggle(g.key)}
@@ -345,7 +577,6 @@ function IssueGroupList({
               </p>
             )}
 
-            {/* Filas individuales — solo si está expandido */}
             {isExpanded && (
               <div className="border-t border-line divide-y divide-line">
                 {g.indices.map((idx) => (

@@ -13,7 +13,8 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, DateTime, ForeignKey, Float, Boolean, Enum, JSON, Integer
+    Column, String, DateTime, ForeignKey, Float, Boolean, Enum, JSON, Integer,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -43,26 +44,71 @@ class User(Base):
 
 
 class ProjectStatus(str, enum.Enum):
+    active = "active"       # el proyecto existe, 0+ módulos subidos/validados, nada pagado aún
+    paid = "paid"           # un pago per_project confirmado para este proyecto -- exportes ilimitados de ESTE proyecto
+    exported = "exported"   # al menos una exportación exitosa ocurrió (auditoría; no bloquea re-exportar si ya está paid)
+
+
+class ModuleStatus(str, enum.Enum):
     uploaded = "uploaded"
-    validated = "validated"     # reporte gratis generado, esperando pago
-    paid = "paid"                # pago confirmado, descarga habilitada
-    downloaded = "downloaded"
+    validating = "validating"
+    validated = "validated"
+    failed = "failed"
+
+
+# Módulos de Odoo soportados por OMI -- ver rules-generator/output/.
+# Tope de 8 por proyecto (se enforce en la API, no acá).
+MAX_MODULES_PER_PROJECT = 8
 
 
 class Project(Base):
+    """Contenedor de la migración completa de un cliente: una instancia de
+    Odoo (una versión, un país si aplica), con hasta MAX_MODULES_PER_PROJECT
+    módulos acumulados adentro (ver ProjectModule). El pago y la exportación
+    son a nivel de Project, no de módulo individual -- el usuario sube y
+    valida módulo por módulo sin perder progreso, y paga/exporta todo junto
+    cuando está listo."""
+
     __tablename__ = "projects"
 
     id = Column(String, primary_key=True, default=gen_uuid)
     owner_id = Column(String, ForeignKey("users.id"), nullable=False)
 
+    odoo_version = Column(String, nullable=False)  # ej "17.0" -- fijo por proyecto, una sola instancia de Odoo
+    odoo_country = Column(String, nullable=True)   # ej "ar", None si ningún módulo del proyecto varía por país
+
+    status = Column(Enum(ProjectStatus), default=ProjectStatus.active)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    owner = relationship("User", back_populates="projects")
+    payment = relationship("Payment", back_populates="project", uselist=False)
+    modules = relationship(
+        "ProjectModule", back_populates="project", cascade="all, delete-orphan"
+    )
+
+
+class ProjectModule(Base):
+    """Un módulo (ej. "contactos") dentro de un Project, con su propio
+    archivo subido, reporte de validación y fixes confirmados. Re-subir un
+    archivo para el mismo módulo pisa esta fila (ver UNIQUE de abajo) -- es
+    intencional, un módulo = un archivo vigente a la vez dentro del proyecto."""
+
+    __tablename__ = "project_modules"
+    __table_args__ = (
+        UniqueConstraint("project_id", "odoo_module", name="uq_project_module"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=False, index=True)
+
     odoo_module = Column(String, nullable=False)   # ej "contactos"
-    odoo_version = Column(String, nullable=False)  # ej "17.0"
-    odoo_country = Column(String, nullable=True)   # ej "ar", None si el módulo no varía por país
 
     original_filename = Column(String, nullable=False)
     storage_path = Column(String, nullable=False)  # path del archivo subido
 
-    status = Column(Enum(ProjectStatus), default=ProjectStatus.uploaded)
+    status = Column(Enum(ModuleStatus), default=ModuleStatus.uploaded)
 
     # Reporte de validación completo (errores, fixes sugeridos, preview).
     # Se guarda como JSON -- ver app/services/validation_engine.py por
@@ -70,7 +116,8 @@ class Project(Base):
     validation_report = Column(JSON, nullable=True)
 
     # Config real del cliente para override de defaults (categorías,
-    # etapas, plan de cuentas propios), si la proveyó.
+    # etapas, plan de cuentas propios), si la proveyó -- puede variar por
+    # módulo (ej. defaults de crm distintos a los de contactos).
     client_config_override = Column(JSON, nullable=True)
 
     # Fixes manuales que el usuario confirmó explícitamente en el reporte
@@ -81,11 +128,18 @@ class Project(Base):
     # aplican en _ensure_corrected_file() junto con los automáticos.
     confirmed_manual_fixes = Column(JSON, nullable=True)
 
+    # Progreso de validación (ver Fase 4 del roadmap) -- se persisten en
+    # DB en vez de en memoria porque el dyno free de Render puede
+    # reiniciar a mitad de una validación larga.
+    rows_processed = Column(Integer, default=0)
+    rows_total = Column(Integer, nullable=True)
+    validation_started_at = Column(DateTime, nullable=True)
+    validation_error = Column(String, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    owner = relationship("User", back_populates="projects")
-    payment = relationship("Payment", back_populates="project", uselist=False)
+    project = relationship("Project", back_populates="modules")
 
 
 class PaymentType(str, enum.Enum):

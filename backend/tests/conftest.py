@@ -23,6 +23,7 @@ os.environ.setdefault("BASE_RPC_URL", "https://example.invalid/base")
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 from app.core.database import Base, get_db
@@ -33,10 +34,19 @@ from app.models.db_models import User
 @pytest.fixture()
 def db_session():
     """Una base SQLite en memoria, nueva en cada test -- así los tests
-    de API no dependen entre si ni tocan la base real de Render."""
+    de API no dependen entre si ni tocan la base real de Render.
+
+    `poolclass=StaticPool` es necesario acá: FastAPI corre los endpoints
+    (incluso los `def` sync) en un thread del threadpool, distinto al
+    thread donde corre este fixture. Sin StaticPool, una engine sqlite
+    ':memory:' le da a cada thread una conexión a una base en memoria
+    DISTINTA (vacía) -- "no such table" apenas el endpoint intenta leer
+    algo que no se haya cacheado antes en el thread principal. StaticPool
+    fuerza a que todos los threads compartan la misma conexión real."""
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)

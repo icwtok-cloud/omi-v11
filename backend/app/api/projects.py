@@ -1,34 +1,49 @@
 """
 Endpoints del flujo principal de OMI:
 
-  POST /projects                  -> sube archivo, crea proyecto
-  POST /projects/{id}/validate    -> corre el motor de validación (gratis)
-  GET  /projects/{id}/report      -> devuelve el reporte (gratis)
-  POST /projects/{id}/apply-fixes -> aplica fixes elegidos por el usuario,
-                                      genera el archivo corregido en storage
-                                      (no lo entrega -- eso requiere pago)
-  GET  /projects/{id}/download    -> entrega el archivo, SOLO si paid/subscription
+  POST /projects                              -> crea el proyecto (contenedor, sin archivo todavía)
+  POST /projects/{id}/modules                 -> sube un archivo para un módulo del proyecto (hasta 8)
+  POST /projects/{id}/modules/{mid}/validate  -> corre el motor de validación sobre ese módulo (gratis)
+  GET  /projects/{id}/modules/{mid}/report    -> devuelve el reporte de ese módulo (gratis)
+  POST /projects/{id}/modules/{mid}/apply-fixes -> aplica fixes elegidos por el usuario para ese módulo
+  GET  /projects/{id}                         -> resumen del proyecto + todos sus módulos
+  GET  /projects/{id}/download                -> entrega un ZIP con todos los módulos validados,
+                                                   SOLO si paid/subscription
+
+Un Project es el contenedor de la migración completa de un cliente (una
+versión de Odoo, un país si aplica). Adentro, cada ProjectModule es un
+módulo (contactos, crm, etc.) con su propio archivo/reporte/fixes,
+acumulados sin perderse entre sí -- el pago y la descarga son a nivel
+Project, no por módulo individual.
 """
 
 from __future__ import annotations
 
 import uuid
+import zipfile
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.safe_logging import log_event
-from app.models.db_models import Project, ProjectStatus, User
+from app.models.db_models import (
+    Project, ProjectModule, ProjectStatus, ModuleStatus, MAX_MODULES_PER_PROJECT, User,
+)
 from app.services.rules_loader import load_rule_schema, list_available_combinations
 from app.services.validation_engine import validate_dataframe
 from app.services.entitlements import user_can_download
-from app.api.schemas import ValidationReportResponse, AvailableCombination
+from app.api.schemas import (
+    ValidationReportResponse, AvailableCombination, ProjectCreateRequest,
+    ProjectCreateResponse, ProjectSummaryResponse, ModuleSummaryResponse,
+    ModuleUploadResponse,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -81,15 +96,60 @@ def _validate_file_signature(contents: bytes, suffix: str) -> None:
             )
 
 
-@router.post("")
-async def create_project(
+@router.post("", response_model=ProjectCreateResponse)
+def create_project(
+    body: ProjectCreateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Crea el proyecto vacío -- todavía sin ningún módulo/archivo. El
+    primer módulo se sube después con POST /projects/{id}/modules."""
+    project = Project(
+        owner_id=user.id,
+        odoo_version=body.odoo_version,
+        odoo_country=body.odoo_country,
+        status=ProjectStatus.active,
+    )
+    db.add(project)
+    db.commit()
+
+    return ProjectCreateResponse(project_id=project.id, status=project.status.value)
+
+
+@router.get("/{project_id}", response_model=ProjectSummaryResponse)
+def get_project(
+    project_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _get_owned_project(project_id, user, db)
+    return ProjectSummaryResponse(
+        project_id=project.id,
+        odoo_version=project.odoo_version,
+        odoo_country=project.odoo_country,
+        status=project.status.value,
+        modules=[
+            ModuleSummaryResponse(
+                module_id=m.id,
+                odoo_module=m.odoo_module,
+                status=m.status.value,
+                total_issues=(m.validation_report or {}).get("total_issues"),
+            )
+            for m in project.modules
+        ],
+    )
+
+
+@router.post("/{project_id}/modules", response_model=ModuleUploadResponse)
+async def upload_module(
+    project_id: str,
     odoo_module: str = Form(...),
-    odoo_version: str = Form(...),
-    odoo_country: str | None = Form(None),
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    project = _get_owned_project(project_id, user, db)
+
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
     contents = await file.read()
     if len(contents) > max_bytes:
@@ -106,99 +166,125 @@ async def create_project(
         )
     _validate_file_signature(contents, suffix)
 
-    # Validamos que la combinación módulo+versión+país exista ANTES de guardar
-    # nada -- evita proyectos huérfanos sin reglas contra qué validar.
+    # Validamos que la combinación módulo+versión+país exista ANTES de
+    # guardar nada -- evita módulos huérfanos sin reglas contra qué validar.
     try:
-        load_rule_schema(odoo_module, odoo_version, odoo_country)
+        load_rule_schema(odoo_module, project.odoo_version, project.odoo_country)
     except (FileNotFoundError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    project_id = str(uuid.uuid4())
-    storage_path = UPLOAD_DIR / f"{project_id}_{file.filename}"
+    existing = next((m for m in project.modules if m.odoo_module == odoo_module), None)
+
+    if existing is None and len(project.modules) >= MAX_MODULES_PER_PROJECT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Este proyecto ya tiene el máximo de {MAX_MODULES_PER_PROJECT} módulos.",
+        )
+
+    module_id = existing.id if existing else str(uuid.uuid4())
+    storage_path = UPLOAD_DIR / f"{project.id}_{module_id}_{file.filename}"
     storage_path.write_bytes(contents)
 
-    project = Project(
-        id=project_id,
-        owner_id=user.id,
-        odoo_module=odoo_module,
-        odoo_version=odoo_version,
-        odoo_country=odoo_country,
-        original_filename=file.filename,
-        storage_path=str(storage_path),
-        status=ProjectStatus.uploaded,
-    )
-    db.add(project)
+    if existing:
+        # Re-subir el mismo módulo pisa la fila existente -- es un archivo
+        # nuevo, así que se descarta cualquier reporte/fix viejo.
+        existing.original_filename = file.filename
+        existing.storage_path = str(storage_path)
+        existing.status = ModuleStatus.uploaded
+        existing.validation_report = None
+        existing.confirmed_manual_fixes = None
+        existing.rows_processed = 0
+        existing.rows_total = None
+        existing.validation_started_at = None
+        existing.validation_error = None
+        module = existing
+    else:
+        module = ProjectModule(
+            id=module_id,
+            project_id=project.id,
+            odoo_module=odoo_module,
+            original_filename=file.filename,
+            storage_path=str(storage_path),
+            status=ModuleStatus.uploaded,
+        )
+        db.add(module)
+
     db.commit()
 
-    return {"project_id": project_id, "status": project.status.value}
+    return ModuleUploadResponse(
+        project_id=project.id, module_id=module.id,
+        odoo_module=module.odoo_module, status=module.status.value,
+    )
 
 
-@router.post("/{project_id}/validate", response_model=ValidationReportResponse)
-def validate_project(
+@router.post("/{project_id}/modules/{module_id}/validate", response_model=ValidationReportResponse)
+def validate_module(
     project_id: str,
+    module_id: str,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     project = _get_owned_project(project_id, user, db)
+    module = _get_project_module(project, module_id)
 
-    if project.status == ProjectStatus.downloaded:
-        raise HTTPException(
-            status_code=410,
-            detail="El archivo original ya fue eliminado tras la descarga (política de no-retención). Subí el archivo de nuevo si necesitás re-validarlo.",
-        )
+    schema = load_rule_schema(module.odoo_module, project.odoo_version, project.odoo_country)
+    df = _read_tabular_file(Path(module.storage_path), module.original_filename)
 
-    schema = load_rule_schema(project.odoo_module, project.odoo_version, project.odoo_country)
-    df = _read_tabular_file(Path(project.storage_path), project.original_filename)
+    report = validate_dataframe(df, schema, client_override=module.client_config_override)
 
-    report = validate_dataframe(df, schema, client_override=project.client_config_override)
-
-    project.validation_report = report.to_dict()
-    project.status = ProjectStatus.validated
+    module.validation_report = report.to_dict()
+    module.status = ModuleStatus.validated
     db.commit()
 
     return ValidationReportResponse(
         project_id=project.id,
+        module_id=module.id,
         can_download=(False if report.structural_mismatch else user_can_download(db, project)),
         **report.to_dict(),
     )
 
 
-@router.get("/{project_id}/report", response_model=ValidationReportResponse)
-def get_report(
+@router.get("/{project_id}/modules/{module_id}/report", response_model=ValidationReportResponse)
+def get_module_report(
     project_id: str,
+    module_id: str,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     project = _get_owned_project(project_id, user, db)
-    if not project.validation_report:
-        raise HTTPException(status_code=404, detail="Este proyecto todavía no fue validado")
+    module = _get_project_module(project, module_id)
+    if not module.validation_report:
+        raise HTTPException(status_code=404, detail="Este módulo todavía no fue validado")
 
     return ValidationReportResponse(
         project_id=project.id,
+        module_id=module.id,
         can_download=(
             False
-            if project.validation_report.get("structural_mismatch")
+            if module.validation_report.get("structural_mismatch")
             else user_can_download(db, project)
         ),
-        **project.validation_report,
+        **module.validation_report,
     )
 
 
-@router.post("/{project_id}/apply-fixes")
-def apply_fixes(
+@router.post("/{project_id}/modules/{module_id}/apply-fixes")
+def apply_module_fixes(
     project_id: str,
+    module_id: str,
     fixes: list[dict],
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Guarda qué fixes manuales eligió aplicar el usuario (lista de
-    {"row_index": int, "column": str}). Se aplican recién al generar el
-    archivo corregido, en _ensure_corrected_file()."""
+    """Guarda qué fixes manuales eligió aplicar el usuario para este módulo
+    (lista de {"row_index": int, "column": str}). Se aplican recién al
+    generar el archivo corregido, en _ensure_corrected_file()."""
     project = _get_owned_project(project_id, user, db)
-    if not project.validation_report:
-        raise HTTPException(status_code=404, detail="Este proyecto todavía no fue validado")
+    module = _get_project_module(project, module_id)
+    if not module.validation_report:
+        raise HTTPException(status_code=404, detail="Este módulo todavía no fue validado")
 
-    project.confirmed_manual_fixes = fixes
+    module.confirmed_manual_fixes = fixes
     db.commit()
     return {"confirmed_count": len(fixes)}
 
@@ -217,30 +303,41 @@ def download_project(
             detail="Necesitás pagar este proyecto o tener una suscripción activa para descargarlo",
         )
 
-    corrected_path = _ensure_corrected_file(project, db)
-    project.status = ProjectStatus.downloaded
+    validated_modules = [m for m in project.modules if m.validation_report]
+    if not validated_modules:
+        raise HTTPException(status_code=400, detail="Este proyecto todavía no tiene ningún módulo validado")
+
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for module in validated_modules:
+            corrected_path = _ensure_corrected_file(module, db)
+            zf.write(corrected_path, arcname=f"{module.odoo_module}_corregido.csv")
+
+    zip_buffer.seek(0)
+    project.status = ProjectStatus.exported
     db.commit()
 
-    return FileResponse(
-        path=corrected_path,
-        filename=f"corregido_{project.original_filename}",
-        media_type="application/octet-stream",
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="omi_{project.id}.zip"'},
     )
 
 
-def _ensure_corrected_file(project: Project, db: Session) -> Path:
+def _ensure_corrected_file(module: ProjectModule, db: Session) -> Path:
     """Genera (si no existe ya) el archivo con los fixes automáticos
-    aplicados. Los fixes manuales que el usuario haya elegido en el
-    frontend se aplican en el endpoint apply-fixes, antes de llegar acá."""
-    corrected_path = Path(project.storage_path).with_suffix(".corrected.csv")
+    aplicados para este módulo. Los fixes manuales que el usuario haya
+    elegido en el frontend se aplican en el endpoint apply-fixes, antes
+    de llegar acá."""
+    corrected_path = Path(module.storage_path).with_suffix(".corrected.csv")
     if corrected_path.exists():
         return corrected_path
 
-    df = _read_tabular_file(Path(project.storage_path), project.original_filename)
-    report = project.validation_report or {}
+    df = _read_tabular_file(Path(module.storage_path), module.original_filename)
+    report = module.validation_report or {}
 
     confirmed_manual = {
-        (f["row_index"], f["column"]) for f in (project.confirmed_manual_fixes or [])
+        (f["row_index"], f["column"]) for f in (module.confirmed_manual_fixes or [])
     }
 
     for issue in report.get("issues", []):
@@ -256,10 +353,10 @@ def _ensure_corrected_file(project: Project, db: Session) -> Path:
 
     # Zero-retention: el original ya no se necesita una vez generado el
     # corregido -- nunca debe persistir indefinidamente en disco.
-    original_path = Path(project.storage_path)
+    original_path = Path(module.storage_path)
     if original_path.exists():
         original_path.unlink()
-    log_event("file_destroyed", project_id=project.id)
+    log_event("file_destroyed", project_id=module.project_id, module_id=module.id)
 
     return corrected_path
 
@@ -271,3 +368,10 @@ def _get_owned_project(project_id: str, user: User, db: Session) -> Project:
     if project.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Este proyecto no te pertenece")
     return project
+
+
+def _get_project_module(project: Project, module_id: str) -> ProjectModule:
+    module = next((m for m in project.modules if m.id == module_id), None)
+    if not module:
+        raise HTTPException(status_code=404, detail="Módulo no encontrado en este proyecto")
+    return module

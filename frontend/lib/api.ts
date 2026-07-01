@@ -42,20 +42,43 @@ export interface CreateProjectResult {
   status: string;
 }
 
+/** Crea el proyecto contenedor -- todavía sin ningún módulo/archivo. */
 export async function createProject(
   getToken: GetToken,
-  odooModule: string,
   odooVersion: string,
-  file: File,
   odooCountry?: string | null
 ): Promise<CreateProjectResult> {
+  const res = await authedFetch("/projects", getToken, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ odoo_version: odooVersion, odoo_country: odooCountry ?? null }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "No se pudo crear el proyecto");
+  }
+  return res.json();
+}
+
+export interface ModuleUploadResult {
+  project_id: string;
+  module_id: string;
+  odoo_module: string;
+  status: string;
+}
+
+/** Sube (o re-sube, pisando el archivo anterior) un módulo dentro de un proyecto. */
+export async function addModule(
+  getToken: GetToken,
+  projectId: string,
+  odooModule: string,
+  file: File
+): Promise<ModuleUploadResult> {
   const formData = new FormData();
   formData.append("odoo_module", odooModule);
-  formData.append("odoo_version", odooVersion);
-  if (odooCountry) formData.append("odoo_country", odooCountry);
   formData.append("file", file);
 
-  const res = await authedFetch("/projects", getToken, {
+  const res = await authedFetch(`/projects/${projectId}/modules`, getToken, {
     method: "POST",
     body: formData,
   });
@@ -63,6 +86,30 @@ export async function createProject(
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "No se pudo subir el archivo");
   }
+  return res.json();
+}
+
+export interface ModuleSummary {
+  module_id: string;
+  odoo_module: string;
+  status: string;
+  total_issues: number | null;
+}
+
+export interface ProjectSummary {
+  project_id: string;
+  odoo_version: string;
+  odoo_country: string | null;
+  status: string;
+  modules: ModuleSummary[];
+}
+
+export async function getProject(
+  getToken: GetToken,
+  projectId: string
+): Promise<ProjectSummary> {
+  const res = await authedFetch(`/projects/${projectId}`, getToken);
+  if (!res.ok) throw new Error("No se pudo cargar el proyecto");
   return res.json();
 }
 
@@ -79,6 +126,7 @@ export interface ValidationIssue {
 
 export interface ValidationReport {
   project_id: string;
+  module_id: string;
   total_rows: number;
   total_issues: number;
   columns_seen: string[];
@@ -94,20 +142,27 @@ export interface ValidationReport {
 
 export async function runValidation(
   getToken: GetToken,
-  projectId: string
+  projectId: string,
+  moduleId: string
 ): Promise<ValidationReport> {
-  const res = await authedFetch(`/projects/${projectId}/validate`, getToken, {
-    method: "POST",
-  });
+  const res = await authedFetch(
+    `/projects/${projectId}/modules/${moduleId}/validate`,
+    getToken,
+    { method: "POST" }
+  );
   if (!res.ok) throw new Error("No se pudo validar el archivo");
   return res.json();
 }
 
 export async function getReport(
   getToken: GetToken,
-  projectId: string
+  projectId: string,
+  moduleId: string
 ): Promise<ValidationReport> {
-  const res = await authedFetch(`/projects/${projectId}/report`, getToken);
+  const res = await authedFetch(
+    `/projects/${projectId}/modules/${moduleId}/report`,
+    getToken
+  );
   if (!res.ok) throw new Error("No se pudo obtener el reporte");
   return res.json();
 }
@@ -167,13 +222,21 @@ export interface ManualFix {
 export async function applyFixes(
   getToken: GetToken,
   projectId: string,
+  moduleId: string,
   fixes: ManualFix[]
-): Promise<{ confirmed_manual_fixes: ManualFix[] }> {
-  const res = await authedFetch(`/projects/${projectId}/apply-fixes`, getToken, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fixes }),
-  });
+): Promise<{ confirmed_count: number }> {
+  const res = await authedFetch(
+    `/projects/${projectId}/modules/${moduleId}/apply-fixes`,
+    getToken,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // El backend espera la lista de fixes directo en el body, no
+      // envuelta en un objeto (FastAPI trata `fixes: list[dict]` como el
+      // body completo).
+      body: JSON.stringify(fixes),
+    }
+  );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "No se pudieron guardar las correcciones");

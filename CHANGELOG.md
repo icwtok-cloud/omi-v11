@@ -10,6 +10,85 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## ⚠️ 2026-06-30 — Rediseño de schema: Project como contenedor multi-módulo
+
+**Contexto:** Fase 2 del roadmap de sesión. Antes, 1 Project = 1 archivo
+= 1 módulo. El nuevo modelo de precios ($99 = proyecto completo con
+hasta 8 módulos, plan gratis de prueba, suscripción con tope mensual)
+necesita que un Project sea el contenedor de la migración completa de
+un cliente, con módulos acumulados adentro sin perder progreso entre
+uno y otro.
+
+**Cambio de schema (corte limpio, confirmado con el dueño del producto
+-- no hay pagos reales ni proyectos de clientes en la base de Render
+todavía):**
+
+- `Project` pierde `odoo_module`, `original_filename`, `storage_path`,
+  `validation_report`, `client_config_override`, `confirmed_manual_fixes`
+  -- se mudan a la tabla nueva `ProjectModule` (FK a `project_id`, UNIQUE
+  por `(project_id, odoo_module)` -- re-subir el mismo módulo pisa la
+  fila existente, no crea una nueva).
+- `ProjectStatus` cambia de `uploaded/validated/paid/downloaded` a
+  `active/paid/exported` (el estado por-archivo ahora vive en
+  `ModuleStatus` de cada `ProjectModule`: `uploaded/validating/validated/failed`).
+- Tope de 8 módulos por proyecto, enforced en la API (`POST
+  /projects/{id}/modules`), no en la DB.
+- Migración Alembic `0002_split_project_into_project_module.py`: crea
+  `project_modules`, dropea las columnas viejas de `projects`, migra el
+  enum de status con el patrón tipo-nuevo→migrar-columna→dropear-viejo
+  (Postgres no permite editar valores de un enum in-place). **Sin
+  migración de datos** -- si en algún momento hay datos reales, esta
+  migración deja de ser aplicable tal cual.
+- **Rollback:** `alembic downgrade -1` desde el backend (revierte el
+  enum y las columnas, sin recuperar datos -- el downgrade tampoco
+  preserva datos, ídem el upgrade).
+
+**Endpoints reshapeados** (`app/api/projects.py`):
+`POST /projects` (crea el contenedor vacío) · `GET /projects/{id}`
+(resumen + lista de módulos, nuevo) · `POST /projects/{id}/modules`
+(sube/re-sube un módulo) · `POST .../modules/{mid}/validate` ·
+`GET .../modules/{mid}/report` · `POST .../modules/{mid}/apply-fixes` ·
+`GET /projects/{id}/download` (ahora entrega un **ZIP** con un archivo
+corregido por módulo validado, en vez de un solo CSV).
+
+**Bug de test encontrado y arreglado de paso:** `tests/conftest.py`
+usaba SQLite `:memory:` sin `StaticPool` -- FastAPI corre los endpoints
+en threads del threadpool, y sin StaticPool cada thread nuevo se
+conectaba a una base en memoria DISTINTA y vacía ("no such table").
+Los tests viejos no lo notaban porque tocaban `test_user.id` en el
+fixture antes de la request HTTP (quedaba cacheado en memoria); los
+tests nuevos de multi-módulo lo expusieron. Fix: `poolclass=StaticPool`
+en el engine de test.
+
+**Bug de frontend encontrado y arreglado de paso:** `lib/api.ts`
+mandaba `applyFixes` como `{fixes: [...]}`, pero el endpoint espera la
+lista directo en el body (`fixes: list[dict]` en FastAPI = el body
+completo, no envuelto en un objeto). No se había notado porque nunca se
+hizo el test E2E manual con un archivo real.
+
+**Tests:** `test_apply_fixes.py` actualizado a `Project`+`ProjectModule`,
+nuevo `test_projects_multimodule.py` (crear proyecto, acumular módulos,
+tope de 8, re-subida limpia, resumen, descarga en ZIP). 32/32 tests
+pasan.
+
+**Regla para no repetirlo:**
+> Un cambio de schema que dropea columnas en producción es la acción
+> más difícil de revertir de todo este roadmap -- antes de pushear,
+> confirmar explícitamente con el dueño del producto que no hay datos
+> reales en juego (no asumirlo por el estado del CHANGELOG), y que el
+> downgrade de Alembic existe y al menos se validó la cadena de
+> revisiones (`alembic history`) aunque no se haya podido correr contra
+> Postgres real antes del deploy.
+
+**Pendiente:** esta migración no se pudo probar de punta a punta contra
+un Postgres real antes de pushear (localmente solo hay SQLite para
+tests) -- se pusheó confiando en que no hay datos que perder y en que
+`alembic downgrade -1` sirve de red de seguridad si Render falla al
+correr `alembic upgrade head` en el deploy. Si el deploy falla, revisar
+los logs de Render del servicio `omi-backend` primero.
+
+---
+
 ## 2026-06-30 — Theming del modal de Clerk + explicación de fixes en el reporte
 
 **Contexto:** arranque de un roadmap más grande (ver plan de sesión:

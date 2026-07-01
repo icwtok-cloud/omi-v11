@@ -1,62 +1,72 @@
 """
-Tests del endpoint POST /projects/{id}/apply-fixes y de cómo
-_ensure_corrected_file() usa confirmed_manual_fixes.
+Tests del endpoint POST /projects/{id}/modules/{mid}/apply-fixes y de
+cómo _ensure_corrected_file() usa confirmed_manual_fixes.
 
 Corresponde al pendiente documentado en CHANGELOG.md, sección
 "Fixes manuales: backend listo, frontend y DB pendientes" del
 2026-06-30: el botón "Aplicar fix" en el frontend cambiaba solo estado
 local de React sin persistir nada -- estos tests cubren que, una vez
 persistido, el archivo final realmente contenga el valor corregido.
+
+Actualizado para el modelo Project (contenedor) + ProjectModule (un
+módulo con su archivo/reporte) -- ver CHANGELOG.md, sección del
+rediseño de schema multi-módulo.
 """
 
 import pandas as pd
 
-from app.models.db_models import Project, ProjectStatus
+from app.models.db_models import Project, ProjectModule, ModuleStatus
 from app.api.projects import _ensure_corrected_file
 
 
 def _make_project(db_session, owner_id, **overrides):
-    defaults = dict(
-        owner_id=owner_id,
-        odoo_module="contactos",
-        odoo_version="15.0",
-        odoo_country="ar",
-        original_filename="contactos.csv",
-        storage_path="/tmp/contactos.csv",
-        status=ProjectStatus.validated,
-    )
-    defaults.update(overrides)
-    project = Project(**defaults)
+    project = Project(owner_id=owner_id, odoo_version="15.0", odoo_country="ar")
     db_session.add(project)
     db_session.commit()
     db_session.refresh(project)
     return project
 
 
+def _make_module(db_session, project, **overrides):
+    defaults = dict(
+        project_id=project.id,
+        odoo_module="contactos",
+        original_filename="contactos.csv",
+        storage_path="/tmp/contactos.csv",
+        status=ModuleStatus.validated,
+    )
+    defaults.update(overrides)
+    module = ProjectModule(**defaults)
+    db_session.add(module)
+    db_session.commit()
+    db_session.refresh(module)
+    return module
+
+
 class TestApplyFixesEndpoint:
-    def test_guarda_fixes_confirmados_en_el_proyecto(self, client, db_session, test_user):
-        project = _make_project(
-            db_session, test_user.id, validation_report={"issues": []}
-        )
+    def test_guarda_fixes_confirmados_en_el_modulo(self, client, db_session, test_user):
+        project = _make_project(db_session, test_user.id)
+        module = _make_module(db_session, project, validation_report={"issues": []})
 
         resp = client.post(
-            f"/projects/{project.id}/apply-fixes",
+            f"/projects/{project.id}/modules/{module.id}/apply-fixes",
             json=[{"row_index": 0, "column": "email"}],
         )
 
         assert resp.status_code == 200
         assert resp.json() == {"confirmed_count": 1}
 
-        db_session.refresh(project)
-        assert project.confirmed_manual_fixes == [{"row_index": 0, "column": "email"}]
+        db_session.refresh(module)
+        assert module.confirmed_manual_fixes == [{"row_index": 0, "column": "email"}]
 
-    def test_requiere_que_el_proyecto_ya_este_validado(self, client, db_session, test_user):
-        project = _make_project(
-            db_session, test_user.id, status=ProjectStatus.uploaded, validation_report=None
+    def test_requiere_que_el_modulo_ya_este_validado(self, client, db_session, test_user):
+        project = _make_project(db_session, test_user.id)
+        module = _make_module(
+            db_session, project, status=ModuleStatus.uploaded, validation_report=None
         )
 
         resp = client.post(
-            f"/projects/{project.id}/apply-fixes",
+            f"/projects/{project.id}/modules/{module.id}/apply-fixes",
             json=[{"row_index": 0, "column": "email"}],
         )
 
@@ -65,9 +75,10 @@ class TestApplyFixesEndpoint:
     def test_no_se_puede_aplicar_fixes_a_proyecto_ajeno(self, client, db_session):
         otro_owner_id = "user_otro_999"
         project = _make_project(db_session, otro_owner_id)
+        module = _make_module(db_session, project)
 
         resp = client.post(
-            f"/projects/{project.id}/apply-fixes",
+            f"/projects/{project.id}/modules/{module.id}/apply-fixes",
             json=[{"row_index": 0, "column": "email"}],
         )
 
@@ -91,9 +102,10 @@ class TestEnsureCorrectedFileAplicaManualFixes:
         )
         df.to_csv(original, index=False)
 
-        project = _make_project(
+        project = _make_project(db_session, test_user.id)
+        module = _make_module(
             db_session,
-            test_user.id,
+            project,
             storage_path=str(original),
             validation_report={
                 "issues": [
@@ -111,7 +123,7 @@ class TestEnsureCorrectedFileAplicaManualFixes:
             confirmed_manual_fixes=[{"row_index": 0, "column": "email"}],
         )
 
-        corrected_path = _ensure_corrected_file(project, db_session)
+        corrected_path = _ensure_corrected_file(module, db_session)
         result_df = pd.read_csv(corrected_path)
 
         assert result_df.at[0, "email"] == "corregido@example.com"
@@ -133,9 +145,10 @@ class TestEnsureCorrectedFileAplicaManualFixes:
         )
         df.to_csv(original, index=False)
 
-        project = _make_project(
+        project = _make_project(db_session, test_user.id)
+        module = _make_module(
             db_session,
-            test_user.id,
+            project,
             storage_path=str(original),
             validation_report={
                 "issues": [
@@ -153,7 +166,7 @@ class TestEnsureCorrectedFileAplicaManualFixes:
             confirmed_manual_fixes=None,  # nunca se confirmó
         )
 
-        corrected_path = _ensure_corrected_file(project, db_session)
+        corrected_path = _ensure_corrected_file(module, db_session)
         result_df = pd.read_csv(corrected_path)
 
         assert result_df.at[0, "email"] == "esto-no-es-un-email"
@@ -171,9 +184,10 @@ class TestEnsureCorrectedFileAplicaManualFixes:
         )
         df.to_csv(original, index=False)
 
-        project = _make_project(
+        project = _make_project(db_session, test_user.id)
+        module = _make_module(
             db_session,
-            test_user.id,
+            project,
             storage_path=str(original),
             validation_report={
                 "issues": [
@@ -191,7 +205,7 @@ class TestEnsureCorrectedFileAplicaManualFixes:
             confirmed_manual_fixes=None,
         )
 
-        corrected_path = _ensure_corrected_file(project, db_session)
+        corrected_path = _ensure_corrected_file(module, db_session)
         result_df = pd.read_csv(corrected_path)
 
         assert result_df.at[0, "name"] == "Juan Perez"

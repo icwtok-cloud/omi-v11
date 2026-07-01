@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   getAvailableCombinations,
   createProject,
+  addModule,
   AvailableCombination,
 } from "@/lib/api";
 
@@ -46,8 +47,11 @@ export default function HomePage() {
   const router = useRouter();
 
   const [combinations, setCombinations] = useState<AvailableCombination[]>([]);
-  const [selectedModule, setSelectedModule] = useState<string>("");
+  // El proyecto es una sola instancia de Odoo (versión fija) -- se elige
+  // primero. El módulo es el primer archivo que se sube adentro; se
+  // pueden agregar más módulos después desde la pantalla del proyecto.
   const [selectedVersion, setSelectedVersion] = useState<string>("");
+  const [selectedModule, setSelectedModule] = useState<string>("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -64,12 +68,11 @@ export default function HomePage() {
       .finally(() => setLoadingModules(false));
   }, [isSignedIn, getToken]);
 
-  const availableModules = Array.from(new Set(combinations.map((c) => c.module)));
+  const availableVersions = Array.from(new Set(combinations.map((c) => c.version))).sort();
 
-  const availableVersions = combinations
-    .filter((c) => c.module === selectedModule)
-    .map((c) => c.version)
-    .filter((v, i, arr) => arr.indexOf(v) === i); // dedup
+  const availableModules = Array.from(
+    new Set(combinations.filter((c) => c.version === selectedVersion).map((c) => c.module))
+  );
 
   const needsCountry = selectedModule ? COUNTRY_SCOPED_MODULES.has(selectedModule) : false;
 
@@ -80,8 +83,8 @@ export default function HomePage() {
     : [];
 
   const isFormReady =
-    selectedModule &&
     selectedVersion &&
+    selectedModule &&
     (!needsCountry || selectedCountry) &&
     file;
 
@@ -90,14 +93,13 @@ export default function HomePage() {
     setUploading(true);
     setError(null);
     try {
-      const result = await createProject(
+      const project = await createProject(
         getToken,
-        selectedModule,
         selectedVersion,
-        file!,
         needsCountry ? selectedCountry : null
       );
-      router.push(`/proyectos/${result.project_id}`);
+      await addModule(getToken, project.project_id, selectedModule, file!);
+      router.push(`/proyectos/${project.project_id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al subir el archivo");
     } finally {
@@ -130,6 +132,8 @@ export default function HomePage() {
         <p className="text-graphite text-lg leading-relaxed max-w-xl">
           Subí tu archivo, elegí el módulo y la versión, y vas a ver exactamente
           qué filas tienen un problema, por qué, y cómo se corrige — antes de pagar nada.
+          Después vas a poder sumar el resto de los módulos de tu migración al
+          mismo proyecto, sin perder lo que ya validaste.
         </p>
       </section>
 
@@ -147,29 +151,32 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="border border-line bg-white/60 rounded-lg p-6 md:p-8 space-y-6">
-            {/* Fila 1: Módulo + Versión */}
+            {/* Fila 1: Versión + Módulo */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2" htmlFor="module-select">
-                  Módulo de Odoo
+                <label className="block text-sm font-medium mb-2" htmlFor="version-select">
+                  Versión de Odoo
+                  <span className="ml-2 text-xs font-normal text-graphite">
+                    la instancia completa de tu proyecto
+                  </span>
                 </label>
                 <select
-                  id="module-select"
+                  id="version-select"
                   className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
-                  value={selectedModule}
+                  value={selectedVersion}
                   disabled={loadingModules}
                   onChange={(e) => {
-                    setSelectedModule(e.target.value);
-                    setSelectedVersion("");
+                    setSelectedVersion(e.target.value);
+                    setSelectedModule("");
                     setSelectedCountry("");
                   }}
                 >
                   <option value="">
-                    {loadingModules ? "Cargando módulos…" : "Elegí un módulo"}
+                    {loadingModules ? "Cargando…" : "Elegí una versión"}
                   </option>
-                  {availableModules.map((m) => (
-                    <option key={m} value={m}>
-                      {MODULE_LABELS[m] || m}
+                  {availableVersions.map((v) => (
+                    <option key={v} value={v}>
+                      Odoo {v}
                     </option>
                   ))}
                 </select>
@@ -182,23 +189,26 @@ export default function HomePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2" htmlFor="version-select">
-                  Versión de Odoo
+                <label className="block text-sm font-medium mb-2" htmlFor="module-select">
+                  Primer módulo a validar
+                  <span className="ml-2 text-xs font-normal text-graphite">
+                    después sumás el resto
+                  </span>
                 </label>
                 <select
-                  id="version-select"
+                  id="module-select"
                   className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
-                  value={selectedVersion}
+                  value={selectedModule}
                   onChange={(e) => {
-                    setSelectedVersion(e.target.value);
+                    setSelectedModule(e.target.value);
                     setSelectedCountry("");
                   }}
-                  disabled={!selectedModule}
+                  disabled={!selectedVersion}
                 >
-                  <option value="">Elegí una versión</option>
-                  {availableVersions.map((v) => (
-                    <option key={v} value={v}>
-                      Odoo {v}
+                  <option value="">Elegí un módulo</option>
+                  {availableModules.map((m) => (
+                    <option key={m} value={m}>
+                      {MODULE_LABELS[m] || m}
                     </option>
                   ))}
                 </select>
@@ -219,7 +229,7 @@ export default function HomePage() {
                   className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
                   value={selectedCountry}
                   onChange={(e) => setSelectedCountry(e.target.value)}
-                  disabled={!selectedVersion}
+                  disabled={!selectedModule}
                 >
                   <option value="">Elegí un país</option>
                   {availableCountries.map((c) => (

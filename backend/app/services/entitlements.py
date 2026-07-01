@@ -40,8 +40,16 @@ def apply_payment_confirmation(db: Session, payment: Payment) -> None:
 
 def user_can_download(db: Session, project: Project) -> bool:
     """Un usuario puede descargar un proyecto si: pagó ese proyecto
-    puntualmente, O tiene una suscripción activa vigente."""
-    if project.status == ProjectStatus.paid or project.status == ProjectStatus.downloaded:
+    puntualmente, O tiene una suscripción activa vigente.
+
+    Nota: esto solo cubre pago puntual + suscripción "activa" en el
+    sentido de Clerk/Payment -- la cuota específica de 5 exportes/mes de
+    la suscripción y el proyecto gratis se resuelven en
+    `can_export_project()` (Fase 3), que es la función que de verdad
+    gatea el endpoint de download. Esta función queda como está para no
+    romper el chequeo que ya usan /validate y /report para mostrar
+    `can_download` informativamente en el reporte."""
+    if project.status == ProjectStatus.paid or project.status == ProjectStatus.exported:
         return True
 
     user = db.query(User).filter(User.id == project.owner_id).first()
