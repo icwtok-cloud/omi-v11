@@ -57,10 +57,21 @@ ERC20_MINIMAL_ABI = [
 POLL_INTERVAL_SECONDS = 15
 
 
+RPC_REQUEST_TIMEOUT_SECONDS = 15
+
+
 class ChainListener:
     def __init__(self, network: PaymentNetwork, rpc_url: str, usdc_contract: str):
         self.network = network
-        self.w3 = Web3(Web3.HTTPProvider(rpc_url))
+        # Sin timeout explícito, `requests` (que usa HTTPProvider por
+        # debajo) espera indefinidamente. `run_forever()` es
+        # single-threaded y secuencial entre redes -- un RPC provider
+        # que se cuelga (no rechaza la conexión, simplemente no
+        # responde) dejaría el worker entero trabado para SIEMPRE, sin
+        # confirmar pagos en NINGUNA red, sin ningún error visible en
+        # logs (nunca se llega a loguear nada porque la llamada nunca
+        # retorna).
+        self.w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": RPC_REQUEST_TIMEOUT_SECONDS}))
         self.contract = self.w3.eth.contract(
             address=Web3.to_checksum_address(usdc_contract),
             abi=ERC20_MINIMAL_ABI,

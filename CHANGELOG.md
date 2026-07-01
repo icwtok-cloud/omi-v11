@@ -8,6 +8,28 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — P1: el worker de pagos podía quedar trabado para siempre si un RPC provider se cuelga
+
+**Qué cambia:** `ChainListener` (`app/workers/payment_listener.py`)
+creaba el `Web3.HTTPProvider` sin timeout explícito. `run_forever()` es
+single-threaded y secuencial entre Polygon y Base -- si el RPC
+provider de una red se cuelga (no rechaza la conexión, simplemente no
+responde nunca), la llamada bloqueante nunca retorna, y el worker
+entero queda trabado para SIEMPRE sin confirmar pagos en NINGUNA red,
+sin ningún error visible en logs (nunca se llega a loguear nada porque
+la llamada nunca retorna). Se agrega `request_kwargs={"timeout": 15}`
+al `HTTPProvider` -- ahora un RPC colgado dispara un
+`requests.exceptions.Timeout`, que ya cae en el `try/except` de
+`run_forever()` (logueado como `PaymentListenerPollError`) sin matar
+el worker ni bloquear la otra red.
+
+**Por qué:** encontrado en la ronda de hardening operacional (Phase 3,
+timeouts) -- es exactamente el tipo de falla silenciosa que la nueva
+telemetría de esta misma ronda está pensada para exponer, así que vale
+la pena cerrarla de una.
+
+**Rollback:** sin cambios de schema -- no aplica rollback de Alembic.
+
 ## 2026-07-01 — Observabilidad de producción: request ID, health/readiness real, telemetría de negocio
 
 **Qué cambia:**
