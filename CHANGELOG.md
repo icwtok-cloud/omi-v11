@@ -8,6 +8,31 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — Modal de Clerk seguía oscuro con el SO en modo oscuro
+
+**Qué cambia:** `frontend/app/globals.css` declara `color-scheme: light`
+en `html`.
+
+**Por qué:** el theming de `appearance.variables`/`appearance.elements`
+del `ClerkProvider` (arreglado en la Fase 1 de esta sesión) ya forzaba
+fondo blanco y texto oscuro vía CSS de autor -- pero sin declarar
+`color-scheme`, el navegador sigue su default (`light dark`) y pinta
+los CONTROLES NATIVOS de formulario (inputs, selects, checkboxes,
+incluidos los del modal de Clerk) con el render "dark" de la interfaz
+del sistema operativo si el usuario tiene el SO en modo oscuro -- esto
+pasa a nivel del motor de renderizado nativo del navegador, no del CSS
+de fondo/color de la página, así que ningún override de `elements` lo
+tapaba. Es el bug clásico "mi sitio claro muestra inputs oscuros en
+modo oscuro del SO". OMI no tiene (ni tenía planeado) modo oscuro, así
+que forzar `light` es correcto para todo el sitio, no solo para Clerk.
+
+**Nota:** no se pudo verificar visualmente en este entorno (el sandbox
+no puede resolver `localhost` en el navegador de preview, limitación ya
+confirmada antes en esta sesión) -- pedir confirmación visual en
+producción con el SO en modo oscuro.
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
 ---
 
 ## 2026-07-01 — Índice de calidad del archivo (quality_score)

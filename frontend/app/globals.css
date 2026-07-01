@@ -5,6 +5,13 @@
 @tailwind utilities;
 
 html {
+  /* OMI no tiene modo oscuro -- sin esto, un navegador con el SO en modo
+     oscuro pinta los controles nativos de formulario (inputs, selects,
+     checkboxes, incluidos los del modal de Clerk) con su render "dark"
+     de la interfaz nativa del sistema operativo, sin importar el fondo
+     blanco que ya seteamos por CSS. Este declaración es la única forma
+     de evitarlo -- el fondo de la página no alcanza. */
+  color-scheme: light;
   background-color: #f7f8fa;
 }
 
