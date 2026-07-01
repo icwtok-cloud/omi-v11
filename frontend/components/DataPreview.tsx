@@ -17,7 +17,7 @@ export function DataPreview({
 
   return (
     <div className="mb-8 border border-line rounded-md bg-white overflow-hidden">
-      <div className="px-5 py-3 border-b border-line bg-paper-dim">
+      <div className="px-5 py-3 border-b border-line bg-canvas">
         <p className="font-medium text-sm text-ink">Vista previa de tu archivo</p>
         <p className="text-xs text-graphite mt-0.5">
           Primeras {rows.length} filas, tal cual vinieron en tu archivo

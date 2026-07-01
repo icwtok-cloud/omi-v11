@@ -190,6 +190,28 @@ class TestValidacionNormal:
         # antes de llegar a columns_expected_missing.
         assert report.structural_mismatch is True
 
+    def test_columna_requerida_presente_via_sinonimo_no_se_reporta_como_faltante(self):
+        """Reproduce un bug real reportado en producción: el reporte decía
+        'faltan columnas obligatorias: name' aunque el archivo SÍ traía esa
+        info bajo el header en español 'Nombre', que el matching de
+        sinónimos reconoce perfectamente. Causa: columns_expected_missing
+        comparaba contra columns_seen (headers crudos) en vez de contra los
+        campos técnicos ya mapeados (column_mapping.values())."""
+        schema = load_rule_schema("ventas", "15.0")
+        df = pd.DataFrame(
+            {
+                "Nombre": ["Pedido 001", "Pedido 002"],
+                "date_order": ["2024-01-01", "2024-01-02"],
+                "partner_id": ["Juan Perez", "Maria Gomez"],
+                "partner_invoice_id": ["Juan Perez", "Maria Gomez"],
+                "partner_shipping_id": ["Juan Perez", "Maria Gomez"],
+                "pricelist_id": ["Lista 1", "Lista 1"],
+                "company_id": ["Mi Empresa", "Mi Empresa"],
+            }
+        )
+        report = validate_dataframe(df, schema)
+        assert "name" not in report.columns_expected_missing
+
 
 # ---------------------------------------------------------------------------
 # fix_explanation: explica en español qué hace un fix (automático o

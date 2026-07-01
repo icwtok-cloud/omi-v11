@@ -17,6 +17,7 @@ import {
 } from "@/lib/api";
 import { IssueRow } from "@/components/IssueRow";
 import { PaywallPanel } from "@/components/PaywallPanel";
+import { DataPreview } from "@/components/DataPreview";
 
 const MODULE_LABELS: Record<string, string> = {
   contactos: "Contactos",
@@ -487,11 +488,17 @@ function ModuleReportView({
           <p className="font-medium text-alert mb-1">
             Faltan columnas obligatorias en tu archivo
           </p>
-          <p className="font-mono text-sm text-alert">
+          <p className="font-mono text-sm text-alert mb-2">
             {report.columns_expected_missing.join(", ")}
+          </p>
+          <p className="text-sm text-alert">
+            Esto no se puede corregir automáticamente porque el dato no está
+            en tu archivo -- agregá esa columna en el origen y volvé a subirlo.
           </p>
         </div>
       )}
+
+      <DataPreview columns={report.columns_seen} rows={report.preview_rows} />
 
       <IssueGroupList
         groups={issueGroups}

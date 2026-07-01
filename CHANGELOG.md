@@ -10,6 +10,74 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-06-30 — Falso positivo de "faltan columnas obligatorias" + sin vista previa en el reporte
+
+**Síntomas reportados por el usuario (2 en la misma captura):**
+
+1. En un módulo CRM el reporte decía "Filas sin errores: 6/6" y "No
+   encontramos errores, está listo para descargar" -- pero AL MISMO
+   TIEMPO mostraba un banner rojo "Faltan columnas obligatorias: name,
+   type", sin ninguna opción para corregirlo ni manual ni
+   automáticamente. Contradictorio: ¿está listo o le faltan columnas?
+2. En un módulo Contactos con 0 errores, no había forma de ver qué
+   había en el archivo -- "si está correcto, ¿qué es lo que está
+   correcto? no me muestra la previsualización".
+
+**Causa del primero (backend, bug real):**
+`validate_dataframe()` en `backend/app/services/validation_engine.py`
+calculaba `columns_expected_missing` ANTES de correr el matching de
+columnas, comparando contra `columns_seen` (los headers crudos del
+archivo) en vez de contra los campos técnicos ya mapeados
+(`column_mapping.values()`). Resultado: un campo requerido que SÍ vino
+en el archivo pero con un header en español (ej. "Nombre" en vez de
+literal `name`, reconocido perfectamente por `FIELD_SYNONYMS` en
+`column_matcher.py`) se reportaba igual como "columna faltante" -- un
+falso positivo exactamente en el caso normal, porque nadie exporta un
+CSV con headers técnicos en inglés.
+
+**Causa del segundo (frontend, feature ya construida pero nunca
+conectada):** `backend` ya calculaba y devolvía `preview_rows` (primeras
+10 filas reales) en cada `ValidationReport`, y ya existía un componente
+`frontend/components/DataPreview.tsx` completo para mostrarlas -- pero
+nunca se importó ni se renderizó en `proyectos/[id]/page.tsx` (ni en la
+versión vieja de un solo módulo, ni en la nueva multi-módulo). De paso,
+`DataPreview.tsx` tenía su propio bug latente sin detectar:
+`bg-paper-dim` no es una clase válida de Tailwind (`paper` es un color
+plano, no una escala con sufijos numéricos) -- el script
+`check-tailwind-colors.js` no lo pescaba porque su heurística de
+"color base" (`"paper-dim".split("-")[0]` = `"paper"`, que sí existe)
+asume shades numéricos, dando un falso negativo. Nadie lo notó porque
+el componente nunca se usó hasta ahora.
+
+**Fix:**
+- `validate_dataframe()`: `columns_expected_missing` ahora se calcula
+  después de `column_mapping`, comparando contra
+  `set(column_mapping.values())`.
+- `proyectos/[id]/page.tsx`: se importa y renderiza `<DataPreview>` en
+  la vista de cada módulo, siempre (no solo cuando hay 0 errores),
+  usando `report.columns_seen` / `report.preview_rows` que el backend
+  ya mandaba.
+- `DataPreview.tsx`: `bg-paper-dim` → `bg-canvas`.
+- El banner de columnas realmente faltantes ahora aclara por qué no
+  tiene botón de corrección ("el dato no está en tu archivo, agregalo
+  en el origen y volvé a subirlo") en vez de dejarlo mudo.
+
+**Tests:** nuevo
+`test_validation_engine.py::TestValidacionNormal::test_columna_requerida_presente_via_sinonimo_no_se_reporta_como_faltante`.
+37/37 tests pasan.
+
+**Regla para no repetirlo:**
+> Cuando dos piezas del mismo reporte pueden contradecirse ("0 errores"
+> + "faltan columnas obligatorias"), es señal de que se están
+> calculando con criterios distintos -- no parchear el mensaje, buscar
+> por qué disienten. Y antes de dar una feature por "no hace falta,
+> es un nice-to-have", revisar si ya existe construida en el código
+> (como pasó con `DataPreview.tsx`) -- conectarla es más barato que
+> reinventarla, y dejarla sin usar significa que sus bugs (como el de
+> `bg-paper-dim`) tampoco se detectan.
+
+---
+
 ## 2026-06-30 — No se podía cambiar el archivo elegido sin recargar la página
 
 **Síntoma reportado por el usuario:** en la home (`/app`), una vez que

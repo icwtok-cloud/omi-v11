@@ -131,7 +131,6 @@ def validate_dataframe(
 
     columns_seen = list(df.columns)
     required = schema.required_fields()
-    columns_expected_missing = [r for r in required if r not in columns_seen]
 
     issues: list[FieldIssue] = []
 
@@ -151,6 +150,16 @@ def validate_dataframe(
     unmatched_columns = [c for c in columns_seen if c not in column_mapping]
     match_ratio = (len(matched_columns) / len(columns_seen)) if columns_seen else 0.0
     structural_mismatch = len(columns_seen) > 0 and match_ratio < 0.2
+
+    # OJO: comparar contra los campos técnicos YA MAPEADOS
+    # (column_mapping.values()), no contra columns_seen (los headers
+    # crudos del archivo). Si no, un campo requerido que sí vino pero con
+    # un header en español (ej. "Nombre" -> "name" vía sinónimo) se
+    # reportaba como "falta esta columna obligatoria" aunque el matching
+    # lo haya reconocido perfectamente -- un falso positivo justo en el
+    # caso normal (nadie exporta un CSV con headers técnicos en inglés).
+    mapped_fields = set(column_mapping.values())
+    columns_expected_missing = [r for r in required if r not in mapped_fields]
 
     # Preview de las primeras filas reales del archivo, tal cual vinieron
     # (no solo el reporte de errores) -- para que el usuario pueda
