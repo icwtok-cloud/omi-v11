@@ -323,7 +323,7 @@ def validate_dataframe(
             on_progress(position, total_rows)
 
     # --- 3. Duplicados (a nivel columna completa, no fila por fila) ---
-    issues.extend(format_rules.check_duplicates(df, columns_seen))
+    issues.extend(format_rules.check_duplicates(df, column_mapping))
 
     return ValidationReport(
         total_rows=len(df),

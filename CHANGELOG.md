@@ -10,6 +10,32 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Detección de duplicados no funcionaba con headers en español
+
+**Qué cambia:** `check_duplicates()` en
+`backend/app/services/format_rules.py` ahora recibe `column_mapping`
+(columna del archivo → campo técnico) en vez de la lista cruda de
+headers, y busca duplicados en la columna real del archivo que mapea a
+cada campo único conocido (`vat`, `default_code`, `code`, `barcode`).
+
+**Por qué:** exactamente el mismo bug que ya se encontró y arregló dos
+veces esta sesión para otras partes del motor (columnas requeridas
+faltantes, mapeo de columnas) -- `check_duplicates` comparaba los
+headers crudos del archivo contra nombres técnicos (`"CUIT" in
+{"vat", ...}` es `False`), así que un archivo con headers en español
+(el caso normal, no el raro) nunca activaba la detección de CUIT/SKU
+duplicado, silenciosamente.
+
+**Fix:** `check_duplicates(df, column_mapping)` construye
+`field_to_col` (técnico → columna real) y valida sobre esa columna.
+
+**Tests:** `test_duplicado_se_detecta_con_header_en_espanol` en
+`backend/tests/test_validation_engine.py`.
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — Confidence score en el matching de columnas
 
 **Qué cambia:** `match_columns()` en

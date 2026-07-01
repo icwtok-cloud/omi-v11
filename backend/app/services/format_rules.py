@@ -175,18 +175,28 @@ def check(column: str, field_type: str, value) -> FormatIssue | None:
     return None
 
 
-def check_duplicates(df: pd.DataFrame, columns: list[str]) -> list:
+def check_duplicates(df: pd.DataFrame, column_mapping: dict[str, str]) -> list:
     """Detecta duplicados en columnas que deberían ser únicas (CUIT, SKU,
     código de cuenta, referencia interna). Se chequea a nivel de toda la
-    columna, no fila por fila."""
+    columna, no fila por fila.
+
+    Recibe `column_mapping` (columna_del_archivo -> campo_tecnico), NO la
+    lista cruda de headers -- comparar contra headers crudos era el mismo
+    bug ya encontrado en columns_expected_missing: un archivo con el
+    header en español ("CUIT" en vez de "vat") nunca activaba la
+    detección de duplicados, porque "CUIT" no está en `unique_candidates`
+    (que son nombres técnicos), aunque el matching ya lo haya reconocido
+    perfectamente como "vat"."""
     from app.services.validation_engine import FieldIssue  # import local para evitar ciclo
 
     unique_candidates = {"vat", "default_code", "code", "barcode"}
     issues = []
 
-    for col in columns:
-        if col not in unique_candidates:
-            continue
+    field_to_col = {
+        field: col for col, field in column_mapping.items() if field in unique_candidates
+    }
+
+    for field_name, col in field_to_col.items():
         if col not in df.columns:
             continue
 

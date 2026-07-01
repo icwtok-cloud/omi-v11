@@ -87,6 +87,23 @@ class TestSerializacionDeReporte:
         assert len(dup_issues) == 1
         assert isinstance(dup_issues[0].current_value, str)
 
+    def test_duplicado_se_detecta_con_header_en_espanol(self):
+        """Reproduce un bug real: check_duplicates comparaba contra
+        headers crudos ("vat") en vez del column_mapping -- un archivo
+        con el header en español ("CUIT") nunca activaba la detección de
+        duplicados, aunque el matching ya lo haya reconocido como "vat"."""
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame(
+            {
+                "Nombre": ["A", "B", "C"],
+                "CUIT": ["20-12345678-9", "20-12345678-9", "30-99999999-1"],
+            }
+        )
+        report = validate_dataframe(df, schema)
+        dup_issues = [i for i in report.issues if i.issue_type == "duplicate"]
+        assert len(dup_issues) == 1
+        assert dup_issues[0].column == "CUIT"
+
 
 # ---------------------------------------------------------------------------
 # Bug #3 (2026-06-29): un archivo sin relación con el módulo elegido se
