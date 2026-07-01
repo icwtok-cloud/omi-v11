@@ -8,6 +8,50 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — BUG P0: el botón de descarga no funcionaba (sin auth header) + reporte PDF
+
+**Bug encontrado de paso, no buscado:** al integrar el botón de
+descarga del nuevo reporte PDF, se encontró que el botón de descarga
+del ZIP (`<a href={downloadUrl(projectId)}>` en `PaywallPanel.tsx`) es
+una navegación de browser plana, SIN el header `Authorization`. El
+backend (`GET /projects/{id}/download`) exige JWT de Clerk vía Bearer
+token (`HTTPBearer`, sin fallback de cookie de sesión en ningún
+endpoint de este backend) -- así que un click en "Descargar archivo
+corregido" devolvía 401/403 en vez de descargar el archivo. **El
+workflow central de todo el producto (pagar y descargar) estaba roto.**
+
+**Fix:** nuevo `triggerAuthedDownload(getToken, url, filename)` en
+`frontend/lib/api.ts` -- trae el archivo con `fetch()` (que sí puede
+llevar el header), arma un blob, y dispara la descarga con un `<a>`
+temporal apuntando a un `blob:` URL. `PaywallPanel.tsx` ahora usa esto
+en vez de un `<a href>` directo.
+
+**Qué más cambia:** nuevo endpoint `GET
+/projects/{id}/modules/{mid}/report.pdf` (`backend/app/services/report_pdf.py`,
+con `reportlab` -- pure Python, sin dependencias nativas de sistema,
+seguro para el build de Render a diferencia de WeasyPrint) -- informe
+técnico (no "bonito": sin logos ni colores de marca) con el mismo
+contenido que el reporte JSON: resumen, desglose del quality score,
+mapeo de columnas, columnas ignoradas, detalle de hasta 200 issues.
+Gratis (mismo gate que ver el reporte en pantalla, no requiere pago).
+Botón "Descargar reporte (PDF)" en el header del reporte de cada
+módulo -- usa el mismo `triggerAuthedDownload()`.
+
+**Por qué:** era el ítem #5 acordado ("reporte PDF profesional... un
+informe técnico que un Partner pueda enviar directamente al cliente").
+El bug de auth se encontró de casualidad al recablear el botón de
+descarga para el PDF -- de no ser por eso, hubiera seguido sin
+detectarse.
+
+**Tests:** `TestReportePdf` en `backend/tests/test_projects_multimodule.py`
+(PDF válido tras validar, 404 sin validar).
+
+**Sin cambios de schema** -- no aplica rollback de Alembic. Nueva
+dependencia de Python (`reportlab==4.2.5`, agregada a
+`requirements.txt`) -- sin impacto en el build de Render (pure Python).
+
+---
+
 ## 2026-07-01 — Detección/explicación de External ID (sin generarlos)
 
 **Qué cambia:** nuevo `has_external_id_column()` en

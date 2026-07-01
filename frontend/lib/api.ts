@@ -270,6 +270,47 @@ export function downloadUrl(projectId: string): string {
   return `${API_BASE}/projects/${projectId}/download`;
 }
 
+export function reportPdfUrl(projectId: string, moduleId: string): string {
+  return `${API_BASE}/projects/${projectId}/modules/${moduleId}/report.pdf`;
+}
+
+/**
+ * Descarga un archivo autenticado (ZIP del proyecto, PDF del reporte).
+ *
+ * Estos endpoints requieren el JWT de Clerk en el header Authorization
+ * -- el backend no acepta cookie de sesión como fallback. Un <a
+ * href={...}> plano no manda ese header (es una navegación normal del
+ * browser, sin JS), así que el click devolvía 401/403 en vez de
+ * descargar el archivo. Por eso hay que traer el archivo con fetch()
+ * (que sí puede llevar el header) y generar la descarga a mano con un
+ * <a> temporal apuntando a un blob: URL.
+ */
+export async function triggerAuthedDownload(
+  getToken: GetToken,
+  url: string,
+  filename: string
+): Promise<void> {
+  const token = await getToken();
+  const headers = new Headers();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "No se pudo descargar el archivo");
+  }
+
+  const blob = await res.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(blobUrl);
+}
+
 export interface ManualFix {
   row_index: number;
   column: string;

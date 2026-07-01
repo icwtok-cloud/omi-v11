@@ -227,6 +227,35 @@ class TestArchivoConEncodingCP1252:
         assert report["preview_rows"][0]["name"] == "José Muñoz"
 
 
+class TestReportePdf:
+    """GET /modules/{mid}/report.pdf -- misma info que /report (JSON) en
+    formato PDF, para que un partner se lo mande al cliente como
+    evidencia. No requiere pago (mismo gate que ver el reporte)."""
+
+    def test_reporte_pdf_devuelve_pdf_valido(self, client):
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+        module = _upload_module(client, project_id, "contactos", CONTACTOS_CSV).json()
+        module_id = module["module_id"]
+        client.post(f"/projects/{project_id}/modules/{module_id}/validate")
+
+        resp = client.get(f"/projects/{project_id}/modules/{module_id}/report.pdf")
+
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/pdf"
+        assert resp.content.startswith(b"%PDF")
+
+    def test_reporte_pdf_sin_validar_da_404(self, client):
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+        module = _upload_module(client, project_id, "contactos", CONTACTOS_CSV).json()
+
+        resp = client.get(f"/projects/{project_id}/modules/{module['module_id']}/report.pdf")
+        assert resp.status_code == 404
+
+
 class TestMissingDependenciesEnResumenDeProyecto:
     """GET /projects/{id} expone missing_dependencies por módulo -- un
     aviso informativo (no bloqueante) de que un módulo dependiente (ej.

@@ -42,6 +42,7 @@ from app.models.db_models import (
 from app.services.rules_loader import load_rule_schema, list_available_combinations
 from app.services.validation_engine import validate_dataframe
 from app.services.module_dependencies import import_order, missing_dependencies
+from app.services.report_pdf import build_module_report_pdf
 from app.services.entitlements import (
     user_can_download, can_export_project, FREE_TIER_MODULE_LIMIT,
 )
@@ -417,6 +418,37 @@ def get_module_report(
             else user_can_download(db, project)
         ),
         **module.validation_report,
+    )
+
+
+@router.get("/{project_id}/modules/{module_id}/report.pdf")
+def get_module_report_pdf(
+    project_id: str,
+    module_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Informe técnico en PDF -- misma información que /report (JSON),
+    en un formato que un partner puede mandarle directo al cliente como
+    evidencia de la migración. No requiere pago: es el mismo reporte que
+    ya se ve gratis dentro de OMI, solo en otro formato."""
+    project = _get_owned_project(project_id, user, db)
+    module = _get_project_module(project, module_id)
+    if not module.validation_report:
+        raise HTTPException(status_code=404, detail="Este módulo todavía no fue validado")
+
+    pdf_bytes = build_module_report_pdf(
+        odoo_module=module.odoo_module,
+        odoo_version=project.odoo_version,
+        odoo_country=project.odoo_country,
+        report=module.validation_report,
+    )
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="omi_{module.odoo_module}_reporte.pdf"'
+        },
     )
 
 

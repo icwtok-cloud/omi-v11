@@ -16,6 +16,8 @@ import {
   ManualFix,
   ProjectSummary,
   AvailableCombination,
+  reportPdfUrl,
+  triggerAuthedDownload,
 } from "@/lib/api";
 import { IssueRow } from "@/components/IssueRow";
 import { PaywallPanel } from "@/components/PaywallPanel";
@@ -471,6 +473,7 @@ export default function ProjectPage() {
       {activeModuleId && activeReport && loadingModuleId !== activeModuleId && (
         <ModuleReportView
           report={activeReport}
+          getToken={getToken}
           manualFixesApplied={manualFixesByModule[activeModuleId] ?? new Set()}
           confirmedSnapshot={confirmedSnapshotByModule[activeModuleId] ?? null}
           confirming={confirming}
@@ -507,6 +510,7 @@ const ISSUE_LABELS: Record<string, string> = {
 
 function ModuleReportView({
   report,
+  getToken,
   manualFixesApplied,
   confirmedSnapshot,
   confirming,
@@ -515,6 +519,7 @@ function ModuleReportView({
   onConfirm,
 }: {
   report: ValidationReport;
+  getToken: () => Promise<string | null>;
   manualFixesApplied: Set<number>;
   confirmedSnapshot: Set<number> | null;
   confirming: boolean;
@@ -522,6 +527,7 @@ function ModuleReportView({
   onToggle: (idx: number) => void;
   onConfirm: () => void;
 }) {
+  const [pdfError, setPdfError] = useState<string | null>(null);
   function setsAreEqual(a: Set<number>, b: Set<number>) {
     if (a.size !== b.size) return false;
     for (const v of a) if (!b.has(v)) return false;
@@ -575,7 +581,22 @@ function ModuleReportView({
                 }`}
           </h2>
           <QualityScoreBadge score={report.quality_score} />
+          <button
+            onClick={() =>
+              triggerAuthedDownload(
+                getToken,
+                reportPdfUrl(report.project_id, report.module_id),
+                `omi_reporte_${report.module_id}.pdf`
+              ).catch((e) =>
+                setPdfError(e instanceof Error ? e.message : "No se pudo descargar el PDF")
+              )
+            }
+            className="font-mono text-xs text-graphite border border-line rounded-full px-3 py-1 hover:border-ink hover:text-ink transition-colors ml-auto"
+          >
+            Descargar reporte (PDF)
+          </button>
         </div>
+        {pdfError && <p className="text-alert text-xs mb-2">{pdfError}</p>}
         {report.quality_score_breakdown.length > 0 && (
           <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4">
             {report.quality_score_breakdown.map((b) => (

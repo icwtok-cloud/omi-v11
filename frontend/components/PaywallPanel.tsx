@@ -11,6 +11,7 @@ import {
   getUserMe,
   PaymentStartResult,
   downloadUrl,
+  triggerAuthedDownload,
 } from "@/lib/api";
 import { USDC_CONTRACTS, USDC_DECIMALS, ERC20_TRANSFER_ABI } from "@/lib/wagmi";
 
@@ -166,12 +167,17 @@ export function PaywallPanel({
             ? "Cubierto por tu suscripción"
             : "Pago confirmado"}
         </p>
-        <a
-          href={downloadUrl(projectId)}
+        <button
+          onClick={() =>
+            triggerAuthedDownload(getToken, downloadUrl(projectId), `omi_${projectId}.zip`).catch(
+              (e) => setErrorMsg(e instanceof Error ? e.message : "No se pudo descargar")
+            )
+          }
           className="inline-block bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity"
         >
           Descargar archivo corregido
-        </a>
+        </button>
+        {errorMsg && <p className="text-alert text-sm mt-2">{errorMsg}</p>}
         <PostDownloadChecklist />
       </div>
     );
