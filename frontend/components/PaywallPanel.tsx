@@ -53,6 +53,46 @@ export function PaywallPanel({
   } | null>(null);
   const [paymentType, setPaymentType] = useState<PaymentType>("per_project");
 
+  // Si el usuario cierra la pestaña o recarga mientras espera la
+  // confirmación on-chain (puede tardar minutos), sin esto perdía el
+  // `payment_id` -- al volver no había forma de ver que ya había
+  // pagado, y el único camino visible era iniciar un pago NUEVO
+  // (arriesgando un doble pago real en USDC). Se persiste el pago en
+  // curso en localStorage, scoped por proyecto, y se retoma al montar.
+  const pendingPaymentKey = `omi_pending_payment_${projectId}`;
+
+  useEffect(() => {
+    const stored = localStorage.getItem(pendingPaymentKey);
+    if (!stored) return;
+    try {
+      const savedPayment: PaymentStartResult = JSON.parse(stored);
+      if (new Date(savedPayment.expires_at) < new Date()) {
+        localStorage.removeItem(pendingPaymentKey);
+        return;
+      }
+      getPaymentStatus(getToken, savedPayment.payment_id)
+        .then((status) => {
+          if (status.status === "confirmed") {
+            localStorage.removeItem(pendingPaymentKey);
+            setStep("confirmed");
+          } else if (status.status === "expired") {
+            localStorage.removeItem(pendingPaymentKey);
+          } else {
+            setPayment(savedPayment);
+            setStep("waiting");
+            pollPaymentStatus(savedPayment.payment_id);
+          }
+        })
+        .catch(() => {
+          // si falla la consulta, no se bloquea el resto del flujo --
+          // el usuario puede iniciar un pago nuevo si hace falta.
+        });
+    } catch {
+      localStorage.removeItem(pendingPaymentKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     getUserMe(getToken)
       .then((me) => {
@@ -93,6 +133,7 @@ export function PaywallPanel({
     }
     try {
       const result = await startPayment(getToken, paymentType, network, projectId);
+      localStorage.setItem(pendingPaymentKey, JSON.stringify(result));
       setPayment(result);
       setStep("connect");
     } catch (e) {
@@ -145,9 +186,11 @@ export function PaywallPanel({
         const status = await getPaymentStatus(getToken, paymentId);
         if (status.status === "confirmed") {
           clearInterval(interval);
+          localStorage.removeItem(pendingPaymentKey);
           setStep("confirmed");
         } else if (status.status === "expired") {
           clearInterval(interval);
+          localStorage.removeItem(pendingPaymentKey);
           setErrorMsg("La ventana de pago expiró. Iniciá el pago de nuevo.");
           setStep("error");
         }
@@ -338,6 +381,7 @@ export function PaywallPanel({
           </p>
           <button
             onClick={() => {
+              localStorage.removeItem(pendingPaymentKey);
               setStep("choose");
               setPayment(null);
             }}

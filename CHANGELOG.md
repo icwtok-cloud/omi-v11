@@ -8,6 +8,43 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — P1: pago no resumible si se cierra la pestaña + tope de pagos pendientes por usuario
+
+**P1 -- riesgo de doble pago real en USDC:** el estado del pago
+(`payment_id`, monto, dirección) vivía solo en `useState` de
+`PaywallPanel.tsx`. Si el usuario cerraba la pestaña o recargaba
+mientras esperaba la confirmación on-chain (puede tardar minutos), y la
+transferencia se confirmaba en background mientras estaba ausente, al
+volver no había forma de ver "ya pagaste" -- el único camino visible
+era iniciar un pago NUEVO, arriesgando pagar dos veces de verdad en
+USDC (dinero real, no reversible).
+
+**Fix:** el resultado de `startPayment()` se persiste en
+`localStorage` (`omi_pending_payment_{projectId}`). Al montar el
+componente, si hay un pago guardado sin expirar, se consulta su estado
+(`GET /payments/{id}/status`) antes de mostrar la pantalla de elegir
+plan -- si ya confirmó, va directo a "Pago confirmado"; si sigue
+pendiente, retoma el polling donde lo dejó; si expiró, se limpia y
+sigue el flujo normal. Se limpia el localStorage al confirmar, expirar,
+o al tocar "Intentar de nuevo".
+
+**P1 -- sin tope de pagos pendientes simultáneos:** `POST
+/payments/start` no tenía ningún límite por usuario -- un usuario
+autenticado podía spamear el endpoint y consumir gran parte del pool
+finito de montos únicos que genera `generate_unique_amount()`,
+disparando el 503 de "no se pudo generar un monto único" (agregado en
+el fix anterior) para otros usuarios legítimos. Se agrega un tope de 3
+pagos PENDIENTES simultáneos por usuario (count query simple contra la
+misma tabla, sin Redis ni slowapi) -- devuelve 429 con mensaje claro si
+se supera.
+
+**Tests:** nuevo `backend/tests/test_payments.py` (3 tests: pago normal
+funciona, el 4to pago pendiente se rechaza con 429, un pago ya
+confirmado no cuenta para el tope). 91/91 backend pasan. Frontend
+typecheck limpio (`npx tsc --noEmit`).
+
+**Rollback:** sin cambios de schema -- no aplica rollback de Alembic.
+
 ## 2026-07-01 — BUG P0: borrar una cuenta de Clerk rompía el webhook + race condition en el monto único de pago
 
 **P0 #1 -- `user.deleted` nunca se completaba de verdad:**

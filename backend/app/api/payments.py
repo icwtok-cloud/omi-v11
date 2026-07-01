@@ -41,6 +41,24 @@ def start_payment(
     if body.network not in (PaymentNetwork.polygon.value, PaymentNetwork.base.value):
         raise HTTPException(status_code=400, detail="network inválida")
 
+    # Tope de pagos pendientes simultáneos por usuario -- sin esto, un
+    # usuario autenticado podría spamear este endpoint y consumir gran
+    # parte del pool finito de montos únicos que genera
+    # generate_unique_amount(), disparando el 503 de "no se pudo
+    # generar un monto único" para otros usuarios legítimos. No hace
+    # falta Redis ni slowapi para esto -- es un simple count contra la
+    # misma tabla que ya se consulta en todos lados.
+    pending_count = (
+        db.query(Payment)
+        .filter(Payment.user_id == user.id, Payment.status == PaymentStatus.pending)
+        .count()
+    )
+    if pending_count >= 3:
+        raise HTTPException(
+            status_code=429,
+            detail="Ya tenés pagos pendientes -- esperá a que se confirmen o expiren antes de iniciar uno nuevo.",
+        )
+
     if body.payment_type == PaymentType.per_project.value:
         if not body.project_id:
             raise HTTPException(status_code=400, detail="project_id requerido para pago por proyecto")
