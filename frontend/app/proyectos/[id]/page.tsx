@@ -488,6 +488,7 @@ const ISSUE_LABELS: Record<string, string> = {
   unknown_relation: "No existe en Odoo",
   duplicate: "Duplicado",
   negative_value: "Valor negativo",
+  missing_contact_info: "Sin datos de contacto",
 };
 
 function ModuleReportView({

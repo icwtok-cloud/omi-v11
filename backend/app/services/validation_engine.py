@@ -202,7 +202,40 @@ def validate_dataframe(
     # ver Fase 4 del roadmap / _run_validation_job() en app/api/projects.py.
     total_rows = len(df)
     progress_step = max(500, total_rows // 100) if total_rows else 1
+
+    # Columnas del archivo que mapean a "email"/"phone"/"mobile", si el
+    # modelo elegido tiene esos campos -- ninguno es `required` en Odoo
+    # (la constraint real vive en la práctica de negocio, no en el
+    # schema), así que hoy un contacto sin ningún dato de contacto pasa
+    # con "0 errores". Es un caso real y no bloqueante: se avisa, pero
+    # no impide exportar (misma lógica que el resto de los issues).
+    contact_field_to_col = {
+        field: col
+        for col, field in column_mapping.items()
+        if field in ("email", "phone", "mobile") and field in fields_by_name
+    }
+
     for position, (row_idx, row) in enumerate(df.iterrows(), start=1):
+        if contact_field_to_col:
+            all_contact_values_empty = all(
+                pd.isna(row[col]) or (isinstance(row[col], str) and row[col].strip() == "")
+                for col in contact_field_to_col.values()
+            )
+            if all_contact_values_empty:
+                any_contact_col = next(iter(contact_field_to_col.values()))
+                issues.append(FieldIssue(
+                    row_index=int(row_idx),
+                    column=any_contact_col,
+                    issue_type="missing_contact_info",
+                    message=(
+                        "Este registro no tiene email ni teléfono/celular cargado — "
+                        "es válido para Odoo, pero no vas a poder contactarlo."
+                    ),
+                    current_value=None,
+                    suggested_fix=None,
+                    fix_is_automatic=False,
+                ))
+
         for col_name in columns_seen:
             mapped_field = column_mapping.get(col_name)
             if mapped_field is None:

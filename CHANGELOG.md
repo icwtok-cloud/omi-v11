@@ -10,6 +10,34 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Aviso no bloqueante: contacto sin email ni teléfono
+
+**Qué cambia:** nuevo `issue_type: "missing_contact_info"` en
+`validate_dataframe()` (`backend/app/services/validation_engine.py`) --
+si el modelo tiene campos `email`/`phone`/`mobile` mapeados y una fila
+no tiene ninguno de los tres cargado, se agrega un issue informativo
+(`fix_is_automatic: false`, sin `suggested_fix`).
+
+**Por qué:** ninguno de esos 3 campos es `required` en el schema de
+Odoo (la constraint real es de negocio, no de la API), así que hoy un
+contacto sin ningún dato de contacto pasa la validación con "0
+errores" -- técnicamente válido para importar, pero inútil en la
+práctica (nadie puede contactarlo). Era el ítem "alerta no bloqueante
+para campos críticos vacíos" del backlog de este mismo archivo.
+
+**No bloquea nada:** igual que el resto de los issues, no afecta
+`can_export_project()` ni el gate de pago -- es puramente informativo
+en el reporte, agrupado junto al resto bajo la etiqueta "Sin datos de
+contacto" en `frontend/app/proyectos/[id]/page.tsx`.
+
+**Tests:** `backend/tests/test_validation_engine.py::TestMissingContactInfo`
+(fila sin ninguno de los 3 campos dispara el aviso; fila con solo
+teléfono no lo dispara).
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — Confirmación extra antes de "Aplicar a todas" en valores negativos
 
 **Qué cambia:** el botón "Aplicar a todas" del grupo `negative_value`

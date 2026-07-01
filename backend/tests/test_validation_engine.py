@@ -213,6 +213,39 @@ class TestValidacionNormal:
         assert "name" not in report.columns_expected_missing
 
 
+class TestMissingContactInfo:
+    """email/phone no son `required` en el schema de Odoo (la falta de
+    ambos no rompe la importación), pero un contacto sin ninguno de los
+    dos es inútil en la práctica -- se avisa sin bloquear la exportación."""
+
+    def test_fila_sin_email_ni_telefono_genera_aviso_no_bloqueante(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame(
+            {
+                "name": ["Juan Perez", "Maria Gomez"],
+                "email": ["juan@x.com", ""],
+                "phone": ["", ""],
+            }
+        )
+        report = validate_dataframe(df, schema)
+        contact_issues = [i for i in report.issues if i.issue_type == "missing_contact_info"]
+        assert len(contact_issues) == 1
+        assert contact_issues[0].row_index == 1
+        assert contact_issues[0].fix_is_automatic is False
+
+    def test_fila_con_solo_telefono_no_genera_aviso(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame(
+            {
+                "name": ["Juan Perez"],
+                "email": [""],
+                "phone": ["11-1234-5678"],
+            }
+        )
+        report = validate_dataframe(df, schema)
+        assert not any(i.issue_type == "missing_contact_info" for i in report.issues)
+
+
 # ---------------------------------------------------------------------------
 # fix_explanation: explica en español qué hace un fix (automático o
 # manual-con-sugerencia) antes de que el usuario lo aplique en el reporte.
