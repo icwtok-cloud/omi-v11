@@ -408,6 +408,30 @@ class TestQualityScore:
         assert total_rows_in_breakdown == 2
 
 
+class TestExternalIdDetection:
+    """has_external_id detecta (sin generar ni exigir) si el archivo trae
+    la columna de External ID de Odoo -- clave para que una reimportación
+    actualice registros existentes en vez de duplicarlos."""
+
+    def test_archivo_sin_columna_id_da_false(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({"name": ["Juan Perez"], "email": ["juan@x.com"]})
+        report = validate_dataframe(df, schema)
+        assert report.has_external_id is False
+
+    def test_columna_id_literal_da_true(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({"id": ["contacto_001"], "name": ["Juan Perez"]})
+        report = validate_dataframe(df, schema)
+        assert report.has_external_id is True
+
+    def test_columna_id_externo_en_espanol_da_true(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({"ID Externo": ["contacto_001"], "Nombre": ["Juan Perez"]})
+        report = validate_dataframe(df, schema)
+        assert report.has_external_id is True
+
+
 class TestFixExplanation:
     def test_telefono_normalizable_trae_explicacion(self):
         issue = format_rules.check("mobile", "char", "(011) 1234-5678")

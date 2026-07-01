@@ -8,6 +8,35 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — Detección/explicación de External ID (sin generarlos)
+
+**Qué cambia:** nuevo `has_external_id_column()` en
+`backend/app/services/column_matcher.py` -- detecta si el archivo trae
+una columna de External ID de Odoo (headers típicos: "id", "External
+ID", "ID Externo", "xml_id", etc., ver `_EXTERNAL_ID_HEADERS`).
+`ValidationReport` expone `has_external_id: bool`. En el frontend, si
+falta y el archivo no tiene mismatch estructural, se muestra un panel
+explicando qué es un External ID, por qué importa (Odoo lo usa para
+saber "este registro ya existe, actualizalo" en vez de duplicarlo), y
+cuándo conviene agregarlo (si vas a reimportar el mismo archivo más de
+una vez).
+
+**Por qué:** era la recomendación #1 de la segunda auditoría de
+producto de esta sesión y del refinamiento del usuario ("el siguiente
+gran diferencial de OMI... no digo que OMI tenga que generarlos, pero
+sí debería detectar/explicar/advertir"). Alcance deliberadamente
+acotado: OMI NO genera External IDs (dependen del sistema de origen
+del cliente), solo detecta su ausencia y explica el riesgo real de
+reimportar sin ellos (duplicados en Odoo).
+
+**Tests:** `TestExternalIdDetection` en
+`backend/tests/test_validation_engine.py` (sin columna = False, "id"
+literal = True, "ID Externo" en español = True).
+
+**Sin cambios de schema** -- no aplica rollback de Alembic.
+
+---
+
 ## 2026-07-01 — Desglose del Quality Score + checklist post-descarga
 
 **Qué cambia:**

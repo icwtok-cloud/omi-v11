@@ -25,7 +25,7 @@ import pandas as pd
 
 from app.services.rules_loader import RuleSchema
 from app.services import format_rules
-from app.services.column_matcher import match_columns_with_confidence
+from app.services.column_matcher import match_columns_with_confidence, has_external_id_column
 
 
 def _to_native(value: object) -> object:
@@ -73,6 +73,7 @@ class ValidationReport:
     preview_rows: list[dict] = field(default_factory=list)
     quality_score: int = 100
     quality_score_breakdown: list[dict] = field(default_factory=list)
+    has_external_id: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -80,6 +81,7 @@ class ValidationReport:
             "total_issues": self.total_issues,
             "quality_score": self.quality_score,
             "quality_score_breakdown": self.quality_score_breakdown,
+            "has_external_id": self.has_external_id,
             "columns_seen": self.columns_seen,
             "columns_expected_missing": self.columns_expected_missing,
             "structural_mismatch": self.structural_mismatch,
@@ -203,6 +205,7 @@ def validate_dataframe(
 
     columns_seen = list(df.columns)
     required = schema.required_fields()
+    has_external_id = has_external_id_column(columns_seen)
 
     issues: list[FieldIssue] = []
 
@@ -264,6 +267,7 @@ def validate_dataframe(
             unmatched_columns=unmatched_columns,
             preview_rows=preview_rows,
             quality_score=0,  # las columnas no corresponden al módulo elegido
+            has_external_id=has_external_id,
         )
 
     # --- 1. Columnas requeridas que ni siquiera están en el archivo ---
@@ -410,4 +414,5 @@ def validate_dataframe(
         preview_rows=preview_rows,
         quality_score=quality_score,
         quality_score_breakdown=quality_score_breakdown,
+        has_external_id=has_external_id,
     )

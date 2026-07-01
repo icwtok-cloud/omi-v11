@@ -608,6 +608,23 @@ function ModuleReportView({
         </div>
       )}
 
+      {!report.has_external_id && !report.structural_mismatch && (
+        <div className="mb-8 border border-line bg-canvas rounded-md px-5 py-4">
+          <p className="font-medium text-sm mb-1">Tu archivo no trae External ID</p>
+          <p className="text-sm text-graphite">
+            El "External ID" es la columna (típicamente llamada "id") que le permite a Odoo
+            reconocer que un registro ya existe y ACTUALIZARLO, en vez de crear uno nuevo. Sin
+            uno, si corregís y volvés a importar este mismo archivo más de una vez (algo muy
+            común: "me olvidé de un dato, corrijo y reimporto"), Odoo puede crear registros
+            duplicados en vez de actualizar los que ya importaste. Si vas a importar una sola
+            vez y no vas a repetir el proceso, no hace falta -- si vas a iterar sobre el mismo
+            archivo, te conviene agregar una columna "id" con un identificador único y estable
+            (ej. tu código interno de cliente/producto) antes de importar. OMI no genera este
+            valor por vos -- depende de tu sistema de origen.
+          </p>
+        </div>
+      )}
+
       <ColumnMappingPanel
         columnMapping={report.column_mapping}
         columnMatchConfidence={report.column_match_confidence}

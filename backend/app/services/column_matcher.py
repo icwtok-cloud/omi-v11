@@ -138,3 +138,23 @@ def match_columns_with_confidence(
             result[col] = (best_field, "fuzzy")
 
     return result
+
+
+# Headers que un archivo usa típicamente para el External ID de Odoo
+# (la columna "id" en un export/import real, formato
+# "modulo.nombre_interno" -- ej. "__export__.res_partner_42_a1b2c3").
+# No es un campo de negocio del modelo (por eso vive separado de
+# FIELD_SYNONYMS) -- es la clave técnica que le permite a Odoo saber
+# "este registro ya existe, actualizalo" en vez de crear uno nuevo en
+# cada reimportación.
+_EXTERNAL_ID_HEADERS = {
+    "id", "external id", "id externo", "referencia externa",
+    "external_id", "xml_id", "reference id", "id de referencia",
+}
+
+
+def has_external_id_column(columns_seen: list[str]) -> bool:
+    """True si alguna columna del archivo parece ser el External ID de
+    Odoo -- ver `_EXTERNAL_ID_HEADERS`. Uso: advertir cuando falta, no
+    para generar uno (OMI no inventa external IDs)."""
+    return any(_normalize(col) in _EXTERNAL_ID_HEADERS for col in columns_seen)

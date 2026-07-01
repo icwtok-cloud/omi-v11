@@ -64,6 +64,7 @@ class ValidationReportResponse(BaseModel):
     total_issues: int
     quality_score: int = 100
     quality_score_breakdown: list[dict] = []
+    has_external_id: bool = False
     columns_seen: list[str]
     columns_expected_missing: list[str]
     structural_mismatch: bool = False
