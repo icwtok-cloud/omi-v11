@@ -1061,27 +1061,88 @@ Para retomar en la próxima sesión, en este orden:
 
 ## Otras ideas (no bugs, mejoras a futuro -- backlog, no urgente)
 
-Pensando como alguien que limpia datos para clientes de Odoo
-(data analyst / partner de Odoo), lo que más valor agregaría después de
-lo de arriba, en orden de impacto:
+**Actualizado 2026-06-30** tras una auditoría de producto desde la
+perspectiva de un partner Odoo senior (15+ años, migraciones reales) +
+refinamiento del dueño del producto. Reemplaza la lista anterior --
+conclusión de la auditoría: OMI hoy resuelve bien "¿mi archivo tiene
+errores de formato obvios?" pero todavía no resuelve el problema caro
+de una migración real: coherencia *entre módulos* y contra el sistema
+destino. Orden de prioridad estratégica acordado:
 
-1. Mapeo de columnas **editable a mano** (hoy solo es informativo) --
-   que el usuario pueda corregir un mapeo mal hecho o mapear una columna
-   que el algoritmo de sinónimos no reconoció.
-2. Guardar/reutilizar un mapeo de columnas como plantilla, para clientes
-   que suben el mismo formato de CRM todos los meses.
-3. Detección de duplicados contra la base real de Odoo del cliente (vía
-   API), no solo duplicados internos del archivo subido.
-4. Que la config de override del cliente (`client_config_override`, ya
-   existe en el modelo) tenga un paso visible en la UI, no solo
-   backend.
-5. Modo "dry run" -- ver el archivo completo con fixes aplicados antes
-   de pagar, no solo las 10 filas de preview.
-6. Reporte exportable (PDF/Excel) del análisis, separado del archivo
-   corregido, para que un partner se lo mande al cliente como evidencia.
-7. Soporte multi-modelo en un mismo archivo (ej. Excel con hoja de
-   Contactos + hoja de Direcciones relacionadas). Hoy `primary_model()`
-   asume un solo modelo por archivo.
+1. **Dependencias entre módulos** (crítico, barato de construir). Un
+   mapa estático `{ventas: [contactos, productos], facturacion:
+   [contactos], ...}` -- cuando `unknown_relation` es alto en un módulo
+   y su dependencia todavía no está en el proyecto, explicarlo: "este
+   error probablemente desaparece cuando importes Contactos. Orden
+   recomendado: Contactos → Productos → Ventas." Antes que el confidence
+   score en la secuencia porque es más rápido de construir e igual de
+   alto impacto.
+2. **Confidence score visible en el column_mapping** + revisión manual
+   para matches por debajo de un umbral (ej. fuzzy match < 90%). Hoy el
+   mapeo se aplica silenciosamente; el usuario no puede auditar ni
+   corregir un match dudoso antes de que se apliquen fixes basados en
+   él.
+3. **Explicar qué pasa con las columnas no mapeadas** (`unmatched_columns`)
+   -- ¿se conservan en el CSV final, se descartan, pertenecen a otro
+   módulo, no tienen equivalente en Odoo? Hoy no se dice nada, genera
+   desconfianza real ("subí 15 columnas, el reporte no menciona 3, ¿a
+   dónde fueron?").
+4. **Normalización de formato numérico regional** (decimales/miles,
+   `1.234,56` vs `1,234.56`) -- mismo patrón de bug que el separador de
+   CSV de hoy, pero en números. Prioridad alta para AR/BR/ES.
+5. **Reconocer y explicar External IDs** (`__export__.res_partner_101_xxx`)
+   sin obligarlos -- detectar la columna, explicar su rol, advertir
+   cuando faltan en escenarios donde son recomendables para poder
+   re-importar sin duplicar.
+6. **Modo "Connected" opcional** (capa premium, NO requisito del
+   producto base): el usuario conecta su instancia real de Odoo y ahí
+   sí OMI compara contra la base real -- duplicados existentes,
+   referencias, `company_id`, External IDs. El modo offline (actual)
+   se mantiene como el producto principal; esto es un upsell, no un
+   reemplazo -- OMI no debe depender de acceso a producción del cliente
+   para su propuesta de valor central.
+7. **Índice de calidad del archivo** (ej. "Calidad: 92/100", desglosado
+   en completitud / consistencia / compatibilidad Odoo / riesgo de
+   importación) -- una síntesis que un cliente no técnico entiende en
+   3 segundos, en vez de 15 stats sueltas.
+8. **Simulación del resultado de la importación** antes de descargar:
+   registros que importarían bien, bloqueados, relaciones pendientes,
+   riesgo estimado. Esto es lo que acerca a OMI de "limpiador
+   inteligente de CSV" a "preparación real para Odoo".
+9. **Reporte exportable (PDF/Excel)** del análisis, separado del
+   archivo corregido, para que un partner se lo mande al cliente como
+   evidencia -- después de consolidar el núcleo funcional (es
+   comunicación, no validación).
+10. **Confirmación adicional para fixes con riesgo contable/inventario**
+    (precio o stock negativo) antes de aplicar "a todas" -- un precio
+    negativo puede ser una nota de crédito legítima, no siempre un
+    error; un solo click hoy puede convertir eso en una venta positiva
+    y duplicar ingresos si se aplica sin pensar.
+11. **Dependencias/orden de importación multi-archivo dentro del ZIP
+    final** -- nombrar o numerar los CSVs del ZIP según el orden
+    recomendado de importación (ver ítem 1), no solo alfabético por
+    nombre de módulo.
+12. **Mapeo de columnas editable a mano** (hoy solo informativo).
+13. **Modo "dry run" completo** -- ver el archivo entero con fixes
+    aplicados antes de pagar, no solo 10 filas de preview. Cuidar
+    rendimiento en archivos grandes (posible modo bajo demanda).
+14. **Detección de encoding** con warning si el archivo no es UTF-8.
+
+**Reservado para un plan Enterprise/consultora** (no para el usuario
+ocasional del plan gratis o $99): plantillas de mapeo de columnas
+reutilizables, para consultoras que suben el mismo formato de CRM todo
+los meses.
+
+**Explícitamente descartado tras la discusión**: soporte multi-país
+dentro de un mismo proyecto. Una migración corresponde a una empresa o
+grupo concreto -- si una consultora trabaja con varios países, es más
+limpio (reglas, config, trazabilidad) que cada proyecto represente una
+migración distinta.
+
+También sigue pendiente, sin repriorizar: soporte multi-modelo en un
+mismo archivo (ej. Excel con hoja de Contactos + hoja de Direcciones
+relacionadas) -- hoy `primary_model()` asume un solo modelo por
+archivo.
 
 ---
 
