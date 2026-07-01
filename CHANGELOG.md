@@ -8,6 +8,43 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — Feature: membresía anual de partner (activación manual, no autoservicio)
+
+**Qué cambia:** nuevo modo de acceso para partners que quieren
+estresar la herramienta con mucho volumen ($499/año, 5M eventos = 5M
+filas analizadas). No es un tier más en la landing -- se activa a
+mano con un `UPDATE users SET annual_event_limit = 5000000 WHERE
+email = '...'` directo en la base de Render (ver README, sección
+"Membresía anual de partner"). Con `annual_event_limit` seteado, la
+cuenta queda exenta de todo el gating normal de pago
+(`can_export_project()` la deja pasar directo) y en cambio se le
+cuenta cada fila que pasa por `validate()` contra su cuota anual --
+incluso re-validar el mismo archivo cuenta de nuevo (decisión
+explícita del producto: mucho más simple que trackear qué filas ya se
+cobraron). Se resetea solo al cruzar a un año calendario nuevo. Si un
+archivo llevaría la cuenta por encima del límite, esa validación
+puntual queda `failed` con mensaje claro, sin cobrar el intento.
+
+**Por qué:** un partner (10 clientes de ~500k filas c/u = 5M filas/año)
+necesita poder probar/estresar la plataforma sin las fricciones de los
+tiers pensados para un cliente final individual (proyecto gratis único,
+$99/proyecto, $149/mes con tope de 5 exportes).
+
+**Migración de Alembic:** `0006_annual_membership.py` (revises `0005`)
+-- agrega `annual_event_limit`, `annual_events_used`,
+`annual_events_reset_at` a `users`. Puramente aditiva, todas
+nullable/con default -- usuarios existentes no se ven afectados
+(`annual_event_limit IS NULL` = comportamiento idéntico a antes).
+**Rollback:** `alembic downgrade -1` desde `0006`, sin pérdida de datos
+relevantes (dropea columnas que solo importan para este modo).
+
+**Tests:** nuevo `backend/tests/test_annual_membership.py` (6 tests:
+usuario sin membresía no se ve afectado, validar incrementa el
+contador, re-validar el mismo archivo cuenta de nuevo, superar el
+límite deja el módulo en `failed` sin incrementar el contador, reset
+al cruzar de año, y que la membresía exime del gating normal de
+pago/descarga). 102/102 backend pasan.
+
 ## 2026-07-01 — BUG P0: confirmar nuevos fixes manuales no invalidaba el corregido ya descargado + validaciones atascadas para siempre si el proceso se reinicia
 
 **P0 -- mismo bug de fondo que el de re-subir con el mismo nombre,

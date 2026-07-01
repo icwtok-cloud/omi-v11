@@ -90,6 +90,14 @@ def can_export_project(db: Session, user: User, project: Project) -> tuple[bool,
     de download) recién si el export efectivamente se concreta, en el
     mismo commit que el resto de sus side-effects (atómico, evita doble
     conteo en un retry). Devuelve (permitido, mensaje_de_error_si_no)."""
+    if user.annual_event_limit is not None:
+        # Socio con membresía anual (deal manual, ver README) -- no
+        # paga por proyecto ni tiene tope de exportes/mes, su único
+        # límite es la cuota de eventos (filas validadas) del año,
+        # que se controla aparte en can_process_validation_events().
+        # Acá solo se lo exime del gating normal de pago.
+        return True, None
+
     if project.status == ProjectStatus.paid:
         return True, None  # ya pagó este proyecto puntual -- exportes ilimitados de ESE proyecto
 
@@ -109,3 +117,37 @@ def can_export_project(db: Session, user: User, project: Project) -> tuple[bool,
         )
 
     return False, "Necesitás pagar este proyecto o tener una suscripción activa para descargarlo."
+
+
+def reset_annual_events_if_needed(user: User) -> None:
+    """Resetea annual_events_used si cruzamos a un año calendario nuevo
+    desde el último reset -- mismo patrón que reset_monthly_counter_if_needed
+    pero por año, no por mes. No hace commit -- el caller es responsable
+    de persistir junto con el resto de los cambios de la misma operación."""
+    now = datetime.utcnow()
+    current_year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    if user.annual_events_reset_at is None or user.annual_events_reset_at < current_year_start:
+        user.annual_events_used = 0
+        user.annual_events_reset_at = current_year_start
+
+
+def can_process_validation_events(user: User, row_count: int) -> tuple[bool, str | None]:
+    """Chequea la cuota de eventos (1 evento = 1 fila analizada) de la
+    membresía anual de partner -- no aplica en absoluto a usuarios que
+    no estén en este plan (annual_event_limit is None), que siguen
+    exactamente igual que antes. Se cuenta CADA validación, incluso
+    re-validar el mismo archivo (decisión explícita: más simple de
+    implementar y de auditar que trackear qué filas ya se cobraron).
+    No incrementa el contador -- eso lo hace el caller recién si la
+    validación efectivamente corre, para no cobrar un intento fallido."""
+    if user.annual_event_limit is None:
+        return True, None
+
+    reset_annual_events_if_needed(user)
+    if user.annual_events_used + row_count > user.annual_event_limit:
+        return False, (
+            f"Este archivo llevaría tu cuenta a {user.annual_events_used + row_count:,} "
+            f"eventos, por encima del límite anual de {user.annual_event_limit:,} de tu "
+            "membresía. Esperá al próximo año calendario o contactá para ampliar tu cuota."
+        )
+    return True, None

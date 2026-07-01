@@ -52,6 +52,20 @@ class User(Base):
     monthly_export_count = Column(Integer, default=0)
     monthly_export_reset_at = Column(DateTime, nullable=True)
 
+    # Membresía anual para partners (deal manual, no autoservicio -- se
+    # activa a mano con un UPDATE directo en la DB, ver README). No es
+    # un plan más entre "gratis/por proyecto/suscripción": si
+    # `annual_event_limit` está seteado, el usuario queda EXENTO de
+    # todo el gating normal de exportación (ver can_export_project())
+    # y en cambio se le cuenta cada fila que pasa por el motor de
+    # validación (1 evento = 1 fila analizada), sin importar cuántas
+    # veces se re-valide el mismo archivo. `annual_event_limit=None`
+    # (el default) significa "no está en este plan" -- no afecta en
+    # nada a usuarios normales.
+    annual_event_limit = Column(Integer, nullable=True)
+    annual_events_used = Column(Integer, default=0)
+    annual_events_reset_at = Column(DateTime, nullable=True)
+
     projects = relationship("Project", back_populates="owner")
     payments = relationship("Payment", back_populates="user")
 

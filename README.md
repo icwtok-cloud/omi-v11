@@ -130,6 +130,34 @@ Si dos pagos pendientes generaran el mismo monto por casualidad, el
 generador reintenta — ver `generate_unique_amount()` en
 `payment_matching.py`.
 
+## Membresía anual de partner (activación manual)
+
+Para partners que quieren estresar la herramienta con mucho volumen
+(ej. $499/año, 5 millones de eventos, donde 1 evento = 1 fila
+analizada por el motor de validación) hay un modo aparte de los tres
+tiers normales. **No es autoservicio** -- no aparece en la landing, no
+se paga con USDC, se activa a mano con un `UPDATE` directo en la base
+de Render:
+
+```sql
+UPDATE users
+SET annual_event_limit = 5000000
+WHERE email = 'partner@ejemplo.com';
+```
+
+Con `annual_event_limit` seteado, esa cuenta queda **exenta** de todo
+el gating normal de pago (proyecto gratis / pago puntual / cuota
+mensual de suscripción) -- puede crear proyectos y descargar sin
+límite. Lo único que se controla es la cuota anual de filas: cada
+`validate()` cuenta todas las filas del archivo contra
+`annual_events_used`, **incluso si se re-valida el mismo archivo**
+(decisión explícita: mucho más simple de implementar y de auditar que
+trackear qué filas ya se cobraron). Se resetea solo al cruzar a un año
+calendario nuevo (ver `reset_annual_events_if_needed()` en
+`entitlements.py`). Si un archivo llevaría la cuenta por encima del
+límite, esa validación puntual queda en `failed` con un mensaje claro
+-- no se cobra el intento fallido.
+
 ## Decisiones de diseño que vale la pena recordar
 
 - **Por qué AST y no importar el ORM de Odoo de verdad**: importar Odoo

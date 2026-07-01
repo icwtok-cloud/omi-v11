@@ -44,6 +44,7 @@ from app.services.module_dependencies import import_order, missing_dependencies
 from app.services.report_pdf import build_module_report_pdf
 from app.services.entitlements import (
     user_can_download, can_export_project, FREE_TIER_MODULE_LIMIT,
+    can_process_validation_events, reset_annual_events_if_needed,
 )
 from app.api.schemas import (
     ValidationReportResponse, AvailableCombination, ProjectCreateRequest,
@@ -385,10 +386,23 @@ def _run_validation_job(module_id: str) -> None:
         if not module:
             return
         project = db.query(Project).filter(Project.id == module.project_id).first()
+        user = db.query(User).filter(User.id == project.owner_id).first()
 
         try:
             schema = load_rule_schema(module.odoo_module, project.odoo_version, project.odoo_country)
             df = _read_tabular_file(Path(module.storage_path), module.original_filename)
+
+            # Solo aplica a socios con membresía anual (annual_event_limit
+            # seteado) -- para cualquier otro usuario esto es un no-op.
+            # Se chequea ANTES de correr la validación (que puede tardar
+            # minutos en un archivo grande) para no gastar tiempo de CPU
+            # en un intento que de todas formas se va a rechazar.
+            allowed, err = can_process_validation_events(user, len(df))
+            if not allowed:
+                module.status = ModuleStatus.failed
+                module.validation_error = err
+                db.commit()
+                return
 
             def _persist_progress(done: int, total: int) -> None:
                 module.rows_processed = done
@@ -402,6 +416,9 @@ def _run_validation_job(module_id: str) -> None:
 
             module.validation_report = report.to_dict()
             module.status = ModuleStatus.validated
+            if user.annual_event_limit is not None:
+                reset_annual_events_if_needed(user)
+                user.annual_events_used += len(df)
             db.commit()
         except Exception as e:
             module.status = ModuleStatus.failed
