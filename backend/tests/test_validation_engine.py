@@ -15,6 +15,7 @@ import pytest
 
 from app.services.validation_engine import validate_dataframe, _to_native
 from app.services.rules_loader import load_rule_schema
+from app.services import format_rules
 
 
 # ---------------------------------------------------------------------------
@@ -188,3 +189,53 @@ class TestValidacionNormal:
         # Si hay tan poca superposición de columnas, debería marcar mismatch
         # antes de llegar a columns_expected_missing.
         assert report.structural_mismatch is True
+
+
+# ---------------------------------------------------------------------------
+# fix_explanation: explica en español qué hace un fix (automático o
+# manual-con-sugerencia) antes de que el usuario lo aplique en el reporte.
+# ---------------------------------------------------------------------------
+
+class TestFixExplanation:
+    def test_telefono_normalizable_trae_explicacion(self):
+        issue = format_rules.check("mobile", "char", "(011) 1234-5678")
+        assert issue is not None
+        assert issue.fix_is_automatic is True
+        assert issue.fix_explanation is not None
+        assert "dígitos" in issue.fix_explanation
+
+    def test_precio_negativo_trae_explicacion(self):
+        issue = format_rules.check("list_price", "float", -50)
+        assert issue is not None
+        assert issue.issue_type == "negative_value"
+        assert issue.fix_explanation is not None
+        assert "valor absoluto" in issue.fix_explanation
+
+    def test_stock_negativo_trae_explicacion(self):
+        issue = format_rules.check("quantity", "float", -3)
+        assert issue is not None
+        assert issue.issue_type == "negative_value"
+        assert issue.fix_explanation is not None
+        assert "piso" in issue.fix_explanation
+
+    def test_sin_fix_no_trae_explicacion(self):
+        issue = format_rules.check("email", "char", "esto-no-es-un-email")
+        assert issue is not None
+        assert issue.suggested_fix is None
+        assert issue.fix_explanation is None
+
+    def test_fix_explanation_se_propaga_al_reporte_serializado(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame(
+            {
+                "name": ["Juan Perez"],
+                "vat": ["20-12345678-9"],
+                "mobile": ["(011) 1234-5678"],
+            }
+        )
+        report = validate_dataframe(df, schema)
+        report_dict = report.to_dict()
+        mobile_issues = [i for i in report_dict["issues"] if i["column"] == "mobile"]
+        assert len(mobile_issues) == 1
+        assert mobile_issues[0]["fix_is_automatic"] is True
+        assert mobile_issues[0]["fix_explanation"] is not None

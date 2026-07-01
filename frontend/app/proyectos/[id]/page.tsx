@@ -94,6 +94,7 @@ export default function ProjectPage() {
     column: string;
     fix_is_automatic: boolean;
     has_suggested_fix: boolean;
+    fix_explanation: string | null;
     indices: number[];
   };
   const issueGroups: IssueGroup[] = [];
@@ -107,6 +108,9 @@ export default function ProjectPage() {
         column: issue.column,
         fix_is_automatic: issue.fix_is_automatic,
         has_suggested_fix: issue.suggested_fix !== null && issue.suggested_fix !== undefined,
+        // Es igual para todo el grupo (mismo issue_type+columna), alcanza
+        // con tomarlo del primer issue.
+        fix_explanation: issue.fix_explanation,
         indices: [],
       };
       groupMap.set(key, g);
@@ -251,6 +255,7 @@ function IssueGroupList({
     column: string;
     fix_is_automatic: boolean;
     has_suggested_fix: boolean;
+    fix_explanation: string | null;
     indices: number[];
   }>;
   allIssues: import("@/lib/api").ValidationIssue[];
@@ -333,6 +338,12 @@ function IssueGroupList({
                 </span>
               )}
             </div>
+
+            {g.fix_explanation && (
+              <p className="text-xs text-graphite italic px-4 pb-3 -mt-1">
+                {g.fix_explanation}
+              </p>
+            )}
 
             {/* Filas individuales — solo si está expandido */}
             {isExpanded && (

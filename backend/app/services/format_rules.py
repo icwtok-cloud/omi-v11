@@ -34,6 +34,10 @@ class FormatIssue:
     message: str
     suggested_fix: object | None
     fix_is_automatic: bool
+    # Explicación en español de qué hace el fix propuesto (automático o
+    # manual-con-sugerencia), para mostrar en el reporte antes de que el
+    # usuario decida aplicarlo. None cuando no hay suggested_fix.
+    fix_explanation: str | None = None
 
 
 # Columnas que activan cada chequeo, por nombre de campo Odoo.
@@ -82,6 +86,7 @@ def check(column: str, field_type: str, value) -> FormatIssue | None:
                 message=f"'{str_value}' tiene formato inconsistente",
                 suggested_fix=cleaned,
                 fix_is_automatic=True,  # normalizar formato sí es seguro de aplicar solo
+                fix_explanation="Se recortan espacios, paréntesis y guiones, dejando solo dígitos y el + inicial.",
             )
 
     elif column in VAT_FIELDS:
@@ -109,6 +114,7 @@ def check(column: str, field_type: str, value) -> FormatIssue | None:
                     message=f"'{column}' es negativo ({numeric}), no es válido para un precio",
                     suggested_fix=abs(numeric),
                     fix_is_automatic=False,  # un valor negativo puede ser un signo invertido por error de carga, pero no siempre -- requiere confirmación
+                    fix_explanation="Se propone el valor absoluto (sin el signo negativo) — confirmalo si corresponde a una nota de crédito o algo similar.",
                 )
         except (ValueError, TypeError):
             return FormatIssue(
@@ -127,6 +133,7 @@ def check(column: str, field_type: str, value) -> FormatIssue | None:
                     message=f"Stock negativo ({numeric}) en '{column}'",
                     suggested_fix=0,
                     fix_is_automatic=False,
+                    fix_explanation="Se propone 0 como piso — confirmalo si el stock negativo no refleja un error de carga.",
                 )
         except (ValueError, TypeError):
             return FormatIssue(

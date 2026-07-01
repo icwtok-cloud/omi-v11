@@ -74,6 +74,7 @@ export interface ValidationIssue {
   current_value: unknown;
   suggested_fix: unknown;
   fix_is_automatic: boolean;
+  fix_explanation: string | null;
 }
 
 export interface ValidationReport {

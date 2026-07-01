@@ -54,6 +54,7 @@ class FieldIssue:
     current_value: object       # valor tal cual vino en el archivo
     suggested_fix: object | None = None   # valor propuesto, si hay fix automático
     fix_is_automatic: bool = False        # True = se puede aplicar solo, False = requiere que el usuario decida
+    fix_explanation: str | None = None    # explicación en español de qué hace el fix, para mostrar antes de aplicarlo
 
 
 @dataclass
@@ -89,6 +90,7 @@ class ValidationReport:
                     "current_value": i.current_value,
                     "suggested_fix": i.suggested_fix,
                     "fix_is_automatic": i.fix_is_automatic,
+                    "fix_explanation": i.fix_explanation,
                 }
                 for i in self.issues
             ],
@@ -221,6 +223,7 @@ def validate_dataframe(
                     current_value=_to_native(value),
                     suggested_fix=_to_native(format_issue.suggested_fix),
                     fix_is_automatic=format_issue.fix_is_automatic,
+                    fix_explanation=format_issue.fix_explanation,
                 ))
 
             # 2c. Validación de coherencia: relaciones contra valores conocidos
@@ -256,6 +259,10 @@ def validate_dataframe(
                         current_value=_to_native(value),
                         suggested_fix=selection_options[0] if selection_options else None,
                         fix_is_automatic=False,
+                        fix_explanation=(
+                            "Se propone la primera opción válida como placeholder — "
+                            "reemplazala por el valor correcto."
+                        ) if selection_options else None,
                     ))
 
     # --- 3. Duplicados (a nivel columna completa, no fila por fila) ---

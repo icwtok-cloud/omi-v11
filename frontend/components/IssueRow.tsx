@@ -34,6 +34,9 @@ export function IssueRow({
           <span className="font-mono text-xs text-graphite">· {issue.column}</span>
         </div>
         <p className="text-sm text-ink">{issue.message}</p>
+        {issue.fix_explanation && (
+          <p className="text-xs text-graphite italic mt-1">{issue.fix_explanation}</p>
+        )}
       </div>
 
       <div className="flex items-center gap-3 shrink-0">

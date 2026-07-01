@@ -10,6 +10,72 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-06-30 — Theming del modal de Clerk + explicación de fixes en el reporte
+
+**Contexto:** arranque de un roadmap más grande (ver plan de sesión:
+Clerk, roles, tiers, proyectos multi-módulo, progreso real de
+validación, explicación de fixes). Estas dos fases (1 y 5 del plan) son
+de bajo riesgo, sin cambios de schema, y se hicieron primero.
+
+**Fase 1 — Modal de Clerk no respetaba la landing:**
+`ClerkProvider` en `frontend/app/layout.tsx` solo tenía `appearance.variables`
+(colores/radius/fuente), pero Clerk usa `appearance.elements` para el
+padding/sombras/estructura real de cada sub-componente — sin eso, el
+modal se veía "ajeno" al resto de la UI aunque los colores fueran
+correctos. Fix: se agregó `appearance.elements` mapeando `card`,
+`headerTitle`, `formButtonPrimary`, `formFieldInput`,
+`socialButtonsBlockButton`, `footer`, etc. a los tokens de la landing, y
+se unificó `borderRadius` a `0.375rem` (antes `0.5rem`, no coincidía con
+`rounded-md` de Tailwind usado en toda la landing).
+
+Aclaración para el dueño del producto: el campo "imagen de perfil"
+opcional que aparece en el signup de Clerk es un toggle del Dashboard de
+Clerk (User & Authentication → Personal Information), no código — solo
+alimenta el avatar de `UserButton`, nunca se usa en la generación de
+reportes ni en el archivo exportado (confirmado por grep, no hay
+`imageUrl`/`profileImageUrl` fuera de `layout.tsx`).
+
+**Rollback:** revertir el commit; no toca DB, sin migración.
+
+**Fase 5 — El reporte no explicaba qué hace cada fix antes de aplicarlo:**
+Se agregó el campo `fix_explanation: str | None` a `FormatIssue`
+(`backend/app/services/format_rules.py`) y a `FieldIssue`
+(`backend/app/services/validation_engine.py`), poblado en los únicos
+casos donde hay `suggested_fix` real: normalización de teléfono (único
+`fix_is_automatic: true` que existe hoy), precio negativo, stock
+negativo, y Selection con opción inválida. El resto de los tipos de
+issue (`missing_required`, email/CUIT/precio-en-cero inválidos,
+`unknown_relation`, `duplicate`) no tienen fix posible, así que
+`fix_explanation` queda en `None` — no hay nada que explicar.
+
+En el frontend, `IssueRow.tsx` muestra la explicación en una línea
+itálica bajo el mensaje del issue, y el header de cada grupo en
+`proyectos/[id]/page.tsx` (`IssueGroupList`) la muestra una sola vez
+(es igual para todo el grupo, mismo `issue_type`+columna).
+
+Tests nuevos en `backend/tests/test_validation_engine.py`
+(`TestFixExplanation`, 5 casos) verifican que la explicación aparece
+donde corresponde y es `None` donde no hay fix. 24/24 tests pasan.
+
+**Regla para no repetirlo:**
+> Un botón de "aplicar fix" sin explicar qué hace es una caja negra
+> para alguien que está limpiando datos de un cliente real — antes de
+> agregar cualquier fix automático o sugerido nuevo, escribirle su
+> `fix_explanation` en el mismo commit, no como deuda para después.
+
+**Rollback:** revertir el commit; `fix_explanation` es un campo nuevo
+opcional (default `None`), no rompe compatibilidad con reportes viejos
+si hiciera falta revertir parcialmente.
+
+**Pendiente de verificación manual:** la verificación visual del modal
+de Clerk y de la explicación en pantalla no se pudo hacer con el
+navegador de preview automatizado en esta sesión (limitación de
+sandboxing del entorno, no del código — `curl` a `localhost:3000`
+respondía 200 pero el navegador de preview no conectaba). Falta
+confirmar visualmente corriendo `npm run dev` localmente.
+
+---
+
 ## 2026-06-30 — Agrupamiento de issues por tipo+columna (UX con archivos grandes)
 
 **Problema:** con un archivo de 20.000 filas y un error de formato en
