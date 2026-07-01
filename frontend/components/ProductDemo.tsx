@@ -330,13 +330,13 @@ function renderStepContent(index: number, active: boolean) {
           </FadeIn>
           <FadeIn active={active} delay={350}>
             <div className="flex items-center justify-between gap-3 bg-verify-light rounded-md px-3 py-2">
-              <span className="font-mono text-xs text-verify">34 filas se corrigen solas</span>
+              <span className="font-mono text-xs text-verify">34 filas se corrigen al exportar</span>
               <IconCheck className="w-4 h-4 text-verify shrink-0" />
             </div>
           </FadeIn>
           <FadeIn active={active} delay={600}>
             <p className="font-mono text-[11px] text-graphite text-center">
-              12 quedan para revisión manual
+              12 quedan para revisar antes de exportar
             </p>
           </FadeIn>
         </div>

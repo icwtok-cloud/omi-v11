@@ -878,12 +878,16 @@ function IssueGroupList({
               </button>
 
               {g.fix_is_automatic ? (
-                <span className="font-mono text-xs text-verify whitespace-nowrap shrink-0">
-                  se corrigen solas
+                <span
+                  className="font-mono text-xs text-verify whitespace-nowrap shrink-0"
+                  title="Se corrigen en el archivo que descargás al exportar -- tu archivo original nunca se modifica."
+                >
+                  se corrigen al exportar
                 </span>
               ) : g.has_suggested_fix ? (
                 <button
                   onClick={() => onToggleGroup(g.indices, g.issue_type)}
+                  title="OMI sugiere un valor para cada fila pero no lo aplica solo -- confirmalo si es correcto antes de exportar."
                   className={`text-xs font-medium rounded-full px-3 py-1.5 whitespace-nowrap transition-colors shrink-0 ${
                     allGroupSelected
                       ? "bg-verify text-white"
@@ -899,8 +903,11 @@ function IssueGroupList({
                     : "Aplicar a todas"}
                 </button>
               ) : (
-                <span className="font-mono text-xs text-graphite whitespace-nowrap shrink-0">
-                  requiere revisión manual
+                <span
+                  className="font-mono text-xs text-graphite whitespace-nowrap shrink-0"
+                  title="OMI no puede adivinar estos valores sin arriesgar un dato de negocio real. Si los dejás así, Odoo puede rechazar esas filas o importarlas con datos incompletos."
+                >
+                  revisalas antes de exportar
                 </span>
               )}
             </div>
