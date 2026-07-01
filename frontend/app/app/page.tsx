@@ -259,7 +259,25 @@ export default function HomePage() {
               }`}
             >
               {file ? (
-                <p className="text-sm text-ink">{file.name}</p>
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  <p className="text-sm text-ink">{file.name}</p>
+                  <label className="cursor-pointer text-verify text-sm font-medium underline">
+                    cambiar archivo
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setFile(null)}
+                    className="text-alert text-sm font-medium underline"
+                  >
+                    quitar
+                  </button>
+                </div>
               ) : (
                 <>
                   <p className="text-graphite mb-3">

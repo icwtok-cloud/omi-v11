@@ -10,6 +10,38 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-06-30 — No se podía cambiar el archivo elegido sin recargar la página
+
+**Síntoma reportado por el usuario:** en la home (`/app`), una vez que
+se elegía un archivo (drag&drop o manual), la zona de upload solo
+mostraba el nombre del archivo en un `<p>` sin ningún elemento
+clickeable -- si el usuario se equivocaba de archivo, la única salida
+era recargar la página entera y volver a elegir versión/módulo/país
+desde cero.
+
+**Causa:** el `<label>` con el `<input type="file">` oculto solo se
+renderizaba en la rama `!file` del condicional -- una vez que `file`
+tenía un valor, esa rama dejaba de existir y no quedaba ningún control
+para reabrir el selector de archivos. (La pantalla de "Agregar módulo"
+en `proyectos/[id]/page.tsx` no tiene este bug: ahí el nombre del
+archivo está envuelto DENTRO del `<label>`, así que siempre queda
+clickeable.)
+
+**Fix:** `frontend/app/app/page.tsx` -- cuando hay un archivo elegido,
+se muestran dos acciones en vez de un texto estático: "cambiar archivo"
+(reabre el selector) y "quitar" (limpia la selección y vuelve a la
+zona de drag&drop). Mismo patrón de siempre-clickeable que ya
+funcionaba en la pantalla de agregar módulo.
+
+**Regla para no repetirlo:**
+> Cualquier estado de formulario que se pueda completar ("archivo
+> elegido", "opción seleccionada") necesita una salida visible para
+> deshacerlo SIN recargar la página -- si armar el flujo felíz hace que
+> el control de entrada desaparezca del DOM, revisar antes de dar por
+> terminada la pantalla.
+
+---
+
 ## 2026-06-30 — "Failed to fetch" con un CSV real de Odoo v14 (separador ';')
 
 **Síntoma reportado por el usuario:** subir un export real de contactos
