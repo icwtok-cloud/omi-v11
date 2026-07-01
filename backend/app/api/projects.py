@@ -464,11 +464,17 @@ def _run_validation_job(module_id: str) -> None:
 
             duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
             rows_per_sec = round(row_count / max(duration_ms / 1000, 0.001), 1)
+            # No amerita un evento aparte para "cuántos fixes se
+            # aplicaron solos" -- se computa en el mismo momento que
+            # ValidationFinished, sobre el mismo report, así que va como
+            # un campo más de ese mismo evento en vez de duplicar un
+            # log_event() por cada validación.
+            auto_fix_count = sum(1 for i in report.issues if i.fix_is_automatic)
             log_event(
                 "ValidationFinished",
                 project_id=project.id, module_id=module.id,
                 rows=row_count, issues=report.total_issues,
-                quality_score=report.quality_score,
+                auto_fix_count=auto_fix_count, quality_score=report.quality_score,
                 duration_ms=duration_ms, rows_per_sec=rows_per_sec,
             )
         except Exception as e:
@@ -572,6 +578,11 @@ def get_module_report_pdf(
         odoo_version=project.odoo_version,
         odoo_country=project.odoo_country,
         report=module.validation_report,
+    )
+    log_event(
+        "PDFGenerated",
+        project_id=project.id, module_id=module.id,
+        odoo_module=module.odoo_module, pdf_size_bytes=len(pdf_bytes),
     )
     return StreamingResponse(
         BytesIO(pdf_bytes),

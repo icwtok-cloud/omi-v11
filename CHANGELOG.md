@@ -8,6 +8,31 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — Telemetría: cerrando huecos (reporte PDF sin instrumentar, fixes automáticos sin contar)
+
+**Qué cambia:** en la ronda anterior de observabilidad se instrumentó
+`ExportGenerated`/`ExportDownloaded` para el ZIP, pero el endpoint del
+**reporte PDF** (`GET .../report.pdf`) quedó sin ningún `log_event` --
+un hueco real, ya que es un endpoint gratis y de alto uso (no requiere
+pago, se puede pedir por cada módulo). Se agrega `PDFGenerated`
+(`pdf_size_bytes`). Además, `ValidationFinished` ahora incluye
+`auto_fix_count` (cuántos issues se corrigieron solos vs. cuántos
+requieren intervención manual) -- no amerita un evento aparte
+(`AutoFixApplied`) porque se computa en el mismo momento sobre el
+mismo report, así que va como un campo más del mismo evento en vez de
+duplicar un `log_event()` por validación.
+
+**Por qué:** encontrado en una revisión fresca de Phase 2 (telemetría)
+contra la lista completa de eventos pedida -- el reporte PDF y el
+conteo de fixes automáticos habían quedado afuera de la primera
+pasada.
+
+**Tests:** `backend/tests/test_observability.py` +2 (`PDFGenerated` se
+loguea al descargar el reporte, `auto_fix_count` presente en
+`ValidationFinished`). 115/115 backend pasan.
+
+**Rollback:** sin cambios de schema -- no aplica rollback de Alembic.
+
 ## 2026-07-01 — P1: el JWKS de Clerk se cacheaba para siempre — una rotación de claves tumbaba el login de todos
 
 **Qué cambia:** `_get_jwks()` (`app/core/auth.py`) cacheaba el JWKS de

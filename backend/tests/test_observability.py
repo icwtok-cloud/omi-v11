@@ -110,6 +110,30 @@ class TestTelemetryEvents:
         finished = next(e for e in events if e[0] == "ValidationFinished")
         assert finished[1]["rows"] == 1
         assert "duration_ms" in finished[1]
+        assert "auto_fix_count" in finished[1]
+
+    def test_descargar_reporte_pdf_loguea_pdf_generated(self, client, monkeypatch):
+        events = []
+        monkeypatch.setattr(
+            projects_module, "log_event", lambda event, **fields: events.append((event, fields))
+        )
+
+        project_id = client.post(
+            "/projects", json={"odoo_version": "15.0", "odoo_country": "ar"}
+        ).json()["project_id"]
+        module_id = client.post(
+            f"/projects/{project_id}/modules",
+            data={"odoo_module": "contactos"},
+            files={"file": ("archivo.csv", io.BytesIO(CONTACTOS_CSV.encode()), "text/csv")},
+        ).json()["module_id"]
+        client.post(f"/projects/{project_id}/modules/{module_id}/validate")
+
+        resp = client.get(f"/projects/{project_id}/modules/{module_id}/report.pdf")
+        assert resp.status_code == 200
+
+        pdf_events = [e for e in events if e[0] == "PDFGenerated"]
+        assert len(pdf_events) == 1
+        assert pdf_events[0][1]["pdf_size_bytes"] > 0
 
     def test_iniciar_pago_loguea_payment_started(self, client, monkeypatch):
         import app.api.payments as payments_module
