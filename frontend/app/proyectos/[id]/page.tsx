@@ -660,8 +660,22 @@ function IssueGroupList({
     });
   }
 
-  function onToggleGroup(indices: number[]) {
+  function onToggleGroup(indices: number[], issueType: string) {
     const allOn = indices.every((i) => manualFixesApplied.has(i));
+    // Un valor negativo de precio puede ser una nota de crédito legítima,
+    // no siempre un error -- aplicar "abs(valor)" a todas las filas de
+    // un click puede convertir esas notas de crédito en ventas positivas
+    // sin que el usuario lo note. Pedimos confirmación extra solo al
+    // pasar de "nada seleccionado" a "todo seleccionado" en este tipo.
+    if (!allOn && issueType === "negative_value") {
+      const confirmed = window.confirm(
+        `Vas a aplicar el fix automático a ${indices.length} fila${indices.length === 1 ? "" : "s"} con valor negativo.\n\n` +
+          "Un valor negativo puede ser una nota de crédito legítima, no siempre un error. " +
+          "Revisá que ninguna de estas filas sea intencional antes de continuar.\n\n" +
+          "¿Aplicar el fix a todas de todos modos?"
+      );
+      if (!confirmed) return;
+    }
     indices.forEach((i) => {
       const isOn = manualFixesApplied.has(i);
       if (allOn && isOn) onToggle(i);
@@ -712,7 +726,7 @@ function IssueGroupList({
                 </span>
               ) : g.has_suggested_fix ? (
                 <button
-                  onClick={() => onToggleGroup(g.indices)}
+                  onClick={() => onToggleGroup(g.indices, g.issue_type)}
                   className={`text-xs font-medium rounded-full px-3 py-1.5 whitespace-nowrap transition-colors shrink-0 ${
                     allGroupSelected
                       ? "bg-verify text-white"

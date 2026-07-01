@@ -10,6 +10,33 @@ subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
 ---
 
+## 2026-07-01 — Confirmación extra antes de "Aplicar a todas" en valores negativos
+
+**Qué cambia:** el botón "Aplicar a todas" del grupo `negative_value`
+(precio o stock negativo) ahora pide una confirmación extra
+(`window.confirm`) antes de aplicar el fix automático (`abs(valor)`) a
+todas las filas del grupo de una sola vez.
+
+**Por qué:** ya estaba documentado en el backlog del CHANGELOG (sección
+"Otras ideas", ítem 10) como riesgo real: un precio negativo puede ser
+una nota de crédito legítima, no siempre un error. Con un solo click en
+"Aplicar a todas" sobre un grupo de miles de filas, se puede convertir
+notas de crédito reales en ventas positivas sin que el usuario se dé
+cuenta -- un bug de negocio silencioso, no un error de código.
+
+**Fix:** en `frontend/app/proyectos/[id]/page.tsx`, `onToggleGroup`
+ahora recibe también `issue_type`; si es `negative_value` y se está
+pasando de "nada seleccionado" a "todo seleccionado", se muestra un
+`window.confirm` con el conteo de filas afectadas antes de aplicar.
+Los toggles individuales por fila (sin pasar por "aplicar a todas") no
+llevan esta confirmación extra porque ahí el usuario ya está revisando
+caso por caso.
+
+**Sin cambios de schema ni de backend** -- no aplica rollback de
+Alembic.
+
+---
+
 ## 2026-06-30 — Fase 4: progreso real de validación (async + polling)
 
 **Qué cambia:** antes, `POST /validate` corría el motor de validación
