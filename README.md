@@ -147,3 +147,14 @@ generador reintenta — ver `generate_unique_amount()` en
 - **Por qué versiones EOL (14-16) y no solo las 3 oficialmente
   soportadas (17-19)**: ahí está la mayor urgencia real de migrar (Odoo
   cobra un recargo a quien sigue en versiones sin soporte).
+
+## Fuera de alcance por ahora
+
+- **No se puede borrar ni renombrar un Proyecto una vez creado.** No es
+  un olvido silencioso -- se decidió no construirlo todavía porque
+  `Project`/`ProjectModule`/`Payment` no tienen `ondelete` a nivel de
+  DB (solo cascade a nivel ORM en `Project.modules`), y un borrado real
+  necesitaría manejar esas foreign keys con cuidado para no dejar
+  registros huérfanos ni romper el historial de pagos. Si un usuario
+  crea un proyecto por error, hoy queda ahí (no afecta cuota ni cobro
+  hasta que se paga/exporta).
