@@ -75,16 +75,29 @@ class TestCanExportProject:
         assert allowed is True
         assert err is None
 
-    def test_segundo_proyecto_no_es_gratis_aunque_no_se_haya_usado_la_cuota(
+    def test_proyecto_gratis_es_una_vez_por_cuenta_no_solo_el_primero(
         self, db_session, test_user
     ):
+        """Regla de negocio real: "una vez por cuenta" -- el flag
+        free_project_used es la única fuente de verdad. Antes se exigía
+        además count()==1 (que fuera el ÚNICO proyecto del usuario), lo
+        que quemaba el gratis para siempre si alguien creaba un segundo
+        proyecto antes de exportar -- y los proyectos no se pueden
+        borrar (fuera de alcance declarado en el README)."""
         primero = Project(owner_id=test_user.id, odoo_version="15.0")
         segundo = Project(owner_id=test_user.id, odoo_version="15.0")
         db_session.add_all([primero, segundo])
         db_session.commit()
 
-        # el usuario nunca exportó nada (free_project_used sigue False),
-        # pero como ya tiene 2 proyectos, el segundo no es el elegible.
+        # nunca exportó nada (free_project_used sigue False): cualquiera
+        # de sus proyectos es elegible para el gratis, no solo el primero.
+        allowed, err = can_export_project(db_session, test_user, segundo)
+        assert allowed is True
+        assert err is None
+
+        # una vez consumido el gratis, ya no hay vía gratuita.
+        test_user.free_project_used = True
+        db_session.commit()
         allowed, err = can_export_project(db_session, test_user, segundo)
         assert allowed is False
         assert "pagar" in err.lower() or "suscripción" in err.lower()

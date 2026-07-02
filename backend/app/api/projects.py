@@ -740,12 +740,14 @@ def download_project(
     # el cliente reintenta la request. Solo cuenta si este export no
     # estaba ya cubierto por un pago puntual (esos son ilimitados para
     # SU proyecto). Misma condición que can_export_project(), en el
-    # mismo orden, para no divergir de lo que ya se autorizó arriba.
-    if project.status != ProjectStatus.paid:
-        is_users_first_project = (
-            db.query(Project).filter(Project.owner_id == user.id).count() == 1
-        )
-        if not user.free_project_used and is_users_first_project:
+    # mismo orden, para no divergir de lo que ya se autorizó arriba:
+    # los partners con membresía anual quedan afuera (su única cuota es
+    # la de eventos anuales -- sin esto, el primer export de un partner
+    # quemaba su free_project_used y los siguientes inflaban
+    # monthly_export_count, contadores que le vuelven a importar si el
+    # deal anual termina).
+    if user.annual_event_limit is None and project.status != ProjectStatus.paid:
+        if not user.free_project_used:
             user.free_project_used = True
         else:
             user.monthly_export_count += 1

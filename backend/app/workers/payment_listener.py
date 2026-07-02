@@ -30,7 +30,7 @@ from web3 import Web3
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.safe_logging import log_event
-from app.models.db_models import Payment, PaymentStatus, PaymentNetwork
+from app.models.db_models import Payment, PaymentStatus, PaymentNetwork, ListenerState
 from app.services.payment_matching import find_pending_payment_by_amount
 
 # ABI mínima: solo necesitamos el evento Transfer y decimals().
@@ -77,7 +77,44 @@ class ChainListener:
             abi=ERC20_MINIMAL_ABI,
         )
         self.decimals = self.contract.functions.decimals().call()
-        self.last_checked_block = self.w3.eth.block_number
+        # Retomar desde el último bloque persistido en DB, si existe --
+        # sin esto, cada restart/deploy del worker arrancaba desde el
+        # bloque actual y toda transferencia recibida durante el downtime
+        # quedaba sin escanear para siempre (pago hecho, nunca acreditado).
+        persisted = self._load_last_checked_block()
+        if persisted is not None:
+            self.last_checked_block = persisted
+        else:
+            self.last_checked_block = self.w3.eth.block_number
+            self._persist_last_checked_block(self.last_checked_block)
+
+    def _load_last_checked_block(self) -> int | None:
+        db = SessionLocal()
+        try:
+            state = (
+                db.query(ListenerState)
+                .filter(ListenerState.network == self.network.value)
+                .first()
+            )
+            return state.last_checked_block if state else None
+        finally:
+            db.close()
+
+    def _persist_last_checked_block(self, block: int) -> None:
+        db = SessionLocal()
+        try:
+            state = (
+                db.query(ListenerState)
+                .filter(ListenerState.network == self.network.value)
+                .first()
+            )
+            if state is None:
+                db.add(ListenerState(network=self.network.value, last_checked_block=block))
+            else:
+                state.last_checked_block = block
+            db.commit()
+        finally:
+            db.close()
 
     def poll_once(self):
         latest_block = self.w3.eth.block_number
@@ -96,6 +133,11 @@ class ChainListener:
             self._handle_transfer(log, latest_block)
 
         self.last_checked_block = latest_block
+        # Persistir DESPUÉS de procesar los logs del rango: si el worker
+        # muere a mitad de un batch, el próximo boot re-escanea el rango
+        # completo (los handlers son idempotentes: tx_hash único + el
+        # early-return de `existing`), en vez de saltearse pagos.
+        self._persist_last_checked_block(latest_block)
 
     def _handle_transfer(self, log, current_block: int):
         raw_value = log["args"]["value"]
@@ -150,14 +192,22 @@ class ChainListener:
             self._confirm_payment(db, payment)
 
     def _confirm_payment(self, db, payment: Payment):
+        # Efectos de negocio (desbloquear proyecto / activar suscripción)
+        # y cambio de estado del Payment en UNA SOLA transacción -- antes
+        # se comiteaba `confirmed` primero y los efectos después, y si el
+        # proceso moría en el medio el pago quedaba confirmado sin
+        # desbloquear nada, sin reintento posible (el re-chequeo corta
+        # con status != pending).
+        from app.services.entitlements import apply_payment_confirmation
+
         payment.status = PaymentStatus.confirmed
         payment.confirmed_at = datetime.utcnow()
-        db.commit()
-
-        # Habilita la descarga en el proyecto asociado, o activa la
-        # suscripción si es ese el tipo de pago.
-        from app.services.entitlements import apply_payment_confirmation
         apply_payment_confirmation(db, payment)
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
 
         log_event(
             "PaymentConfirmed",

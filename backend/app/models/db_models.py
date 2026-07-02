@@ -220,3 +220,20 @@ class Payment(Base):
 
     user = relationship("User", back_populates="payments")
     project = relationship("Project", back_populates="payment")
+
+
+class ListenerState(Base):
+    """Estado de avance del worker de pagos, por red.
+
+    `last_checked_block` vivía solo en memoria del proceso: cada
+    restart/deploy del worker lo re-inicializaba al bloque actual, y
+    toda transferencia recibida durante el downtime quedaba sin escanear
+    para siempre (el usuario pagó, nadie lo vio). Persistirlo acá hace
+    que el worker retome desde donde quedó.
+    """
+
+    __tablename__ = "listener_state"
+
+    network = Column(String, primary_key=True)  # "polygon" | "base"
+    last_checked_block = Column(Integer, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

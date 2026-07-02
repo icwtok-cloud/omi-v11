@@ -301,6 +301,20 @@ def validate_dataframe(
         if field in ("email", "phone", "mobile") and field in fields_by_name
     }
 
+    # Cache por comodel de los valores de relación conocidos -- el set no
+    # cambia durante la validación, y reconstruirlo por CADA fila × campo
+    # de relación (como hacía antes) multiplicaba el costo de CPU por el
+    # tamaño del archivo. Lazy: solo se computa para los comodels que
+    # realmente aparecen en el archivo.
+    relation_values_cache: dict[str, set[str] | None] = {}
+
+    def _cached_relation_values(comodel_name: str) -> set[str] | None:
+        if comodel_name not in relation_values_cache:
+            relation_values_cache[comodel_name] = _known_relation_values(
+                schema, comodel_name, client_override
+            )
+        return relation_values_cache[comodel_name]
+
     for position, (row_idx, row) in enumerate(df.iterrows(), start=1):
         if contact_field_to_col:
             all_contact_values_empty = all(
@@ -348,8 +362,14 @@ def validate_dataframe(
                 continue  # vacío pero no requerido, no es un issue
 
             # 2b. Validaciones de formato puro (no dependen de Odoo)
+            # OJO: se pasa el campo técnico mapeado (mapped_field), NO el
+            # header crudo del archivo -- EMAIL_FIELDS/VAT_FIELDS/etc. en
+            # format_rules contienen nombres técnicos ("email", "vat"), así
+            # que con el header crudo ("Correo", "CUIT") ningún chequeo de
+            # formato corría. Misma clase de bug ya arreglada en
+            # columns_expected_missing y check_duplicates.
             format_issue = format_rules.check(
-                col_name, field_def["type"], value, country_rules=schema.country_rules
+                mapped_field, field_def["type"], value, country_rules=schema.country_rules
             )
             if format_issue:
                 issues.append(FieldIssue(
@@ -366,7 +386,7 @@ def validate_dataframe(
             # 2c. Validación de coherencia: relaciones contra valores conocidos
             comodel = field_def.get("comodel_name")
             if comodel:
-                known_values = _known_relation_values(schema, comodel, client_override)
+                known_values = _cached_relation_values(comodel)
                 if known_values is not None and str(value) not in known_values:
                     issues.append(FieldIssue(
                         row_index=int(row_idx),

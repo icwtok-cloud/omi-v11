@@ -28,12 +28,18 @@ SUBSCRIPTION_MONTHLY_EXPORT_LIMIT = 5
 
 
 def apply_payment_confirmation(db: Session, payment: Payment) -> None:
+    """Aplica los efectos de negocio de un pago confirmado (desbloquear
+    proyecto / activar suscripción). NO hace commit -- el caller es
+    responsable de comitear estos efectos JUNTO con el cambio de estado
+    del Payment, en la misma transacción (ver _confirm_payment en el
+    worker). Antes cada rama comiteaba acá adentro, lo que permitía el
+    estado inconsistente `confirmed` sin efectos si el proceso moría
+    entre los dos commits."""
     if payment.payment_type == PaymentType.per_project:
         if payment.project_id:
             project = db.query(Project).filter(Project.id == payment.project_id).first()
             if project:
                 project.status = ProjectStatus.paid
-                db.commit()
 
     elif payment.payment_type == PaymentType.subscription:
         user = db.query(User).filter(User.id == payment.user_id).first()
@@ -46,7 +52,6 @@ def apply_payment_confirmation(db: Session, payment: Payment) -> None:
                 base = datetime.utcnow()
             user.has_active_subscription = True
             user.subscription_expires_at = base + timedelta(days=SUBSCRIPTION_DURATION_DAYS)
-            db.commit()
 
 
 def user_can_download(db: Session, project: Project) -> bool:
@@ -64,6 +69,12 @@ def user_can_download(db: Session, project: Project) -> bool:
         return True
 
     user = db.query(User).filter(User.id == project.owner_id).first()
+    if user and user.annual_event_limit is not None:
+        # Socio con membresía anual: exento del gating de pago (igual que
+        # en can_export_project). Sin esto, el `can_download` informativo
+        # del reporte mostraba False para partners aunque el export real
+        # sí les funcionara -- veían el paywall sin estar bloqueados.
+        return True
     if user and user.has_active_subscription:
         if user.subscription_expires_at and user.subscription_expires_at > datetime.utcnow():
             return True
@@ -101,10 +112,12 @@ def can_export_project(db: Session, user: User, project: Project) -> tuple[bool,
     if project.status == ProjectStatus.paid:
         return True, None  # ya pagó este proyecto puntual -- exportes ilimitados de ESE proyecto
 
-    is_users_first_project = (
-        db.query(Project).filter(Project.owner_id == user.id).count() == 1
-    )
-    if not user.free_project_used and is_users_first_project and project.owner_id == user.id:
+    # Proyecto gratis: "una vez por cuenta" significa exactamente eso --
+    # el flag free_project_used es la única fuente de verdad. Antes se
+    # exigía además que fuera el ÚNICO proyecto del usuario (count()==1),
+    # lo que quemaba el gratis para siempre si alguien creaba un segundo
+    # proyecto antes de exportar (y los proyectos no se pueden borrar).
+    if not user.free_project_used and project.owner_id == user.id:
         return True, None  # usa su proyecto gratis (1 vez por cuenta)
 
     reset_monthly_counter_if_needed(user)

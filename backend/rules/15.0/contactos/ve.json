@@ -8,7 +8,7 @@
   "country_rules": {
     "tax_id": {
       "label": "RIF",
-      "regex": "^[JGVE]-\\d{8}-\\d{1}$",
+      "regex": "^[JGVE]-?\\d{8}-?\\d{1}$",
       "example": "J-12345678-9"
     }
   },

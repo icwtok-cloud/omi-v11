@@ -8,7 +8,7 @@
   "country_rules": {
     "tax_id": {
       "label": "NIT",
-      "regex": "^\\d{9,10}-\\d{1}$",
+      "regex": "^\\d{9,10}-?\\d{1}$",
       "example": "900123456-7"
     }
   },

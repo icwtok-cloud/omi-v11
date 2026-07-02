@@ -130,7 +130,19 @@ def check(
         if tax_id_rule and tax_id_rule.get("regex"):
             tax_id_re = re.compile(tax_id_rule["regex"])
             label = tax_id_rule.get("label", "identificador fiscal")
-            if not tax_id_re.match(str_value):
+            # Se prueba el valor crudo Y variantes normalizadas (mayúsculas,
+            # sin puntos) -- los regexes generados son estrictos y en archivos
+            # reales el mismo identificador válido aparece con variaciones de
+            # tipeo: RUT chileno con puntos ("12.345.678-9", el formato más
+            # común), RFC mexicano en minúsculas. El valor crudo va primero
+            # para no romper países donde los puntos SÍ son parte del formato
+            # (CNPJ/CPF de Brasil).
+            candidates = (
+                str_value,
+                str_value.upper(),
+                str_value.upper().replace(".", ""),
+            )
+            if not any(tax_id_re.match(c) for c in candidates):
                 return FormatIssue(
                     issue_type="invalid_format",
                     message=f"'{str_value}' no tiene formato de {label} válido",
@@ -234,7 +246,10 @@ def check_duplicates(df: pd.DataFrame, column_mapping: dict[str, str]) -> list:
                     row_index=int(row_idx),
                     column=col,
                     issue_type="duplicate",
-                    message=f"'{original}' en '{col}' ya aparece en la fila {seen[key]}",
+                    # +1: el mensaje habla en filas 1-based (como las cuenta
+                    # el usuario en su planilla), no en el índice 0-based
+                    # interno que sigue viajando en row_index.
+                    message=f"'{original}' en '{col}' ya aparece en la fila {seen[key] + 1}",
                     current_value=original,
                     suggested_fix=None,
                     fix_is_automatic=False,

@@ -569,3 +569,90 @@ class TestOnProgressCallback:
         df = pd.DataFrame({"name": ["Juan"], "vat": ["20-12345678-9"], "email": ["ok@x.com"]})
         report = validate_dataframe(df, schema)  # sin on_progress
         assert report.total_rows == 1
+
+
+# ---------------------------------------------------------------------------
+# Bug (2026-07-02): validate_dataframe pasaba el header CRUDO del archivo
+# a format_rules.check(), que compara contra nombres técnicos ("email",
+# "vat"...). Con headers en español -- el caso normal -- NINGÚN chequeo
+# de formato corría (email, teléfono, VAT, precio en cero, stock
+# negativo). Silencioso: cero falsos positivos, simplemente no validaba.
+# Misma clase de bug ya arreglada en columns_expected_missing y
+# check_duplicates.
+# ---------------------------------------------------------------------------
+
+class TestFormatRulesConHeadersEnEspanol:
+    def test_header_correo_activa_validacion_de_email(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({"Nombre": ["A"], "Correo": ["esto no es un email"]})
+        report = validate_dataframe(df, schema)
+        email_issues = [
+            i for i in report.issues
+            if i.issue_type == "invalid_format" and i.column == "Correo"
+        ]
+        assert len(email_issues) == 1
+
+    def test_header_telefono_activa_validacion_de_phone(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({"Nombre": ["A"], "Teléfono": ["no-es-un-telefono!"]})
+        report = validate_dataframe(df, schema)
+        phone_issues = [
+            i for i in report.issues
+            if i.issue_type == "invalid_format" and i.column == "Teléfono"
+        ]
+        assert len(phone_issues) == 1
+
+    def test_header_cuit_activa_validacion_de_vat(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({"Nombre": ["A"], "CUIT": ["basura-total"]})
+        report = validate_dataframe(df, schema)
+        vat_issues = [
+            i for i in report.issues
+            if i.issue_type == "invalid_format" and i.column == "CUIT"
+        ]
+        assert len(vat_issues) == 1
+
+    def test_vat_valido_por_pais_no_genera_issue(self):
+        # RFC mexicano válido con header en español: el chequeo corre
+        # (por el fix del header) y usa el regex de MX, no el CUIT.
+        schema = load_rule_schema("contactos", "15.0", "mx")
+        df = pd.DataFrame({"Nombre": ["A"], "RFC": ["XAXX010101000"]})
+        report = validate_dataframe(df, schema)
+        vat_issues = [i for i in report.issues if i.column == "RFC"]
+        assert vat_issues == []
+
+
+# ---------------------------------------------------------------------------
+# Normalización de tax-ID (2026-07-02): los regexes por país son estrictos
+# pero en archivos reales el mismo identificador válido aparece con
+# variaciones -- RUT chileno con puntos, RFC en minúsculas, CUIT sin
+# guiones (Excel guarda la columna como número y los pierde).
+# ---------------------------------------------------------------------------
+
+class TestTaxIdNormalizacion:
+    def _check_vat(self, country: str, value: str):
+        schema = load_rule_schema("contactos", "15.0", country)
+        return format_rules.check(
+            "vat", "char", value, country_rules=schema.country_rules
+        )
+
+    def test_rut_chileno_con_puntos_es_valido(self):
+        assert self._check_vat("cl", "12.345.678-9") is None
+
+    def test_rfc_mexicano_en_minusculas_es_valido(self):
+        assert self._check_vat("mx", "xaxx010101000") is None
+
+    def test_cuit_argentino_sin_guiones_es_valido(self):
+        # Regresión del fix de country_rules: el CUIT_RE legacy aceptaba
+        # guiones opcionales; el regex de ar.json los exigía.
+        assert self._check_vat("ar", "20123456789") is None
+
+    def test_basura_sigue_siendo_invalida_en_todos_los_paises(self):
+        for country in ("ar", "cl", "mx", "br"):
+            issue = self._check_vat(country, "no-es-un-tax-id")
+            assert issue is not None, country
+            assert issue.issue_type == "invalid_format"
+
+    def test_cnpj_brasileno_con_y_sin_puntos_es_valido(self):
+        assert self._check_vat("br", "12.345.678/0001-90") is None
+        assert self._check_vat("br", "12345678000190") is None

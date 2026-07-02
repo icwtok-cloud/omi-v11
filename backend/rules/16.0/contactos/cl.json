@@ -8,7 +8,7 @@
   "country_rules": {
     "tax_id": {
       "label": "RUT",
-      "regex": "^\\d{1,8}-[\\dkK]$",
+      "regex": "^\\d{1,8}-?[\\dkK]$",
       "example": "12345678-9"
     }
   },
