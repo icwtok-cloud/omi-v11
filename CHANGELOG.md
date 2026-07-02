@@ -8,6 +8,54 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-02 (4) — Traducción completa a portugués: producto funcional + 12 hubs SEO/GEO
+
+**Cierre de la traducción completa** pedida explícitamente después de
+la entrada anterior (que solo cubría la landing). Dos fases más:
+
+**Fase 2 — producto funcional** (`app/pt/app/page.tsx`,
+`app/pt/proyectos/[id]/page.tsx`): espejo exacto de la lógica de las
+páginas en español (mismo polling, mismo backoff, misma protección
+de confirmación extra en fixes de `negative_value`) con todo el texto
+en portugués. `IssueRow`, `DataPreview` y `PaywallPanel` ganan prop
+`locale` opcional (default `"es"`, no rompe ningún uso existente).
+`middleware.ts` protege `/pt/proyectos(.*)` igual que `/proyectos(.*)`.
+Los valores de módulo/país enviados al backend siguen en español (son
+el contrato real de la API); solo cambian los rótulos que ve el usuario.
+
+**Fase 3 — 12 hubs de contenido SEO/GEO** (13 archivos: guías, guía
+de preparar datos, migraciones, desarrollo, preguntas frecuentes,
+datos, comparativas, excel-vs-omi, glosario, compatibilidad, casos
+frecuentes, empresas, versiones): mismo patrón de duplicar bajo
+`/pt/<hub>` en vez de tocar el original, mismo JSON-LD
+(BreadcrumbList/Article/FAQPage/DefinedTermSet) con URLs y contenido
+en portugués. `SiteHeader` y `RelatedHubs` ganan prop `locale` para
+que los hubs en portugués enlacen entre sí y a la landing `/pt` sin
+mezclar idiomas.
+
+**Omitido a propósito, documentado, no un descuido:** `IntentCTASlot`
+(`components/IntentEngine.tsx`, el motor de detección de intención
+con CTA progresiva) no se tradujo -- su copy está hardcodeado en
+español y agregarle locale toca lógica de scoring, no solo texto. Se
+omitió de los hubs en portugués en vez de mostrar un CTA en español
+en medio de una página en portugués.
+
+**Verificación:** `tsc --noEmit` limpio en ambas fases; `curl` contra
+el servidor de desarrollo confirmó 200 en `/pt/app`,
+`/pt/proyectos/{id}` (protegido idéntico a su par ES), y las 13 rutas
+`/pt/<hub>`, con el contenido correcto en cada una, cross-links entre
+hubs funcionando, y cero regresión verificada en las páginas ES
+equivalentes (mismo comportamiento, mismo contenido).
+
+**Alcance final de la traducción:** landing, producto funcional
+completo y los 12 hubs -- los tres bajo `/pt`, sin tocar una sola
+línea de las páginas en español existentes en ningún punto de las
+tres fases.
+
+**Rollback:** sin migración de DB. Todas las rutas `/pt/*` son
+aditivas -- revertir cualquiera de los tres commits no afecta ninguna
+ruta en español existente.
+
 ## 2026-07-02 (3) — Landing en portugués (toggle ES/PT) + segunda instancia de la promesa de privacidad falsa
 
 **Contexto:** pedido explícito de agregar soporte de portugués. Se
