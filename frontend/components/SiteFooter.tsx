@@ -14,9 +14,9 @@ export function SiteFooter() {
           <a href="mailto:hello@alterego.lat" className="hover:text-ink transition-colors">
             hello@alterego.lat
           </a>
-          <span>
-            Consultas sobre tus datos (acceso, borrado) -- escribinos al mismo correo.
-          </span>
+          <Link href="/privacidad" className="hover:text-ink transition-colors">
+            Privacidad y datos
+          </Link>
         </div>
       </div>
     </footer>

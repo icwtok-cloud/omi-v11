@@ -198,7 +198,7 @@ export default function LandingPage() {
                 Ver cómo funciona
               </a>
             </div>
-            <p className="text-sm text-graphite">Sin tarjeta. Sin instalación. Resultados en segundos.</p>
+            <p className="text-sm text-graphite">Sin tarjeta. Sin instalación. Reporte gratis, primera descarga incluida.</p>
           </div>
 
           <div>
@@ -346,11 +346,7 @@ export default function LandingPage() {
             {LATAM_COUNTRIES.map((country) => (
               <span
                 key={country.code}
-                className={`font-mono text-xs rounded-full px-3 py-1.5 border ${
-                  country.code === "br"
-                    ? "border-brand text-brand font-semibold"
-                    : "border-line text-graphite"
-                }`}
+                className="font-mono text-xs rounded-full px-3 py-1.5 border border-line text-graphite"
               >
                 {country.name}
               </span>
@@ -393,10 +389,11 @@ export default function LandingPage() {
             Precios
           </p>
           <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight mb-4">
-            Pagás en cripto, sin suscripciones escondidas
+            Precios simples, pagás cuando estás listo
           </h2>
           <p className="text-graphite mb-14">
-            USDC en Polygon o Base, directo desde tu wallet. Sin tarjeta, sin intermediarios.
+            El análisis y el reporte siempre son gratis. Se paga solo al exportar, hoy en USDC
+            (Polygon o Base) desde tu wallet -- sin tarjeta ni intermediarios.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
@@ -420,11 +417,11 @@ export default function LandingPage() {
             <div className="bg-white border border-line rounded-xl p-7">
               <p className="font-bold text-lg mb-1">Por proyecto</p>
               <p className="font-extrabold text-4xl tracking-tight mb-1">USD 99</p>
-              <p className="text-sm text-graphite mb-6">Hasta 8 módulos, todo el proyecto junto</p>
+              <p className="text-sm text-graphite mb-6">Descarga de hasta 8 módulos, todo el proyecto junto</p>
               <ul className="space-y-2 text-sm mb-6">
-                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Reporte completo gratis, sin límite</li>
-                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Validaciones por módulo y versión</li>
-                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Export listo para Odoo</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Export listo para Odoo, todos los módulos</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Reporte y validación siguen siendo gratis antes de pagar</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Sin límite de filas</li>
               </ul>
               <Link
                 href="/app"
