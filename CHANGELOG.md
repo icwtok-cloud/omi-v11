@@ -8,6 +8,57 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-02 (2) — Fix UX pre-piloto, parte 2: contradicción de precios, chip de Brasil, página de privacidad
+
+**Continuación de la entrada anterior** -- misma auditoría, hallazgos
+que habían quedado sin resolver en la primera tanda.
+
+**1. El titular de la sección Precios ("Pagás en cripto, sin
+suscripciones escondidas") se contradecía con el plan mensual de $149
+que aparecía dos tarjetas al lado**, y encima vendía la mayor barrera
+de conversión del producto (cripto-only) como si fuera un beneficio.
+**Fix:** titular neutral ("Precios simples, pagás cuando estás
+listo"), el detalle de USDC/Polygon/Base pasa al subtítulo como dato,
+no como gancho.
+
+**2. La tarjeta de $99 mezclaba en la misma lista de bullets lo que ya
+es gratis (reporte completo) con lo que efectivamente se paga (el
+export).** Un lector rápido no podía distinguir qué estaba comprando.
+**Fix:** el primer bullet ahora es explícitamente lo que se paga
+("Export listo para Odoo, todos los módulos"); el reporte gratis pasa
+a una línea aclaratoria separada.
+
+**3. El hero prometía "Resultados en segundos"**, contradicho por los
+propios mensajes de `ValidationProgress` en `/proyectos/[id]` ("esto
+puede tardar unos minutos con archivos grandes"). **Fix:** cambiado a
+"Reporte gratis, primera descarga incluida" -- no promete una
+velocidad que el propio producto desmiente en el flujo real.
+
+**4. El chip de "Brasil" en la sección LatAm se mostraba resaltado
+(borde y texto de marca)**, justo arriba de un párrafo que aclara que
+Brasil es el único país sin soporte de idioma todavía ("interfaz en
+español; soporte en portugués, próximamente") -- resaltar visualmente
+la única excepción negativa manda la señal opuesta a la intención.
+**Fix:** chip de Brasil ahora con el mismo estilo neutral que el resto.
+
+**5. El footer no linkeaba ninguna página de privacidad**, pese a que
+el producto le pide a consultoras subir datos de sus propios clientes.
+**Fix:** nueva página `/privacidad` (`app/privacidad/page.tsx`),
+enlazada desde `SiteFooter.tsx`. Contenido grounded únicamente en
+comportamiento verificado del código (retención de archivos según
+`_ensure_corrected_file()`, método de pago actual, cómo pedir
+borrado por mail) -- deliberadamente NO incluye términos de servicio
+ni política de reembolso: son decisiones de negocio/legales que el
+equipo tiene que tomar, no algo para inventar en una pasada de UX.
+
+**Verificación:** `tsc --noEmit` limpio; contenido confirmado por
+`curl` contra el servidor de desarrollo (landing y `/privacidad`
+sirven el HTML esperado).
+
+**Rollback:** sin migración de DB. `git revert` alcanza; `/privacidad`
+es una página nueva, revertirla no rompe ningún link existente salvo
+el que agrega este mismo commit en el footer.
+
 ## 2026-07-02 — Fix UX pre-piloto: login en /app, listado de proyectos, menú móvil, copy engañoso
 
 **Contexto:** auditoría UX/UI end-to-end del flujo landing → auth →
