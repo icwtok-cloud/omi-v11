@@ -250,6 +250,49 @@ class TestValidacionNormal:
         assert "name" not in report.columns_expected_missing
 
 
+class TestValidacionVatPorPais:
+    """Bug real: la validación de `vat` usaba CUIT_RE (formato argentino)
+    sin importar el país del proyecto, marcando como inválido un RFC
+    mexicano o un RUT chileno perfectamente correctos. El schema por país
+    ya traía la regex correcta en country_rules.tax_id, pero nunca
+    llegaba al motor de validación -- ver rules_loader.RuleSchema.country_rules
+    y format_rules.check(country_rules=...)."""
+
+    def test_cuit_argentino_valido_sigue_funcionando(self):
+        schema = load_rule_schema("contactos", "15.0", "ar")
+        df = pd.DataFrame({
+            "name": ["Juan Perez"], "vat": ["20-12345678-9"], "email": ["juan@x.com"],
+        })
+        report = validate_dataframe(df, schema)
+        assert not [i for i in report.issues if i.column == "vat"]
+
+    def test_rfc_mexicano_valido_no_marca_error(self):
+        schema = load_rule_schema("contactos", "15.0", "mx")
+        df = pd.DataFrame({
+            "name": ["Juan Perez"], "vat": ["XAXX010101000"], "email": ["juan@x.com"],
+        })
+        report = validate_dataframe(df, schema)
+        assert not [i for i in report.issues if i.column == "vat"]
+
+    def test_rut_chileno_valido_no_marca_error(self):
+        schema = load_rule_schema("contactos", "15.0", "cl")
+        df = pd.DataFrame({
+            "name": ["Juan Perez"], "vat": ["12345678-9"], "email": ["juan@x.com"],
+        })
+        report = validate_dataframe(df, schema)
+        assert not [i for i in report.issues if i.column == "vat"]
+
+    def test_rfc_mexicano_invalido_si_marca_error(self):
+        schema = load_rule_schema("contactos", "15.0", "mx")
+        df = pd.DataFrame({
+            "name": ["Juan Perez"], "vat": ["no-es-un-rfc"], "email": ["juan@x.com"],
+        })
+        report = validate_dataframe(df, schema)
+        vat_issues = [i for i in report.issues if i.column == "vat"]
+        assert len(vat_issues) == 1
+        assert "RFC" in vat_issues[0].message
+
+
 class TestColumnMatchConfidence:
     """column_match_confidence distingue exact/synonym/fuzzy -- solo el
     fuzzy vale la pena que el usuario revise a ojo (los otros dos son

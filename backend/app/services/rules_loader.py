@@ -24,6 +24,10 @@ class RuleSchema:
         self.version = raw["odoo_version"]
         self.models: dict = raw["models"]
         self.default_records: list = raw["default_records"]
+        # Reglas de formato específicas del país (ej. regex de RFC/RUT/CUIT
+        # para el campo `vat`), generadas por rules-generator junto con el
+        # resto del schema. Ausente en módulos que no son COUNTRY_SCOPED_MODULES.
+        self.country_rules: dict = raw.get("country_rules") or {}
 
     def primary_model(self) -> dict:
         """Devuelve el primer modelo del schema -- por convención, el

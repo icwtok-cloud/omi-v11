@@ -8,6 +8,52 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-02 — Fix crítico: validación de `vat` ignoraba el país del proyecto
+
+**Bug:** `format_rules.check()` validaba el campo `vat` contra `CUIT_RE`
+(formato argentino `XX-XXXXXXXX-X`) sin importar el país del proyecto.
+Un RFC mexicano o un RUT chileno válidos se marcaban como
+`invalid_format` en cualquier país que no fuera AR. Afectaba a los 3
+módulos con reglas por país (`COUNTRY_SCOPED_MODULES = {"contactos",
+"contabilidad", "facturacion"}`).
+
+**Causa raíz:** el dato correcto ya existía en disco -- cada
+`rules/{version}/{module}/{country}.json` trae un bloque
+`country_rules.tax_id.regex` generado por `rules-generator` (ej. para MX:
+`^[A-Z&Ñ]{3,4}\d{6}[A-Z\d]{3}$`, label "RFC"). Pero `RuleSchema.__init__`
+en `rules_loader.py` no leía esa clave del JSON, así que nunca llegaba al
+validador -- un cable sin conectar, no un bug de regex.
+
+**Fix:**
+- `rules_loader.py`: `RuleSchema` ahora expone `self.country_rules`
+  (`raw.get("country_rules") or {}`).
+- `format_rules.py`: `check()` acepta un nuevo parámetro opcional
+  `country_rules`. Si trae `tax_id.regex`, se usa esa regex (con el
+  `label` del país en el mensaje de error, ej. "no tiene formato de RFC
+  válido"). Si no hay regla de país, cae al `CUIT_RE` legacy -- mismo
+  comportamiento de antes para AR o países sin l10n reconocido.
+  `CUIT_RE` no se eliminó, solo pasó a ser el fallback.
+- `validation_engine.py`: el único call site (línea ~351) ahora pasa
+  `country_rules=schema.country_rules`.
+
+**Por qué así y no distinto:** cambio mínimo, sin tocar la firma de
+ningún otro chequeo de `format_rules.check()`, sin nueva dependencia, sin
+cambiar la arquitectura del validation engine. Los módulos sin campo
+`vat` relevante (ventas, crm, inventario, productos, compras) no se ven
+afectados -- `country_rules` llega vacío (`{}`) en esos schemas y el
+`elif column in VAT_FIELDS` ni se evalúa si la columna no está mapeada.
+
+**Tests:** `tests/test_validation_engine.py::TestValidacionVatPorPais`
+(4 tests nuevos: CUIT argentino sigue validando igual, RFC mexicano
+válido ya no marca error, RUT chileno válido ya no marca error, RFC
+mexicano inválido sí sigue marcando error con el mensaje correcto).
+Verificado por reversión: revertir el fix temporalmente hace fallar 3 de
+los 4 tests nuevos exactamente como se espera; restaurado, 138/138
+pasan.
+
+**Rollback:** no hay migración de DB involucrada -- es lógica pura, un
+`git revert` del commit alcanza.
+
 ## 2026-07-01 — Feature: Data Enrichment Engine — genera campos técnicos seguros (SKU, External ID) sin inventar datos de negocio
 
 **Qué cambia:** nueva etapa del pipeline, DESPUÉS de Validation y

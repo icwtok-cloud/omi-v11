@@ -348,7 +348,9 @@ def validate_dataframe(
                 continue  # vacío pero no requerido, no es un issue
 
             # 2b. Validaciones de formato puro (no dependen de Odoo)
-            format_issue = format_rules.check(col_name, field_def["type"], value)
+            format_issue = format_rules.check(
+                col_name, field_def["type"], value, country_rules=schema.country_rules
+            )
             if format_issue:
                 issues.append(FieldIssue(
                     row_index=int(row_idx),

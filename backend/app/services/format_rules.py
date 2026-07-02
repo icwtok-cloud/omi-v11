@@ -88,7 +88,9 @@ def _clean_phone(value: str) -> str:
     return f"{prefix}{digits}"
 
 
-def check(column: str, field_type: str, value) -> FormatIssue | None:
+def check(
+    column: str, field_type: str, value, country_rules: dict | None = None
+) -> FormatIssue | None:
     str_value = str(value).strip()
 
     if column in EMAIL_FIELDS:
@@ -119,7 +121,23 @@ def check(column: str, field_type: str, value) -> FormatIssue | None:
             )
 
     elif column in VAT_FIELDS:
-        if not CUIT_RE.match(str_value):
+        # Si el schema trae una regla de tax_id propia del país (RFC en
+        # MX, RUT en CL, etc.), se usa esa -- es la fuente correcta.
+        # CUIT_RE queda como fallback solo cuando no hay regla de país
+        # (ej. AR, o un país sin l10n reconocido todavía), preservando el
+        # comportamiento legacy tal cual estaba.
+        tax_id_rule = (country_rules or {}).get("tax_id")
+        if tax_id_rule and tax_id_rule.get("regex"):
+            tax_id_re = re.compile(tax_id_rule["regex"])
+            label = tax_id_rule.get("label", "identificador fiscal")
+            if not tax_id_re.match(str_value):
+                return FormatIssue(
+                    issue_type="invalid_format",
+                    message=f"'{str_value}' no tiene formato de {label} válido",
+                    suggested_fix=None,
+                    fix_is_automatic=False,
+                )
+        elif not CUIT_RE.match(str_value):
             return FormatIssue(
                 issue_type="invalid_format",
                 message=f"'{str_value}' no tiene formato de CUIT/CUIL válido",
