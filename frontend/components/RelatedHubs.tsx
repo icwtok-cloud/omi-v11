@@ -1,26 +1,53 @@
 import Link from "next/link";
 
-const ALL_HUBS = [
-  { href: "/guias", label: "Guías" },
-  { href: "/migraciones", label: "Migraciones" },
-  { href: "/versiones", label: "Versiones" },
-  { href: "/compatibilidad", label: "Compatibilidad" },
-  { href: "/datos", label: "Datos" },
-  { href: "/casos-frecuentes", label: "Casos frecuentes" },
-  { href: "/comparativas", label: "Comparativas" },
-  { href: "/empresas", label: "Empresas" },
-  { href: "/desarrollo", label: "Desarrollo" },
-  { href: "/glosario", label: "Glosario" },
-  { href: "/preguntas-frecuentes", label: "Preguntas frecuentes" },
-];
+type Locale = "es" | "pt";
 
-export function RelatedHubs({ currentHref }: { currentHref: string }) {
-  const others = ALL_HUBS.filter((hub) => hub.href !== currentHref);
+const ALL_HUBS: Record<Locale, { href: string; label: string }[]> = {
+  es: [
+    { href: "/guias", label: "Guías" },
+    { href: "/migraciones", label: "Migraciones" },
+    { href: "/versiones", label: "Versiones" },
+    { href: "/compatibilidad", label: "Compatibilidad" },
+    { href: "/datos", label: "Datos" },
+    { href: "/casos-frecuentes", label: "Casos frecuentes" },
+    { href: "/comparativas", label: "Comparativas" },
+    { href: "/empresas", label: "Empresas" },
+    { href: "/desarrollo", label: "Desarrollo" },
+    { href: "/glosario", label: "Glosario" },
+    { href: "/preguntas-frecuentes", label: "Preguntas frecuentes" },
+  ],
+  pt: [
+    { href: "/pt/guias", label: "Guias" },
+    { href: "/pt/migraciones", label: "Migrações" },
+    { href: "/pt/versiones", label: "Versões" },
+    { href: "/pt/compatibilidad", label: "Compatibilidade" },
+    { href: "/pt/datos", label: "Dados" },
+    { href: "/pt/casos-frecuentes", label: "Casos frequentes" },
+    { href: "/pt/comparativas", label: "Comparativos" },
+    { href: "/pt/empresas", label: "Empresas" },
+    { href: "/pt/desarrollo", label: "Desenvolvimento" },
+    { href: "/pt/glosario", label: "Glossário" },
+    { href: "/pt/preguntas-frecuentes", label: "Perguntas frequentes" },
+  ],
+};
+
+const TITLE: Record<Locale, string> = {
+  es: "Más sobre migrar a Odoo",
+  pt: "Mais sobre migrar para o Odoo",
+};
+
+const ARIA: Record<Locale, string> = {
+  es: "Más recursos sobre migrar a Odoo",
+  pt: "Mais recursos sobre migrar para o Odoo",
+};
+
+export function RelatedHubs({ currentHref, locale = "es" }: { currentHref: string; locale?: Locale }) {
+  const others = ALL_HUBS[locale].filter((hub) => hub.href !== currentHref);
 
   return (
-    <nav aria-label="Más recursos sobre migrar a Odoo" className="max-w-3xl mx-auto px-6 md:px-10 pb-16">
+    <nav aria-label={ARIA[locale]} className="max-w-3xl mx-auto px-6 md:px-10 pb-16">
       <p className="text-xs font-semibold uppercase tracking-widest text-graphite mb-3">
-        Más sobre migrar a Odoo
+        {TITLE[locale]}
       </p>
       <div className="flex flex-wrap gap-2">
         {others.map((hub) => (

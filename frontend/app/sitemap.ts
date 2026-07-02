@@ -43,5 +43,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: hub.changeFrequency,
       priority: hub.priority,
     })),
+    ...HUB_PAGES.map((hub) => ({
+      url: `${SITE_URL}/pt${hub.path}`,
+      lastModified: new Date(),
+      changeFrequency: hub.changeFrequency,
+      priority: hub.priority,
+    })),
   ];
 }

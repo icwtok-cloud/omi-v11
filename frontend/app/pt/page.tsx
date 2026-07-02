@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ProductDemo } from "@/components/ProductDemo";
 import { LocalizationPulse } from "@/components/LocalizationPulse";
 import { SiteFooter } from "@/components/SiteFooter";
+import { RelatedHubs } from "@/components/RelatedHubs";
 import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -636,6 +637,8 @@ export default function LandingPagePT() {
           </Link>
         </div>
       </section>
+
+      <RelatedHubs currentHref="" locale="pt" />
 
       <SiteFooter locale="pt" />
     </main>
