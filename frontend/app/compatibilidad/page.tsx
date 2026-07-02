@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { RelatedHubs } from "@/components/RelatedHubs";
 import { SITE_URL } from "@/lib/site";
 
 const PAGE_URL = `${SITE_URL}/compatibilidad`;
@@ -100,6 +101,7 @@ export default function CompatibilidadPage() {
             </Link>
           </div>
         </div>
+        <RelatedHubs currentHref="/compatibilidad" />
         <SiteFooter />
       </main>
     </>

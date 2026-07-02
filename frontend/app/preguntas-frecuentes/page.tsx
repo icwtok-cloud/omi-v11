@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { RelatedHubs } from "@/components/RelatedHubs";
 import { SITE_URL } from "@/lib/site";
 import { DOUBTS } from "@/lib/faq-data";
 
@@ -82,6 +83,7 @@ export default function PreguntasFrecuentesPage() {
             </Link>
           </div>
         </div>
+        <RelatedHubs currentHref="/preguntas-frecuentes" />
         <SiteFooter />
       </main>
     </>
