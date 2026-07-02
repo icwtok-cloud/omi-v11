@@ -16,6 +16,7 @@ import {
 import { USDC_CONTRACTS, USDC_DECIMALS, ERC20_TRANSFER_ABI } from "@/lib/wagmi";
 
 type Network = "polygon" | "base";
+type Locale = "es" | "pt";
 
 const CHAIN_BY_NETWORK: Record<Network, typeof polygon | typeof base> = {
   polygon,
@@ -29,13 +30,101 @@ type Step = "choose" | "connect" | "confirm-wallet" | "waiting" | "confirmed" | 
 // nueva (todavía no tiene una, o se le venció).
 type PaymentType = "free" | "per_project" | "subscription" | "subscription_covered";
 
+const COPY = {
+  es: {
+    startPaymentError: "No se pudo iniciar el pago",
+    txError: "No se pudo completar la transacción",
+    windowExpired: "La ventana de pago expiró. Iniciá el pago de nuevo.",
+    downloadError: "No se pudo descargar",
+    downloadEnabled: "Descarga habilitada",
+    coveredBySubscription: "Cubierto por tu suscripción",
+    paymentConfirmed: "Pago confirmado",
+    downloadFile: "Descargar archivo corregido",
+    unlockDownload: "Desbloqueá la descarga",
+    freeOneModule: "Gratis · 1 módulo",
+    perProject: "Por proyecto · $99",
+    yourSubscription: (used: number, limit: number) => `Tu suscripción (${used}/${limit})`,
+    monthly: "Mensual · $149",
+    freeExplain:
+      "Tu proyecto de prueba gratis incluye 1 módulo, con reporte y descarga -- una sola vez por cuenta. No hace falta wallet ni pago para esto.",
+    coveredExplain: (used: number, limit: number) =>
+      `Ya tenés una suscripción activa -- usaste ${used} de ${limit} exportaciones este mes. No hace falta pagar de nuevo ni conectar wallet para este proyecto.`,
+    network: "Red",
+    downloadCta: "Descargar",
+    continueUsdc: "Continuar con USDC",
+    exactAmount: "Monto exacto",
+    address: "Dirección",
+    amountMustMatch: "El monto tiene que coincidir exactamente — es lo que nos permite identificar tu pago de forma automática.",
+    confirmInMetamask: "Confirmá en MetaMask...",
+    payWithMetamask: "Pagar con MetaMask",
+    connectAndPay: "Conectar MetaMask y pagar",
+    waitingConfirmation: (network: string) => `Esperando confirmación en la red (${network})...`,
+    waitingMinutes: "Esto puede tardar uno o dos minutos.",
+    tryAgain: "Intentar de nuevo",
+    checklistTitle: "Antes de importar en Odoo, tené en cuenta:",
+    checklistDisclaimer: "Esta checklist es una guía general -- no reemplaza el criterio de quien hace la importación en tu Odoo.",
+    checklist: [
+      "Backup de la base de Odoo antes de importar",
+      "Activar el modo desarrollador",
+      "Importar primero los módulos base (Contactos, Productos) antes que los que dependen de ellos",
+      "Verificar que los impuestos y listas de precio usados en el archivo existan en tu Odoo",
+      "Revisar que las compañías/multi-empresa estén bien asignadas",
+      "Hacer una prueba con un lote chico (50 registros) antes de importar todo",
+    ],
+  },
+  pt: {
+    startPaymentError: "Não foi possível iniciar o pagamento",
+    txError: "Não foi possível concluir a transação",
+    windowExpired: "A janela de pagamento expirou. Inicie o pagamento novamente.",
+    downloadError: "Não foi possível baixar",
+    downloadEnabled: "Download habilitado",
+    coveredBySubscription: "Coberto pela sua assinatura",
+    paymentConfirmed: "Pagamento confirmado",
+    downloadFile: "Baixar arquivo corrigido",
+    unlockDownload: "Desbloqueie o download",
+    freeOneModule: "Grátis · 1 módulo",
+    perProject: "Por projeto · $99",
+    yourSubscription: (used: number, limit: number) => `Sua assinatura (${used}/${limit})`,
+    monthly: "Mensal · $149",
+    freeExplain:
+      "Seu projeto de teste grátis inclui 1 módulo, com relatório e download -- uma única vez por conta. Não precisa de carteira nem pagamento para isso.",
+    coveredExplain: (used: number, limit: number) =>
+      `Você já tem uma assinatura ativa -- usou ${used} de ${limit} exportações este mês. Não precisa pagar de novo nem conectar carteira para este projeto.`,
+    network: "Rede",
+    downloadCta: "Baixar",
+    continueUsdc: "Continuar com USDC",
+    exactAmount: "Valor exato",
+    address: "Endereço",
+    amountMustMatch: "O valor precisa coincidir exatamente — é isso que nos permite identificar seu pagamento automaticamente.",
+    confirmInMetamask: "Confirme na MetaMask...",
+    payWithMetamask: "Pagar com MetaMask",
+    connectAndPay: "Conectar MetaMask e pagar",
+    waitingConfirmation: (network: string) => `Aguardando confirmação na rede (${network})...`,
+    waitingMinutes: "Isso pode levar um ou dois minutos.",
+    tryAgain: "Tentar novamente",
+    checklistTitle: "Antes de importar no Odoo, tenha em conta:",
+    checklistDisclaimer: "Esta checklist é um guia geral -- não substitui o critério de quem faz a importação no seu Odoo.",
+    checklist: [
+      "Backup da base do Odoo antes de importar",
+      "Ativar o modo desenvolvedor",
+      "Importar primeiro os módulos base (Contatos, Produtos) antes dos que dependem deles",
+      "Verificar se os impostos e listas de preço usados no arquivo existem no seu Odoo",
+      "Revisar se as empresas/multi-empresa estão bem atribuídas",
+      "Fazer um teste com um lote pequeno (50 registros) antes de importar tudo",
+    ],
+  },
+} as const;
+
 export function PaywallPanel({
   projectId,
   priceLabel,
+  locale = "es",
 }: {
   projectId: string;
   priceLabel: string;
+  locale?: Locale;
 }) {
+  const t = COPY[locale];
   const { getToken } = useAuth();
   const { address, isConnected, chainId } = useAccount();
   const { connectAsync, connectors } = useConnect();
@@ -150,7 +239,7 @@ export function PaywallPanel({
       setPayment(result);
       setStep("connect");
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "No se pudo iniciar el pago");
+      setErrorMsg(e instanceof Error ? e.message : t.startPaymentError);
       setStep("error");
     }
   }
@@ -186,9 +275,7 @@ export function PaywallPanel({
       setStep("waiting");
       pollPaymentStatus(payment.payment_id, payment.expires_at);
     } catch (e) {
-      setErrorMsg(
-        e instanceof Error ? e.message : "No se pudo completar la transacción"
-      );
+      setErrorMsg(e instanceof Error ? e.message : t.txError);
       setStep("error");
     }
   }
@@ -215,7 +302,7 @@ export function PaywallPanel({
         }
         if (status.status === "expired") {
           localStorage.removeItem(pendingPaymentKey);
-          setErrorMsg("La ventana de pago expiró. Iniciá el pago de nuevo.");
+          setErrorMsg(t.windowExpired);
           setStep("error");
           return;
         }
@@ -229,7 +316,7 @@ export function PaywallPanel({
       // Margen de 60s para que la última consulta vea el estado final.
       if (Date.now() > new Date(expiresAt).getTime() + 60_000) {
         localStorage.removeItem(pendingPaymentKey);
-        setErrorMsg("La ventana de pago expiró. Iniciá el pago de nuevo.");
+        setErrorMsg(t.windowExpired);
         setStep("error");
         return;
       }
@@ -246,23 +333,23 @@ export function PaywallPanel({
       <div className="border border-verify bg-verify-light rounded-lg p-6 text-center">
         <p className="font-extrabold text-xl text-verify mb-3">
           {paymentType === "free"
-            ? "Descarga habilitada"
+            ? t.downloadEnabled
             : paymentType === "subscription_covered"
-            ? "Cubierto por tu suscripción"
-            : "Pago confirmado"}
+            ? t.coveredBySubscription
+            : t.paymentConfirmed}
         </p>
         <button
           onClick={() =>
             triggerAuthedDownload(getToken, downloadUrl(projectId), `omi_${projectId}.zip`).catch(
-              (e) => setErrorMsg(e instanceof Error ? e.message : "No se pudo descargar")
+              (e) => setErrorMsg(e instanceof Error ? e.message : t.downloadError)
             )
           }
           className="inline-block bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity"
         >
-          Descargar archivo corregido
+          {t.downloadFile}
         </button>
         {errorMsg && <p className="text-alert text-sm mt-2">{errorMsg}</p>}
-        <PostDownloadChecklist />
+        <PostDownloadChecklist locale={locale} />
       </div>
     );
   }
@@ -270,7 +357,7 @@ export function PaywallPanel({
   return (
     <div className="border border-line bg-white rounded-lg p-6 space-y-5">
       <div>
-        <p className="font-extrabold text-xl mb-1">Desbloqueá la descarga</p>
+        <p className="font-extrabold text-xl mb-1">{t.unlockDownload}</p>
         <p className="text-graphite text-sm">{priceLabel}</p>
       </div>
 
@@ -286,7 +373,7 @@ export function PaywallPanel({
                     : "border-line text-graphite"
                 }`}
               >
-                Gratis · 1 módulo
+                {t.freeOneModule}
               </button>
             )}
             <button
@@ -297,7 +384,7 @@ export function PaywallPanel({
                   : "border-line text-graphite"
               }`}
             >
-              Por proyecto · $99
+              {t.perProject}
             </button>
             {subscriptionCoveredInfo ? (
               <button
@@ -308,7 +395,7 @@ export function PaywallPanel({
                     : "border-line text-graphite"
                 }`}
               >
-                Tu suscripción ({subscriptionCoveredInfo.used}/{subscriptionCoveredInfo.limit})
+                {t.yourSubscription(subscriptionCoveredInfo.used, subscriptionCoveredInfo.limit)}
               </button>
             ) : (
               <button
@@ -319,26 +406,20 @@ export function PaywallPanel({
                     : "border-line text-graphite"
                 }`}
               >
-                Mensual · $149
+                {t.monthly}
               </button>
             )}
           </div>
 
           {paymentType === "free" ? (
-            <p className="text-xs text-graphite">
-              Tu proyecto de prueba gratis incluye 1 módulo, con reporte y
-              descarga -- una sola vez por cuenta. No hace falta wallet ni
-              pago para esto.
-            </p>
+            <p className="text-xs text-graphite">{t.freeExplain}</p>
           ) : paymentType === "subscription_covered" && subscriptionCoveredInfo ? (
             <p className="text-xs text-graphite">
-              Ya tenés una suscripción activa -- usaste{" "}
-              {subscriptionCoveredInfo.used} de {subscriptionCoveredInfo.limit} exportaciones
-              este mes. No hace falta pagar de nuevo ni conectar wallet para este proyecto.
+              {t.coveredExplain(subscriptionCoveredInfo.used, subscriptionCoveredInfo.limit)}
             </p>
           ) : (
             <div>
-              <p className="text-sm font-medium mb-2">Red</p>
+              <p className="text-sm font-medium mb-2">{t.network}</p>
               <div className="flex gap-2">
                 {(["polygon", "base"] as Network[]).map((n) => (
                   <button
@@ -362,8 +443,8 @@ export function PaywallPanel({
             className="w-full bg-ink text-paper rounded-full py-3 font-medium hover:opacity-90 transition-opacity"
           >
             {paymentType === "free" || paymentType === "subscription_covered"
-              ? "Descargar"
-              : "Continuar con USDC"}
+              ? t.downloadCta
+              : t.continueUsdc}
           </button>
         </>
       )}
@@ -372,46 +453,39 @@ export function PaywallPanel({
         <div className="space-y-4">
           <div className="bg-canvas border border-line rounded-md p-4 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-graphite">Red</span>
+              <span className="text-graphite">{t.network}</span>
               <span className="font-mono capitalize">{network}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-graphite">Monto exacto</span>
+              <span className="text-graphite">{t.exactAmount}</span>
               <span className="font-mono">{payment.expected_amount_usd.toFixed(4)} USDC</span>
             </div>
             <div className="flex justify-between text-sm items-start">
-              <span className="text-graphite">Dirección</span>
+              <span className="text-graphite">{t.address}</span>
               <span className="font-mono text-xs text-right break-all max-w-[60%]">
                 {payment.receive_address}
               </span>
             </div>
           </div>
-          <p className="text-xs text-graphite">
-            El monto tiene que coincidir exactamente — es lo que nos permite
-            identificar tu pago de forma automática.
-          </p>
+          <p className="text-xs text-graphite">{t.amountMustMatch}</p>
           <button
             onClick={handleConnectAndPay}
             disabled={step === "confirm-wallet"}
             className="w-full bg-verify text-white rounded-full py-3 font-medium disabled:opacity-50 hover:opacity-90 transition-opacity"
           >
             {step === "confirm-wallet"
-              ? "Confirmá en MetaMask..."
+              ? t.confirmInMetamask
               : isConnected
-              ? "Pagar con MetaMask"
-              : "Conectar MetaMask y pagar"}
+              ? t.payWithMetamask
+              : t.connectAndPay}
           </button>
         </div>
       )}
 
       {step === "waiting" && (
         <div className="text-center py-4">
-          <p className="text-graphite text-sm">
-            Esperando confirmación en la red ({network})...
-          </p>
-          <p className="text-xs text-graphite mt-1">
-            Esto puede tardar uno o dos minutos.
-          </p>
+          <p className="text-graphite text-sm">{t.waitingConfirmation(network)}</p>
+          <p className="text-xs text-graphite mt-1">{t.waitingMinutes}</p>
         </div>
       )}
 
@@ -428,7 +502,7 @@ export function PaywallPanel({
             }}
             className="w-full border border-line rounded-full py-2.5 font-medium text-sm"
           >
-            Intentar de nuevo
+            {t.tryAgain}
           </button>
         </div>
       )}
@@ -436,16 +510,8 @@ export function PaywallPanel({
   );
 }
 
-const POST_DOWNLOAD_CHECKLIST = [
-  "Backup de la base de Odoo antes de importar",
-  "Activar el modo desarrollador",
-  "Importar primero los módulos base (Contactos, Productos) antes que los que dependen de ellos",
-  "Verificar que los impuestos y listas de precio usados en el archivo existan en tu Odoo",
-  "Revisar que las compañías/multi-empresa estén bien asignadas",
-  "Hacer una prueba con un lote chico (50 registros) antes de importar todo",
-];
-
-function PostDownloadChecklist() {
+function PostDownloadChecklist({ locale = "es" }: { locale?: Locale }) {
+  const t = COPY[locale];
   const [checked, setChecked] = useState<Set<number>>(new Set());
 
   function toggle(i: number) {
@@ -458,11 +524,9 @@ function PostDownloadChecklist() {
 
   return (
     <div className="mt-6 text-left border-t border-verify/30 pt-4">
-      <p className="text-xs font-medium text-graphite mb-2">
-        Antes de importar en Odoo, tené en cuenta:
-      </p>
+      <p className="text-xs font-medium text-graphite mb-2">{t.checklistTitle}</p>
       <div className="space-y-1.5">
-        {POST_DOWNLOAD_CHECKLIST.map((item, i) => (
+        {t.checklist.map((item, i) => (
           <label key={i} className="flex items-start gap-2 text-xs text-ink cursor-pointer">
             <input
               type="checkbox"
@@ -474,10 +538,7 @@ function PostDownloadChecklist() {
           </label>
         ))}
       </div>
-      <p className="text-xs text-graphite italic mt-2">
-        Esta checklist es una guía general -- no reemplaza el criterio de quien hace la
-        importación en tu Odoo.
-      </p>
+      <p className="text-xs text-graphite italic mt-2">{t.checklistDisclaimer}</p>
     </div>
   );
 }
