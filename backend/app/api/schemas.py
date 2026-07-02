@@ -43,6 +43,15 @@ class ProjectSummaryResponse(BaseModel):
     modules: list[ModuleSummaryResponse] = []
 
 
+class ProjectListItemResponse(BaseModel):
+    project_id: str
+    odoo_version: str
+    odoo_country: str | None = None
+    status: str
+    modules_count: int
+    created_at: str
+
+
 class ModuleValidateStartResponse(BaseModel):
     project_id: str
     module_id: str

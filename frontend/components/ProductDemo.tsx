@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const STEPS = [
   { key: "upload", label: "Subir archivo" },
-  { key: "detect", label: "Detectar módulo" },
+  { key: "detect", label: "Confirmar módulo" },
   { key: "validate", label: "Validar" },
   { key: "group", label: "Agrupar problemas" },
   { key: "fix", label: "Corregir" },
@@ -27,7 +27,7 @@ function useReducedMotion() {
 }
 
 /**
- * Demo autoplay del flujo real de OMI (subir → detectar → validar → agrupar
+ * Demo autoplay del flujo real de OMI (subir → confirmar módulo → validar → agrupar
  * → corregir → quality score → exportar). Arranca pausado si el usuario
  * prefiere menos movimiento (prefers-reduced-motion) y siempre expone un
  * botón de play/pausa -- contenido que se autoactualiza en loop necesita un
@@ -104,8 +104,8 @@ export function ProductDemo() {
       </div>
 
       <span className="sr-only">
-        Demostración animada del flujo de OMI: subir un archivo, detectar el módulo y la
-        versión de Odoo, validar cada fila, agrupar los problemas encontrados, aplicar las
+        Demostración animada del flujo de OMI: subir un archivo, confirmar el módulo y la
+        versión de Odoo elegidos, validar cada fila, agrupar los problemas encontrados, aplicar las
         correcciones automáticas, calcular el Quality Score, y exportar el archivo corregido
         listo para importar a Odoo.
       </span>
@@ -263,6 +263,7 @@ function renderStepContent(index: number, active: boolean) {
       return (
         <div className="flex flex-col items-center gap-3">
           <p className="font-mono text-xs text-graphite">clientes_2026.csv</p>
+          <p className="text-[11px] text-graphite">Elegiste esto antes de subir:</p>
           <div className="flex items-center gap-2 flex-wrap justify-center">
             <FadeIn active={active} delay={100}>
               <span className="font-mono text-xs bg-canvas border border-line rounded-full px-3 py-1">

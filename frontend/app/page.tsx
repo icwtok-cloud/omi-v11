@@ -3,6 +3,7 @@ import { ProductDemo } from "@/components/ProductDemo";
 import { LocalizationPulse } from "@/components/LocalizationPulse";
 import { StructuredData } from "@/components/StructuredData";
 import { RelatedHubs } from "@/components/RelatedHubs";
+import { SiteFooter } from "@/components/SiteFooter";
 import { DOUBTS } from "@/lib/faq-data";
 import { PAIN_CARDS } from "@/lib/pain-cards-data";
 
@@ -27,7 +28,7 @@ const STEPS = [
   {
     n: "01",
     title: "Subís tu archivo",
-    body: "CSV o Excel. OMI detecta el módulo, la versión y -- si corresponde -- el país, y valida cada campo contra las reglas reales. En segundos, no horas.",
+    body: "CSV o Excel. Elegís el módulo, la versión y -- si corresponde -- el país, y OMI valida cada campo contra las reglas reales. En segundos, no horas.",
   },
   {
     n: "02",
@@ -84,8 +85,8 @@ const TRUST_POINTS = [
     body: "Reglas generadas leyendo el código fuente real de Odoo. Sin IA, sin resultados que cambian entre corridas.",
   },
   {
-    title: "Tus datos no quedan guardados",
-    body: "El archivo original se borra automáticamente apenas se genera tu archivo corregido.",
+    title: "Tus datos, bajo tu control",
+    body: "Tu archivo se guarda solo mientras el proyecto exista en tu cuenta -- podés pedir que se borre en cualquier momento escribiéndonos.",
   },
   {
     title: "Odoo 14 a 19",
@@ -122,7 +123,7 @@ export default function LandingPage() {
             <a href="#precios" className="hover:text-ink transition-colors">Precios</a>
             <a href="#partners" className="hover:text-ink transition-colors">Partners</a>
           </nav>
-          <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-4">
             <Link href="/app" className="text-sm font-medium text-graphite hover:text-ink transition-colors">
               Iniciar sesión
             </Link>
@@ -133,6 +134,36 @@ export default function LandingPage() {
               Empezar gratis
             </Link>
           </div>
+
+          {/* Menú móvil: <details>/<summary> nativo, sin JS extra. */}
+          <details className="md:hidden relative">
+            <summary
+              className="list-none cursor-pointer border border-line rounded-md px-3 py-2 text-sm font-medium text-ink [&::-webkit-details-marker]:hidden"
+              aria-label="Abrir menú"
+            >
+              Menú
+            </summary>
+            <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-line rounded-lg shadow-lg py-2 z-50">
+              <nav className="flex flex-col text-sm">
+                <a href="#como-funciona" className="px-4 py-2 text-graphite hover:bg-canvas hover:text-ink transition-colors">Cómo funciona</a>
+                <a href="#modulos" className="px-4 py-2 text-graphite hover:bg-canvas hover:text-ink transition-colors">Módulos</a>
+                <a href="#latam" className="px-4 py-2 text-graphite hover:bg-canvas hover:text-ink transition-colors">LatAm</a>
+                <a href="#precios" className="px-4 py-2 text-graphite hover:bg-canvas hover:text-ink transition-colors">Precios</a>
+                <a href="#partners" className="px-4 py-2 text-graphite hover:bg-canvas hover:text-ink transition-colors">Partners</a>
+              </nav>
+              <div className="border-t border-line mt-2 pt-2 px-4 flex flex-col gap-2">
+                <Link href="/app" className="text-sm font-medium text-graphite hover:text-ink transition-colors">
+                  Iniciar sesión
+                </Link>
+                <Link
+                  href="/app"
+                  className="bg-brand text-white text-sm font-semibold rounded-md px-4 py-2 text-center hover:bg-brand-dark transition-colors"
+                >
+                  Empezar gratis
+                </Link>
+              </div>
+            </div>
+          </details>
         </div>
       </header>
 
@@ -490,14 +521,7 @@ export default function LandingPage() {
 
       <RelatedHubs currentHref="" />
 
-      <footer className="border-t border-line py-10">
-        <div className="max-w-6xl mx-auto px-6 md:px-10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-graphite">
-          <p>© 2026 OMI Engine</p>
-          <Link href="/app" className="text-brand font-medium hover:underline">
-            Analizar mis datos gratis →
-          </Link>
-        </div>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

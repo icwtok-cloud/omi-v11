@@ -280,6 +280,25 @@ export async function getProject(
   return res.json();
 }
 
+export interface ProjectListItem {
+  project_id: string;
+  odoo_version: string;
+  odoo_country: string | null;
+  status: string;
+  modules_count: number;
+  created_at: string;
+}
+
+/** Lista los proyectos del usuario logueado, más nuevo primero -- para
+ * que quien vuelve a /app encuentre lo que ya subió en vez de depender
+ * de tener guardada la URL exacta de /proyectos/{id}. */
+export async function listProjects(getToken: GetToken): Promise<ProjectListItem[]> {
+  const res = await authedFetch(
+    "/projects", getToken, "No se pudieron cargar tus proyectos"
+  );
+  return res.json();
+}
+
 export interface ValidationIssue {
   row_index: number;
   column: string;

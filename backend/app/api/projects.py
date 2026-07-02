@@ -54,6 +54,7 @@ from app.api.schemas import (
     ValidationReportResponse, AvailableCombination, ProjectCreateRequest,
     ProjectCreateResponse, ProjectSummaryResponse, ModuleSummaryResponse,
     ModuleUploadResponse, ModuleValidateStartResponse, ModuleValidateStatusResponse,
+    ProjectListItemResponse,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -187,6 +188,34 @@ def create_project(
         odoo_version=project.odoo_version, odoo_country=project.odoo_country,
     )
     return ProjectCreateResponse(project_id=project.id, status=project.status.value)
+
+
+@router.get("", response_model=list[ProjectListItemResponse])
+def list_projects(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lista los proyectos del usuario, más nuevo primero -- alimenta la
+    pantalla de "tus proyectos" en /app para que un usuario que vuelve
+    encuentre lo que ya subió sin depender de tener guardada la URL
+    exacta de /proyectos/{id}."""
+    projects = (
+        db.query(Project)
+        .filter(Project.owner_id == user.id)
+        .order_by(Project.created_at.desc())
+        .all()
+    )
+    return [
+        ProjectListItemResponse(
+            project_id=p.id,
+            odoo_version=p.odoo_version,
+            odoo_country=p.odoo_country,
+            status=p.status.value,
+            modules_count=len(p.modules),
+            created_at=p.created_at.isoformat(),
+        )
+        for p in projects
+    ]
 
 
 @router.get("/{project_id}", response_model=ProjectSummaryResponse)

@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import { useAuth, SignInButton, UserButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   getAvailableCombinations,
   createProject,
   addModule,
+  listProjects,
   AvailableCombination,
+  ProjectListItem,
 } from "@/lib/api";
 
 const MODULE_LABELS: Record<string, string> = {
@@ -59,6 +62,9 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [loadingModules, setLoadingModules] = useState(true);
 
+  const [projects, setProjects] = useState<ProjectListItem[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+
   useEffect(() => {
     if (!isSignedIn) return;
     setLoadingModules(true);
@@ -66,6 +72,18 @@ export default function HomePage() {
       .then(setCombinations)
       .catch(() => setError("No se pudieron cargar los módulos disponibles."))
       .finally(() => setLoadingModules(false));
+  }, [isSignedIn, getToken]);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    setLoadingProjects(true);
+    listProjects(getToken)
+      .then(setProjects)
+      .catch(() => {
+        // si falla, no bloquea el flujo de crear un proyecto nuevo --
+        // solo no se muestra la lista de proyectos anteriores.
+      })
+      .finally(() => setLoadingProjects(false));
   }, [isSignedIn, getToken]);
 
   const availableVersions = Array.from(new Set(combinations.map((c) => c.version))).sort();
@@ -137,7 +155,41 @@ export default function HomePage() {
         </p>
       </section>
 
+      {isSignedIn && !loadingProjects && projects.length > 0 && (
+        <section className="px-6 md:px-12 pb-10 max-w-3xl w-full">
+          <h2 className="font-bold text-sm text-graphite uppercase tracking-wide mb-3">
+            Tus proyectos
+          </h2>
+          <div className="space-y-2">
+            {projects.map((p) => (
+              <Link
+                key={p.project_id}
+                href={`/proyectos/${p.project_id}`}
+                className="flex items-center justify-between gap-3 border border-line rounded-lg px-4 py-3 bg-white/60 hover:border-ink transition-colors"
+              >
+                <div>
+                  <p className="font-medium text-sm">
+                    Odoo {p.odoo_version}
+                    {p.odoo_country ? ` · ${p.odoo_country.toUpperCase()}` : ""}
+                  </p>
+                  <p className="text-xs text-graphite mt-0.5">
+                    {p.modules_count} {p.modules_count === 1 ? "módulo" : "módulos"} ·{" "}
+                    {new Date(p.created_at).toLocaleDateString("es-AR")}
+                  </p>
+                </div>
+                <span className="text-xs text-graphite">→</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="px-6 md:px-12 pb-24 max-w-3xl w-full">
+        {isSignedIn && projects.length > 0 && (
+          <h2 className="font-bold text-sm text-graphite uppercase tracking-wide mb-3">
+            Nuevo proyecto
+          </h2>
+        )}
         {!isSignedIn ? (
           <div className="border border-line bg-white/60 rounded-lg p-8 text-center">
             <p className="text-graphite mb-4">
