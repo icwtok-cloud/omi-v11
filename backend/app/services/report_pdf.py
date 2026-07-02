@@ -110,6 +110,28 @@ def build_module_report_pdf(
         story.append(t)
         story.append(Spacer(1, 16))
 
+    enrichment_opportunities = report.get("enrichment_opportunities") or []
+    if enrichment_opportunities:
+        story.append(Paragraph("Campos técnicos que OMI puede generar", styles["Heading2"]))
+        rows = [["Campo", "Filas afectadas", "Cómo se genera"]]
+        for o in enrichment_opportunities:
+            rows.append([o["label"], str(o["rows_affected"]), o["algorithm"]])
+        t = Table(rows, colWidths=[4 * cm, 3 * cm, 7 * cm])
+        t.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(t)
+        story.append(Paragraph(
+            "Ninguno de estos campos se genera sin tu confirmación explícita "
+            "-- son identificadores técnicos, nunca datos de negocio.",
+            styles["Italic"],
+        ))
+        story.append(Spacer(1, 16))
+
     columns_expected_missing = report.get("columns_expected_missing") or []
     if columns_expected_missing:
         story.append(Paragraph("Columnas obligatorias faltantes", styles["Heading2"]))

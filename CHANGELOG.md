@@ -8,6 +8,72 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-01 — Feature: Data Enrichment Engine — genera campos técnicos seguros (SKU, External ID) sin inventar datos de negocio
+
+**Qué cambia:** nueva etapa del pipeline, DESPUÉS de Validation y
+ANTES de Report/Export, completamente independiente (no mezcla
+responsabilidades con matching/validation): `app/services/enrichment_engine.py`.
+
+Principio innegociable que se mantiene: OMI nunca inventa información
+de negocio (precio, categoría, impuesto, proveedor). Lo nuevo es que
+ahora SÍ puede generar, con consentimiento explícito del usuario,
+identificadores TÉCNICOS que faltan en el archivo y que Odoo necesita
+para un import prolijo:
+
+- **`default_code` (SKU/código interno)** -- secuencial y
+  determinístico: `OMI-<MODULO>-NNNNNN`. Solo se ofrece si el modelo
+  de Odoo del módulo elegido realmente tiene ese campo.
+- **`external_id`** -- formato que Odoo reconoce para imports:
+  `omi_import.<modulo>_NNNNNN`. Se ofrece si el archivo no trae
+  ninguna columna de External ID (antes solo se *avisaba* que faltaba,
+  ver `has_external_id_column()`; ahora, si el usuario lo pide, se
+  genera).
+
+**Todo lo generado es**: determinístico (mismo archivo → mismo valor
+siempre, nunca `random`/`uuid4`), único y estable dentro del archivo
+(secuencial por fila), **100% opt-in** (nunca se aplica sin
+confirmación explícita vía el nuevo endpoint), y **auditable**: cada
+valor generado queda en un log (`{module}_enriquecimiento.json`,
+viaja junto al corregido en el mismo ZIP) con fila, campo, valor
+generado y algoritmo usado, y el archivo corregido agrega una columna
+`omi_generated_fields` que dice qué se tocó en cada fila -- nunca se
+mezcla en silencio con los datos originales del cliente.
+
+**Nuevo endpoint:** `POST /projects/{id}/modules/{mid}/apply-enrichment`
+(`{"fields": ["default_code", "external_id"]}`) -- deliberadamente
+SEPARADO de `apply-fixes`: "corregir un dato existente" y "generar un
+dato técnico que no existía" son decisiones distintas del usuario.
+Reusa el mismo patrón de invalidación de cache que ya existía para
+fixes manuales y re-uploads (centralizado ahora en
+`_invalidate_corrected_cache()`, que también borra el log de
+auditoría viejo si quedó desactualizado).
+
+**Reporte:** `ValidationReport` gana `enrichment_opportunities`
+(informativo, NO cuenta contra el `quality_score` ni se mezcla con
+`issues` -- son campos que se PUEDEN generar, no defectos del
+archivo). El reporte PDF ahora incluye una sección listando qué se
+podría generar, si aplica.
+
+**Migración de Alembic:** `0007_module_confirmed_enrichments.py`
+(revises `0006`) -- agrega `confirmed_enrichments` (JSON, nullable) a
+`project_modules`. Puramente aditiva. **Rollback:** `alembic downgrade -1`.
+
+**Nunca se toca**: ningún campo de negocio (precio, categoría,
+impuesto, proveedor, cuenta contable) -- el registro de reglas
+(`ENRICHMENT_RULES`) es explícito y acotado a `default_code`/`external_id`
+a propósito; agregar un enriquecimiento nuevo en el futuro es agregar
+una entrada al registro, sin tocar el parser ni el validation engine
+(escalable/modular, como pedía el diseño).
+
+**Tests:** `test_enrichment_engine.py` (13, unitarios: generadores
+determinísticos, detección no modifica nada, nunca toca columnas de
+negocio) + `test_enrichment_api.py` (6, integración end-to-end:
+reporte expone oportunidades, endpoint rechaza campos desconocidos,
+corregido + log de auditoría en el ZIP, **re-confirmar sin campos
+invalida el enriquecimiento previo -- verificado que ese test falla
+sin el fix**, revirtiéndolo temporalmente antes de commitear). 134/134
+backend pasan, **cero regresiones** en los 115 tests preexistentes.
+
 ## 2026-07-01 — Telemetría: cerrando huecos (reporte PDF sin instrumentar, fixes automáticos sin contar)
 
 **Qué cambia:** en la ronda anterior de observabilidad se instrumentó

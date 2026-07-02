@@ -158,6 +158,18 @@ calendario nuevo (ver `reset_annual_events_if_needed()` en
 límite, esa validación puntual queda en `failed` con un mensaje claro
 -- no se cobra el intento fallido.
 
+## Data Enrichment Engine
+
+Etapa separada del pipeline (después de Validation, antes de
+Report/Export) que genera campos TÉCNICOS seguros cuando faltan --
+`default_code` (SKU) y `external_id` -- sin nunca inventar información
+de negocio. Todo lo generado es determinístico (secuencial por fila,
+nunca random), 100% opt-in (requiere confirmar explícitamente vía
+`POST /projects/{id}/modules/{mid}/apply-enrichment`) y auditable (log
+de qué se generó, viaja junto al archivo corregido en el ZIP). Ver
+`app/services/enrichment_engine.py` y la entrada del CHANGELOG del
+2026-07-01 para el detalle completo.
+
 ## Decisiones de diseño que vale la pena recordar
 
 - **Por qué AST y no importar el ORM de Odoo de verdad**: importar Odoo

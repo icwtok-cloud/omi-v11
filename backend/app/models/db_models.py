@@ -155,6 +155,15 @@ class ProjectModule(Base):
     # aplican en _ensure_corrected_file() junto con los automáticos.
     confirmed_manual_fixes = Column(JSON, nullable=True)
 
+    # Campos técnicos que el usuario confirmó explícitamente que OMI
+    # puede GENERAR (no corregir -- generar de cero) para este módulo,
+    # ej. ["default_code", "external_id"]. Ver app/services/enrichment_engine.py
+    # -- deliberadamente separado de confirmed_manual_fixes: son
+    # decisiones distintas (arreglar un dato existente vs. generar uno
+    # técnico que no existía), y mezclarlas complicaría auditar cuál es
+    # cuál más adelante.
+    confirmed_enrichments = Column(JSON, nullable=True)
+
     # Progreso de validación (ver Fase 4 del roadmap) -- se persisten en
     # DB en vez de en memoria porque el dyno free de Render puede
     # reiniciar a mitad de una validación larga.

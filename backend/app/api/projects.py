@@ -20,6 +20,7 @@ Project, no por módulo individual.
 from __future__ import annotations
 
 import csv
+import json
 import time
 import uuid
 import zipfile
@@ -42,6 +43,7 @@ from app.models.db_models import (
 )
 from app.services.rules_loader import load_rule_schema, list_available_combinations
 from app.services.validation_engine import validate_dataframe
+from app.services.enrichment_engine import ENRICHMENT_RULES, apply_enrichment
 from app.services.module_dependencies import import_order, missing_dependencies
 from app.services.report_pdf import build_module_report_pdf
 from app.services.entitlements import (
@@ -320,15 +322,14 @@ async def upload_module(
         # cache acá, en el momento del re-upload, no esperar a
         # _ensure_corrected_file (que solo borra el original, nunca el
         # corregido).
-        stale_corrected = Path(existing.storage_path).with_suffix(".corrected.csv")
-        if stale_corrected.exists():
-            stale_corrected.unlink()
+        _invalidate_corrected_cache(existing.storage_path)
 
         existing.original_filename = file.filename
         existing.storage_path = str(storage_path)
         existing.status = ModuleStatus.uploaded
         existing.validation_report = None
         existing.confirmed_manual_fixes = None
+        existing.confirmed_enrichments = None
         existing.rows_processed = 0
         existing.rows_total = None
         existing.validation_started_at = None
@@ -621,15 +622,56 @@ def apply_module_fixes(
     # -- silenciosamente ignorando los nuevos fixes que el usuario
     # acaba de confirmar. Se borra el cache acá para forzar que se
     # regenere con los fixes actualizados en la próxima descarga.
-    stale_corrected = Path(module.storage_path).with_suffix(".corrected.csv")
-    if stale_corrected.exists():
-        stale_corrected.unlink()
+    _invalidate_corrected_cache(module.storage_path)
 
     log_event(
         "ManualFixApplied",
         project_id=project.id, module_id=module.id, fixes_count=len(fixes),
     )
     return {"confirmed_count": len(fixes)}
+
+
+@router.post("/{project_id}/modules/{module_id}/apply-enrichment")
+def apply_module_enrichment(
+    project_id: str,
+    module_id: str,
+    body: dict,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Confirma qué campos TÉCNICOS quiere que OMI genere para este
+    módulo (ej. {"fields": ["default_code", "external_id"]}) -- ver
+    app/services/enrichment_engine.py. Endpoint separado de
+    apply-fixes a propósito: "corregir un dato existente" y "generar
+    un dato técnico que no existía" son decisiones distintas del
+    usuario, no deberían compartir el mismo campo en la DB."""
+    project = _get_owned_project(project_id, user, db)
+    module = _get_project_module(project, module_id)
+    if not module.validation_report:
+        raise HTTPException(status_code=404, detail="Este módulo todavía no fue validado")
+
+    requested_fields = body.get("fields", [])
+    valid_fields = set(ENRICHMENT_RULES.keys())
+    unknown = [f for f in requested_fields if f not in valid_fields]
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Campo(s) de enriquecimiento desconocido(s): {', '.join(unknown)}",
+        )
+
+    module.confirmed_enrichments = requested_fields
+    db.commit()
+
+    # Mismo patrón que apply_module_fixes: invalidar el .corrected.csv
+    # cacheado (+ su log de auditoría) para forzar que se regenere con
+    # el enriquecimiento recién confirmado en la próxima descarga.
+    _invalidate_corrected_cache(module.storage_path)
+
+    log_event(
+        "EnrichmentApplied",
+        project_id=project.id, module_id=module.id, fields=requested_fields,
+    )
+    return {"confirmed_fields": requested_fields}
 
 
 @router.get("/{project_id}/download")
@@ -673,6 +715,18 @@ def download_project(
             corrected_path = _ensure_corrected_file(module, db)
             zf.write(corrected_path, arcname=f"{position:02d}_{module.odoo_module}_corregido.csv")
 
+            # "Migration Package": si el usuario confirmó enriquecimiento
+            # para este módulo, el log de auditoría (qué se generó, en
+            # qué fila, con qué algoritmo) viaja junto al corregido en
+            # el mismo ZIP -- nunca se genera nada sin dejar rastro de
+            # qué se tocó.
+            audit_log_path = corrected_path.with_suffix(".enrichment_log.json")
+            if audit_log_path.exists():
+                zf.write(
+                    audit_log_path,
+                    arcname=f"{position:02d}_{module.odoo_module}_enriquecimiento.json",
+                )
+
     zip_buffer.seek(0)
     zip_size_bytes = zip_buffer.getbuffer().nbytes
     log_event(
@@ -707,6 +761,21 @@ def download_project(
     )
 
 
+def _invalidate_corrected_cache(storage_path: str) -> None:
+    """Borra el `.corrected.csv` cacheado y su log de auditoría de
+    enriquecimiento (si existen) -- se llama cada vez que algo cambia
+    lo que _ensure_corrected_file() debería generar (re-upload, nuevos
+    fixes manuales, nuevo enriquecimiento confirmado). Centralizado
+    acá para no repetir (y volver a desincronizar, como pasó una vez)
+    la lista exacta de archivos derivados que hay que invalidar juntos."""
+    corrected_path = Path(storage_path).with_suffix(".corrected.csv")
+    if corrected_path.exists():
+        corrected_path.unlink()
+    audit_log_path = corrected_path.with_suffix(".enrichment_log.json")
+    if audit_log_path.exists():
+        audit_log_path.unlink()
+
+
 def _ensure_corrected_file(module: ProjectModule, db: Session) -> Path:
     """Genera (si no existe ya) el archivo con los fixes automáticos
     aplicados para este módulo. Los fixes manuales que el usuario haya
@@ -731,6 +800,23 @@ def _ensure_corrected_file(module: ProjectModule, db: Session) -> Path:
         if should_apply and issue.get("suggested_fix") is not None:
             if col in df.columns and row_idx in df.index:
                 df.at[row_idx, col] = issue["suggested_fix"]
+
+    # Data Enrichment (etapa separada de los fixes de arriba, ver
+    # enrichment_engine.py) -- SOLO se aplica si el usuario confirmó
+    # explícitamente qué campos técnicos quiere generar vía
+    # POST .../apply-enrichment. Nunca se ejecuta por default.
+    if module.confirmed_enrichments:
+        df, audit_log = apply_enrichment(
+            df, module.odoo_module, set(module.confirmed_enrichments),
+        )
+        if audit_log:
+            audit_log_path = corrected_path.with_suffix(".enrichment_log.json")
+            audit_log_path.write_text(json.dumps(audit_log, ensure_ascii=False, indent=2))
+            log_event(
+                "EnrichmentGenerated",
+                project_id=module.project_id, module_id=module.id,
+                fields=list(module.confirmed_enrichments), rows_touched=len(audit_log),
+            )
 
     df.to_csv(corrected_path, index=False)
 
