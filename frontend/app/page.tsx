@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ProductDemo } from "@/components/ProductDemo";
 import { LocalizationPulse } from "@/components/LocalizationPulse";
 import { StructuredData } from "@/components/StructuredData";
+import { RelatedHubs } from "@/components/RelatedHubs";
 import { DOUBTS } from "@/lib/faq-data";
 import { PAIN_CARDS } from "@/lib/pain-cards-data";
 
@@ -486,6 +487,8 @@ export default function LandingPage() {
           </Link>
         </div>
       </section>
+
+      <RelatedHubs currentHref="" />
 
       <footer className="border-t border-line py-10">
         <div className="max-w-6xl mx-auto px-6 md:px-10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-graphite">
