@@ -16,6 +16,7 @@ export function SiteHeader() {
           <Link href="/#latam" className="hover:text-ink transition-colors">LatAm</Link>
           <Link href="/#precios" className="hover:text-ink transition-colors">Precios</Link>
           <Link href="/guias" className="hover:text-ink transition-colors">Guías</Link>
+          <Link href="/preguntas-frecuentes" className="hover:text-ink transition-colors">FAQ</Link>
         </nav>
         <div className="flex items-center gap-4">
           <Link href="/app" className="text-sm font-medium text-graphite hover:text-ink transition-colors">
