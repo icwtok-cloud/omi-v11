@@ -8,6 +8,79 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-02 — Fix UX pre-piloto: login en /app, listado de proyectos, menú móvil, copy engañoso
+
+**Contexto:** auditoría UX/UI end-to-end del flujo landing → auth →
+upload → validación → paywall → export, hecha la noche antes del
+lanzamiento del MVP. Se priorizaron 5 hallazgos accionables sin tocar
+arquitectura backend.
+
+**1. `/app` estaba protegido por el middleware de Clerk, matando el
+flujo de "ver el valor antes de pedir login".** `middleware.ts` tenía
+`/app(.*)` en `isProtectedRoute`, así que Clerk redirigía a su pantalla
+de login ANTES de que Next.js sirviera la página -- el código en
+`app/app/page.tsx` que muestra "Necesitás ingresar para subir un
+archivo" + `SignInButton` en modal (pensado para que el visitante vea
+el formulario primero) era inalcanzable, dead code en la práctica.
+**Fix:** se saca `/app` de `isProtectedRoute`, queda solo
+`/proyectos(.*)` protegido (ahí sí hay datos de un proyecto real).
+Verificado con `curl`: `GET /app` devuelve 200 con el HTML real en vez
+de redirect.
+
+**2. No existía forma de volver a un proyecto sin la URL exacta de
+`/proyectos/{id}`.** Un usuario que subía un archivo, cerraba la
+pestaña y volvía a `/app` no tenía ningún listado de sus proyectos
+anteriores -- el producto era de facto de un solo uso por sesión.
+**Fix:** nuevo endpoint `GET /projects` (`backend/app/api/projects.py`,
+`ProjectListItemResponse` en `schemas.py`) que lista los proyectos del
+usuario logueado, más nuevo primero. Nueva función `listProjects()` en
+`lib/api.ts` y sección "Tus proyectos" en `app/app/page.tsx` que
+renderiza la lista con link directo a cada uno.
+
+**3. La landing y la demo animada afirmaban que "OMI detecta el
+módulo, la versión y el país" del archivo subido.** Es falso: el
+usuario los elige de dropdowns ANTES de subir (ver `selectedVersion` /
+`selectedModule` / `selectedCountry` en `app/app/page.tsx`) -- no hay
+ninguna detección automática en el backend. **Fix:** copy corregido en
+`app/page.tsx` ("Elegís el módulo...") y en `ProductDemo.tsx` (paso
+"Detectar módulo" → "Confirmar módulo", con aclaración visual
+"Elegiste esto antes de subir").
+
+**4. El trust point "Tus datos no quedan guardados -- El archivo
+original se borra automáticamente" era una promesa de privacidad falsa
+en producción.** El código de `_ensure_corrected_file()` en
+`projects.py` mantiene explícitamente el archivo original en disco
+mientras el módulo exista (comentario en el código: la limpieza
+"queda como tarea de limpieza programada aparte, no acá" -- nunca
+implementada). Publicar esa promesa expone al producto a un reclamo
+de privacidad verificable como falso. **Fix:** reescrito a "Tus
+datos, bajo tu control -- se guarda solo mientras el proyecto exista
+en tu cuenta, podés pedir el borrado escribiéndonos".
+
+**5. Header sin menú en mobile (nav con `hidden md:flex`, sin
+alternativa) y footer sin ningún contacto ni identidad de empresa.**
+**Fix:** menú `<details>/<summary>` nativo (sin JS extra, mantiene
+`SiteHeader.tsx` como server component) en la landing y en
+`SiteHeader.tsx` (compartido por los 12 hubs de contenido).
+`SiteFooter.tsx` ahora incluye `hello@alterego.lat` y "un producto de
+Alterego" -- antes el footer de todo el sitio no identificaba a la
+empresa detrás del producto.
+
+**Pendiente, no resuelto hoy:** pago fiat (Stripe no disponible para
+cuentas argentinas sin LLC en EE.UU.; se evalúa Lemon Squeezy en
+verificación + Binance Pay como alternativa cripto con polling en vez
+de webhook). El MVP lanza con el flujo USDC/MetaMask existente sin
+cambios.
+
+**Verificación:** `tsc --noEmit` limpio en frontend, `py_compile`
+limpio en los archivos de backend tocados, contenido verificado por
+`curl` contra el servidor de desarrollo (HTML servido contiene todos
+los textos y componentes nuevos, tanto en `/`, `/app` como en
+`/guias`).
+
+**Rollback:** sin migración de DB. `git revert` del commit alcanza;
+el endpoint `GET /projects` es aditivo (no rompe nada si se revierte).
+
 ## 2026-07-02 — Fix crítico: validación de `vat` ignoraba el país del proyecto
 
 **Bug:** `format_rules.check()` validaba el campo `vat` contra `CUIT_RE`
