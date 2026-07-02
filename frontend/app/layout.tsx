@@ -1,12 +1,39 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Web3Providers } from "@/components/Web3Providers";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OMI — Preparación de datos para Odoo",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "OMI — Validador de datos para migraciones Odoo",
+    template: "%s | OMI",
+  },
   description:
-    "Subí tus datos, elegí el módulo y la versión de Odoo, y OMI te muestra exactamente qué corregir antes de migrar.",
+    "Subí tus datos, elegí el módulo y la versión de Odoo, y OMI te muestra exactamente qué corregir antes de migrar. Validación determinística contra las reglas reales de Odoo 14 a 19, sin IA.",
+  alternates: {
+    canonical: SITE_URL,
+  },
+  openGraph: {
+    type: "website",
+    locale: "es_419",
+    url: SITE_URL,
+    siteName: "OMI",
+    title: "OMI — Validador de datos para migraciones Odoo",
+    description:
+      "Detectá los errores que van a romper tu migración de Odoo antes de importar. Validación determinística, sin IA, de Odoo 14 a 19.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "OMI — Validador de datos para migraciones Odoo",
+    description:
+      "Detectá los errores que van a romper tu migración de Odoo antes de importar. Validación determinística, sin IA, de Odoo 14 a 19.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ProductDemo } from "@/components/ProductDemo";
 import { LocalizationPulse } from "@/components/LocalizationPulse";
+import { StructuredData } from "@/components/StructuredData";
 
 const PAIN_CARDS = [
   {
@@ -194,6 +195,7 @@ const DOUBTS = [
 export default function LandingPage() {
   return (
     <main className="min-h-screen">
+      <StructuredData faqs={DOUBTS} />
       <a
         href="#contenido"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-brand focus:text-white focus:font-medium focus:rounded-md focus:px-4 focus:py-2"
