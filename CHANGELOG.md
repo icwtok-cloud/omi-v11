@@ -8,6 +8,55 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-02 (3) — Landing en portugués (toggle ES/PT) + segunda instancia de la promesa de privacidad falsa
+
+**Contexto:** pedido explícito de agregar soporte de portugués. Se
+midió el alcance real antes de tocar código: ~3.400 líneas de copy
+entre landing, 12 hubs SEO/GEO y las páginas funcionales del producto
+(`/app`, `/proyectos/[id]`, ~1.430 líneas). Traducir todo eso con
+calidad nativa, routing por idioma y metadata SEO duplicada es
+trabajo de días, no de una noche -- se acotó el alcance explícitamente
+para no arriesgar el flujo funcional (upload/validación/pago) horas
+antes del piloto.
+
+**Qué se tradujo esta noche:** la landing principal completa, en una
+ruta nueva `/pt` (`app/pt/page.tsx`) -- hero, trust points, pain
+cards, antes/después, cómo funciona, personas, sección LatAm, FAQ y
+precios, programa de partners, CTA final. Toggle ES↔PT real en el
+header de ambas versiones (desktop y menú móvil).
+
+**Qué NO se tradujo, a propósito:** `/app` y `/proyectos/[id]` (el
+producto funcional en sí) siguen en español -- reescribir ~1.430
+líneas de UI en producción bajo presión de tiempo es el tipo de
+cambio que puede romper lo que se lanza mañana. Tampoco se tradujeron
+los 12 hubs de contenido SEO/GEO -- son para tráfico orgánico, no
+bloquean el piloto, y traducirlos apurado perjudicaría el SEO en
+portugués más que no tenerlos todavía.
+
+**Arquitectura:** en vez de duplicar componentes, `ProductDemo` y
+`SiteFooter` ganaron un prop opcional `locale` (`"es" | "pt"`,
+default `"es"`) -- no rompe ninguno de los usos existentes en los 12
+hubs. `sitemap.ts` incluye `/pt` y `/privacidad`; `layout.tsx` declara
+el `alternates.languages` (hreflang es/pt) para SEO.
+
+**Bug encontrado de paso, mismo tipo que el de la entrada anterior:**
+`lib/faq-data.ts` tenía su propia copia de la promesa "el archivo
+original se elimina automáticamente" -- la misma afirmación falsa ya
+corregida en `TRUST_POINTS` de la landing, pero en un archivo
+separado, embebida además en el JSON-LD `FAQPage` (citable
+textualmente por buscadores e IA) tanto en la landing como en
+`/preguntas-frecuentes`. Corregida para reflejar el comportamiento
+real (`_ensure_corrected_file()` en el backend).
+
+**Verificación:** `tsc --noEmit` limpio; `curl` contra el servidor de
+desarrollo confirmó: `/pt` sirve 200 con el contenido traducido, el
+toggle PT aparece en `/`, los 12 hubs conservan su footer en español
+sin cambios (regresión descartada), y la respuesta de privacidad
+corregida aparece tanto en `/` como en `/preguntas-frecuentes`.
+
+**Rollback:** sin migración de DB. `/pt` es una ruta nueva y aditiva;
+revertir el commit no afecta ninguna ruta existente.
+
 ## 2026-07-02 (2) — Fix UX pre-piloto, parte 2: contradicción de precios, chip de Brasil, página de privacidad
 
 **Continuación de la entrada anterior** -- misma auditoría, hallazgos
