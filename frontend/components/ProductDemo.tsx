@@ -2,15 +2,49 @@
 
 import { useEffect, useState } from "react";
 
-const STEPS = [
-  { key: "upload", label: "Subir archivo" },
-  { key: "detect", label: "Confirmar módulo" },
-  { key: "validate", label: "Validar" },
-  { key: "group", label: "Agrupar problemas" },
-  { key: "fix", label: "Corregir" },
-  { key: "score", label: "Quality Score" },
-  { key: "export", label: "Exportar" },
-] as const;
+type Locale = "es" | "pt";
+
+const STEPS_BY_LOCALE: Record<Locale, { key: string; label: string }[]> = {
+  es: [
+    { key: "upload", label: "Subir archivo" },
+    { key: "detect", label: "Confirmar módulo" },
+    { key: "validate", label: "Validar" },
+    { key: "group", label: "Agrupar problemas" },
+    { key: "fix", label: "Corregir" },
+    { key: "score", label: "Quality Score" },
+    { key: "export", label: "Exportar" },
+  ],
+  pt: [
+    { key: "upload", label: "Enviar arquivo" },
+    { key: "detect", label: "Confirmar módulo" },
+    { key: "validate", label: "Validar" },
+    { key: "group", label: "Agrupar problemas" },
+    { key: "fix", label: "Corrigir" },
+    { key: "score", label: "Quality Score" },
+    { key: "export", label: "Exportar" },
+  ],
+};
+
+const UI_COPY: Record<Locale, { pause: string; resume: string; srDescription: string }> = {
+  es: {
+    pause: "❚❚ Pausar",
+    resume: "▶ Reanudar",
+    srDescription:
+      "Demostración animada del flujo de OMI: subir un archivo, confirmar el módulo y la " +
+      "versión de Odoo elegidos, validar cada fila, agrupar los problemas encontrados, aplicar las " +
+      "correcciones automáticas, calcular el Quality Score, y exportar el archivo corregido " +
+      "listo para importar a Odoo.",
+  },
+  pt: {
+    pause: "❚❚ Pausar",
+    resume: "▶ Retomar",
+    srDescription:
+      "Demonstração animada do fluxo da OMI: enviar um arquivo, confirmar o módulo e a " +
+      "versão do Odoo escolhidos, validar cada linha, agrupar os problemas encontrados, aplicar as " +
+      "correções automáticas, calcular o Quality Score, e exportar o arquivo corrigido " +
+      "pronto para importar no Odoo.",
+  },
+};
 
 const STEP_DURATION_MS = 2000;
 
@@ -33,10 +67,12 @@ function useReducedMotion() {
  * botón de play/pausa -- contenido que se autoactualiza en loop necesita un
  * mecanismo para pararlo (WCAG 2.2.2).
  */
-export function ProductDemo() {
+export function ProductDemo({ locale = "es" }: { locale?: Locale }) {
   const reducedMotion = useReducedMotion();
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(true);
+  const STEPS = STEPS_BY_LOCALE[locale];
+  const ui = UI_COPY[locale];
 
   useEffect(() => {
     if (reducedMotion) setPlaying(false);
@@ -48,7 +84,7 @@ export function ProductDemo() {
       setStep((s) => (s + 1) % STEPS.length);
     }, STEP_DURATION_MS);
     return () => clearInterval(id);
-  }, [playing]);
+  }, [playing, STEPS.length]);
 
   useEffect(() => {
     function handleVisibility() {
@@ -71,16 +107,16 @@ export function ProductDemo() {
           type="button"
           onClick={() => setPlaying((p) => !p)}
           className="font-mono text-xs text-graphite border border-line rounded-full px-2.5 py-1 hover:text-ink hover:border-ink transition-colors"
-          aria-label={playing ? "Pausar demo" : "Reanudar demo"}
+          aria-label={playing ? ui.pause : ui.resume}
         >
-          {playing ? "❚❚ Pausar" : "▶ Reanudar"}
+          {playing ? ui.pause : ui.resume}
         </button>
       </div>
 
       <div className="relative h-[240px] sm:h-[220px]" aria-hidden="true">
         {STEPS.map((s, i) => (
           <DemoFrame key={s.key} active={step === i}>
-            {renderStepContent(i, step === i)}
+            {renderStepContent(i, step === i, locale)}
           </DemoFrame>
         ))}
       </div>
@@ -103,12 +139,7 @@ export function ProductDemo() {
         </p>
       </div>
 
-      <span className="sr-only">
-        Demostración animada del flujo de OMI: subir un archivo, confirmar el módulo y la
-        versión de Odoo elegidos, validar cada fila, agrupar los problemas encontrados, aplicar las
-        correcciones automáticas, calcular el Quality Score, y exportar el archivo corregido
-        listo para importar a Odoo.
-      </span>
+      <span className="sr-only">{ui.srDescription}</span>
     </div>
   );
 }
@@ -247,7 +278,8 @@ function IconSearch({ className = "" }: { className?: string }) {
   );
 }
 
-function renderStepContent(index: number, active: boolean) {
+function renderStepContent(index: number, active: boolean, locale: Locale) {
+  const pt = locale === "pt";
   switch (index) {
     case 0:
       return (
@@ -263,7 +295,9 @@ function renderStepContent(index: number, active: boolean) {
       return (
         <div className="flex flex-col items-center gap-3">
           <p className="font-mono text-xs text-graphite">clientes_2026.csv</p>
-          <p className="text-[11px] text-graphite">Elegiste esto antes de subir:</p>
+          <p className="text-[11px] text-graphite">
+            {pt ? "Você escolheu isto antes de enviar:" : "Elegiste esto antes de subir:"}
+          </p>
           <div className="flex items-center gap-2 flex-wrap justify-center">
             <FadeIn active={active} delay={100}>
               <span className="font-mono text-xs bg-canvas border border-line rounded-full px-3 py-1">
@@ -272,19 +306,19 @@ function renderStepContent(index: number, active: boolean) {
             </FadeIn>
             <FadeIn active={active} delay={280}>
               <span className="font-mono text-xs bg-canvas border border-line rounded-full px-3 py-1">
-                Argentina
+                {pt ? "Brasil" : "Argentina"}
               </span>
             </FadeIn>
             <FadeIn active={active} delay={460}>
               <span className="font-mono text-xs bg-brand text-white rounded-full px-3 py-1">
-                Módulo: Contactos
+                {pt ? "Módulo: Contatos" : "Módulo: Contactos"}
               </span>
             </FadeIn>
           </div>
           <FadeIn active={active} delay={700}>
             <p className="text-xs text-graphite flex items-center gap-1.5">
               <IconCheck className="w-3.5 h-3.5 text-verify shrink-0" />
-              6 columnas mapeadas
+              {pt ? "6 colunas mapeadas" : "6 columnas mapeadas"}
             </p>
           </FadeIn>
         </div>
@@ -293,7 +327,9 @@ function renderStepContent(index: number, active: boolean) {
       return (
         <div className="flex flex-col items-center gap-3 w-full">
           <IconSearch className="w-5 h-5 text-graphite" />
-          <p className="font-mono text-xs text-graphite">Validando 482 filas contra Odoo 17…</p>
+          <p className="font-mono text-xs text-graphite">
+            {pt ? "Validando 482 linhas contra Odoo 17…" : "Validando 482 filas contra Odoo 17…"}
+          </p>
           <AnimatedBar active={active} duration={1600} />
         </div>
       );
@@ -302,20 +338,32 @@ function renderStepContent(index: number, active: boolean) {
         <div className="flex flex-col gap-2 w-full max-w-[280px]">
           <FadeIn active={active} delay={100}>
             <div className="flex items-center justify-between gap-3 bg-alert-light rounded-md px-3 py-2">
-              <span className="font-mono text-xs text-alert">Formato inválido · email</span>
-              <span className="font-mono text-xs text-alert shrink-0">34 filas</span>
+              <span className="font-mono text-xs text-alert">
+                {pt ? "Formato inválido · email" : "Formato inválido · email"}
+              </span>
+              <span className="font-mono text-xs text-alert shrink-0">
+                {pt ? "34 linhas" : "34 filas"}
+              </span>
             </div>
           </FadeIn>
           <FadeIn active={active} delay={350}>
             <div className="flex items-center justify-between gap-3 bg-alert-light rounded-md px-3 py-2">
-              <span className="font-mono text-xs text-alert">No existe en Odoo · etapa_crm</span>
-              <span className="font-mono text-xs text-alert shrink-0">12 filas</span>
+              <span className="font-mono text-xs text-alert">
+                {pt ? "Não existe no Odoo · etapa_crm" : "No existe en Odoo · etapa_crm"}
+              </span>
+              <span className="font-mono text-xs text-alert shrink-0">
+                {pt ? "12 linhas" : "12 filas"}
+              </span>
             </div>
           </FadeIn>
           <FadeIn active={active} delay={600}>
             <div className="flex items-center justify-between gap-3 bg-alert-light rounded-md px-3 py-2">
-              <span className="font-mono text-xs text-alert">Duplicado · CUIT</span>
-              <span className="font-mono text-xs text-alert shrink-0">6 filas</span>
+              <span className="font-mono text-xs text-alert">
+                {pt ? "Duplicado · CNPJ" : "Duplicado · CUIT"}
+              </span>
+              <span className="font-mono text-xs text-alert shrink-0">
+                {pt ? "6 linhas" : "6 filas"}
+              </span>
             </div>
           </FadeIn>
         </div>
@@ -331,13 +379,15 @@ function renderStepContent(index: number, active: boolean) {
           </FadeIn>
           <FadeIn active={active} delay={350}>
             <div className="flex items-center justify-between gap-3 bg-verify-light rounded-md px-3 py-2">
-              <span className="font-mono text-xs text-verify">34 filas se corrigen al exportar</span>
+              <span className="font-mono text-xs text-verify">
+                {pt ? "34 linhas se corrigem ao exportar" : "34 filas se corrigen al exportar"}
+              </span>
               <IconCheck className="w-4 h-4 text-verify shrink-0" />
             </div>
           </FadeIn>
           <FadeIn active={active} delay={600}>
             <p className="font-mono text-[11px] text-graphite text-center">
-              12 quedan para revisar antes de exportar
+              {pt ? "12 ficam para revisar antes de exportar" : "12 quedan para revisar antes de exportar"}
             </p>
           </FadeIn>
         </div>
@@ -347,13 +397,13 @@ function renderStepContent(index: number, active: boolean) {
         <div className="flex flex-col items-center gap-3">
           <FadeIn active={active} delay={100}>
             <span className="font-mono text-sm font-medium rounded-full px-4 py-1.5 bg-verify-light text-verify">
-              Calidad: 94/100
+              {pt ? "Qualidade: 94/100" : "Calidad: 94/100"}
             </span>
           </FadeIn>
           <FadeIn active={active} delay={350}>
             <div className="font-mono text-[11px] text-graphite flex flex-col items-center gap-0.5">
-              <span>-4 Formato inválido (34 filas)</span>
-              <span>-2 No existe en Odoo (12 filas)</span>
+              <span>{pt ? "-4 Formato inválido (34 linhas)" : "-4 Formato inválido (34 filas)"}</span>
+              <span>{pt ? "-2 Não existe no Odoo (12 linhas)" : "-2 No existe en Odoo (12 filas)"}</span>
             </div>
           </FadeIn>
         </div>
@@ -364,14 +414,18 @@ function renderStepContent(index: number, active: boolean) {
           <div className="w-12 h-12 rounded-lg bg-canvas border border-line flex items-center justify-center">
             <IconDownload className="w-5 h-5 text-brand" />
           </div>
-          <p className="font-mono text-xs text-ink">clientes_2026_corregido.zip</p>
+          <p className="font-mono text-xs text-ink">
+            {pt ? "clientes_2026_corrigido.zip" : "clientes_2026_corregido.zip"}
+          </p>
           <FadeIn active={active} delay={150}>
-            <p className="font-mono text-[11px] text-graphite">+ reporte_tecnico.pdf</p>
+            <p className="font-mono text-[11px] text-graphite">
+              {pt ? "+ relatorio_tecnico.pdf" : "+ reporte_tecnico.pdf"}
+            </p>
           </FadeIn>
           <FadeIn active={active} delay={350}>
             <span className="inline-flex items-center gap-1.5 font-mono text-xs text-verify">
               <IconCheck className="w-3.5 h-3.5 shrink-0" />
-              Listo para importar a Odoo
+              {pt ? "Pronto para importar no Odoo" : "Listo para importar a Odoo"}
             </span>
           </FadeIn>
         </div>

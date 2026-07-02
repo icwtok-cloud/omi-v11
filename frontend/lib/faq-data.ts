@@ -25,7 +25,7 @@ export const DOUBTS = [
   },
   {
     q: "¿Mis datos se quedan guardados?",
-    a: "No. El archivo original se elimina automáticamente apenas se genera tu archivo corregido. No queda nada guardado más de lo necesario para procesarlo.",
+    a: "Tu archivo se guarda solo mientras el proyecto exista en tu cuenta -- así podés volver a descargarlo o sumar módulos sin resubir nada. Podés pedir el borrado de un proyecto cuando quieras escribiendo a hello@alterego.lat.",
   },
   {
     q: "¿Puedo usarlo sin ser técnico?",

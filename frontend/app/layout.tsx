@@ -14,6 +14,10 @@ export const metadata: Metadata = {
     "Subí tus datos, elegí el módulo y la versión de Odoo, y OMI te muestra exactamente qué corregir antes de migrar. Validación determinística contra las reglas reales de Odoo 14 a 19, sin IA.",
   alternates: {
     canonical: SITE_URL,
+    languages: {
+      es: SITE_URL,
+      pt: `${SITE_URL}/pt`,
+    },
   },
   openGraph: {
     type: "website",
