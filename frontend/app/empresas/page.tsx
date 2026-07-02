@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { RelatedHubs } from "@/components/RelatedHubs";
+import { IntentCTASlot } from "@/components/IntentEngine";
 import { SITE_URL } from "@/lib/site";
 
 const PAGE_URL = `${SITE_URL}/empresas`;
@@ -80,6 +81,8 @@ export default function EmpresasPage() {
               </div>
             ))}
           </div>
+
+          <IntentCTASlot />
 
           <div className="bg-canvas border border-line rounded-xl p-8 text-center mt-12">
             <p className="font-bold text-lg mb-2">Vé el estado real de tus datos antes de decidir</p>

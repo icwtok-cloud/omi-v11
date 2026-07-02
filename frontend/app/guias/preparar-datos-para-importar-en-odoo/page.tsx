@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { RelatedHubs } from "@/components/RelatedHubs";
+import { IntentCTASlot } from "@/components/IntentEngine";
 import { SITE_URL } from "@/lib/site";
 
 const PAGE_URL = `${SITE_URL}/guias/preparar-datos-para-importar-en-odoo`;
@@ -126,6 +127,8 @@ export default function PrepararDatosGuide() {
             módulos relacionados. Nada de esto usa IA: es determinístico, así que el
             mismo archivo produce siempre el mismo resultado.
           </p>
+
+          <IntentCTASlot />
 
           <div className="bg-canvas border border-line rounded-xl p-8 text-center">
             <p className="font-bold text-lg mb-2">¿Querés ver esto sobre tu propio archivo?</p>

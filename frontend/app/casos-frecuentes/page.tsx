@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { RelatedHubs } from "@/components/RelatedHubs";
+import { IntentCTASlot } from "@/components/IntentEngine";
 import { SITE_URL } from "@/lib/site";
 import { PAIN_CARDS } from "@/lib/pain-cards-data";
 
@@ -64,6 +65,8 @@ export default function CasosFrecuentesPage() {
               </div>
             ))}
           </div>
+
+          <IntentCTASlot />
 
           <div className="bg-canvas border border-line rounded-xl p-8 text-center mt-12">
             <p className="font-bold text-lg mb-2">¿Tu archivo tiene alguno de estos?</p>

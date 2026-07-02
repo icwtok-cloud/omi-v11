@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { RelatedHubs } from "@/components/RelatedHubs";
+import { IntentCTASlot } from "@/components/IntentEngine";
 import { SITE_URL } from "@/lib/site";
 
 const PAGE_URL = `${SITE_URL}/comparativas/excel-vs-omi`;
@@ -106,6 +107,8 @@ export default function ExcelVsOmiPage() {
             etapas o categorías existen en tu instancia real. OMI valida contra esas
             reglas reales, no contra una checklist genérica que armaste vos mismo.
           </p>
+
+          <IntentCTASlot />
 
           <div className="bg-canvas border border-line rounded-xl p-8 text-center">
             <p className="font-bold text-lg mb-2">Probalo sobre el mismo archivo que ya limpiaste en Excel</p>

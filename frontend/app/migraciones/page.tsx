@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { RelatedHubs } from "@/components/RelatedHubs";
+import { IntentCTASlot } from "@/components/IntentEngine";
 import { SITE_URL } from "@/lib/site";
 
 const PAGE_URL = `${SITE_URL}/migraciones`;
@@ -95,6 +96,8 @@ export default function MigracionesPage() {
             conviene validarlos igual antes de importar, pero el orden relativo
             entre ellos es menos crítico.
           </p>
+
+          <IntentCTASlot />
 
           <div className="bg-canvas border border-line rounded-xl p-8 text-center">
             <p className="font-bold text-lg mb-2">OMI arma este orden por vos</p>
