@@ -1,28 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth, SignInButton, UserButton } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  getAvailableCombinations,
-  createProject,
-  addModule,
-  listProjects,
-  AvailableCombination,
-  ProjectListItem,
-} from "@/lib/api";
-
-const MODULE_LABELS: Record<string, string> = {
-  contactos: "Contactos",
-  crm: "CRM",
-  ventas: "Ventas",
-  facturacion: "Facturación",
-  inventario: "Inventario",
-  productos: "Productos",
-  contabilidad: "Contabilidad",
-  compras: "Compras",
-};
+import { listProjects, ProjectListItem } from "@/lib/api";
+import { NewProjectModal } from "@/components/NewProjectModal";
 
 const COUNTRY_LABELS: Record<string, string> = {
   ar: "Argentina",
@@ -42,88 +24,47 @@ const COUNTRY_LABELS: Record<string, string> = {
   ve: "Venezuela",
 };
 
-// Módulos cuyas reglas varían por país (deben mostrar selector de país)
-const COUNTRY_SCOPED_MODULES = new Set(["contactos", "contabilidad", "facturacion"]);
-
 export default function HomePage() {
   const { isSignedIn, getToken } = useAuth();
-  const router = useRouter();
-
-  const [combinations, setCombinations] = useState<AvailableCombination[]>([]);
-  // El proyecto es una sola instancia de Odoo (versión fija) -- se elige
-  // primero. El módulo es el primer archivo que se sube adentro; se
-  // pueden agregar más módulos después desde la pantalla del proyecto.
-  const [selectedVersion, setSelectedVersion] = useState<string>("");
-  const [selectedModule, setSelectedModule] = useState<string>("");
-  const [selectedCountry, setSelectedCountry] = useState<string>("");
-  const [file, setFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingModules, setLoadingModules] = useState(true);
 
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
-
-  useEffect(() => {
-    if (!isSignedIn) return;
-    setLoadingModules(true);
-    getAvailableCombinations(getToken)
-      .then(setCombinations)
-      .catch(() => setError("No se pudieron cargar los módulos disponibles."))
-      .finally(() => setLoadingModules(false));
-  }, [isSignedIn, getToken]);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [versionFilter, setVersionFilter] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isSignedIn) return;
     setLoadingProjects(true);
     listProjects(getToken)
-      .then(setProjects)
-      .catch(() => {
-        // si falla, no bloquea el flujo de crear un proyecto nuevo --
-        // solo no se muestra la lista de proyectos anteriores.
+      .then((p) => {
+        setProjects(p);
+        setProjectsError(null);
       })
+      .catch(() => setProjectsError("No se pudieron cargar tus proyectos."))
       .finally(() => setLoadingProjects(false));
   }, [isSignedIn, getToken]);
 
-  const availableVersions = Array.from(new Set(combinations.map((c) => c.version))).sort();
-
-  const availableModules = Array.from(
-    new Set(combinations.filter((c) => c.version === selectedVersion).map((c) => c.module))
+  const availableVersionFilters = useMemo(
+    () => Array.from(new Set(projects.map((p) => p.odoo_version))).sort(),
+    [projects]
   );
 
-  const needsCountry = selectedModule ? COUNTRY_SCOPED_MODULES.has(selectedModule) : false;
-
-  const availableCountries = needsCountry
-    ? combinations
-        .filter((c) => c.module === selectedModule && c.version === selectedVersion && c.country)
-        .map((c) => c.country as string)
-    : [];
-
-  const isFormReady =
-    selectedVersion &&
-    selectedModule &&
-    (!needsCountry || selectedCountry) &&
-    file;
-
-  async function handleSubmit() {
-    if (!isFormReady) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const project = await createProject(
-        getToken,
-        selectedVersion,
-        needsCountry ? selectedCountry : null
-      );
-      await addModule(getToken, project.project_id, selectedModule, file!);
-      router.push(`/proyectos/${project.project_id}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al subir el archivo");
-    } finally {
-      setUploading(false);
-    }
-  }
+  const filteredProjects = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return projects.filter((p) => {
+      if (versionFilter && p.odoo_version !== versionFilter) return false;
+      if (!term) return true;
+      const haystack = [
+        `odoo ${p.odoo_version}`,
+        p.odoo_country ? COUNTRY_LABELS[p.odoo_country] || p.odoo_country : "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [projects, search, versionFilter]);
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -155,45 +96,11 @@ export default function HomePage() {
         </p>
       </section>
 
-      {isSignedIn && !loadingProjects && projects.length > 0 && (
-        <section className="px-6 md:px-12 pb-10 max-w-3xl w-full">
-          <h2 className="font-bold text-sm text-graphite uppercase tracking-wide mb-3">
-            Tus proyectos
-          </h2>
-          <div className="space-y-2">
-            {projects.map((p) => (
-              <Link
-                key={p.project_id}
-                href={`/proyectos/${p.project_id}`}
-                className="flex items-center justify-between gap-3 border border-line rounded-lg px-4 py-3 bg-white/60 hover:border-ink transition-colors"
-              >
-                <div>
-                  <p className="font-medium text-sm">
-                    Odoo {p.odoo_version}
-                    {p.odoo_country ? ` · ${p.odoo_country.toUpperCase()}` : ""}
-                  </p>
-                  <p className="text-xs text-graphite mt-0.5">
-                    {p.modules_count} {p.modules_count === 1 ? "módulo" : "módulos"} ·{" "}
-                    {new Date(p.created_at).toLocaleDateString("es-AR")}
-                  </p>
-                </div>
-                <span className="text-xs text-graphite">→</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
       <section className="px-6 md:px-12 pb-24 max-w-3xl w-full">
-        {isSignedIn && projects.length > 0 && (
-          <h2 className="font-bold text-sm text-graphite uppercase tracking-wide mb-3">
-            Nuevo proyecto
-          </h2>
-        )}
         {!isSignedIn ? (
           <div className="border border-line bg-white/60 rounded-lg p-8 text-center">
             <p className="text-graphite mb-4">
-              Necesitás ingresar para subir un archivo.
+              Necesitás ingresar para ver y crear proyectos.
             </p>
             <SignInButton mode="modal">
               <button className="bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity">
@@ -202,168 +109,89 @@ export default function HomePage() {
             </SignInButton>
           </div>
         ) : (
-          <div className="border border-line bg-white/60 rounded-lg p-6 md:p-8 space-y-6">
-            {/* Fila 1: Versión + Módulo */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" htmlFor="version-select">
-                  Versión de Odoo
-                  <span className="ml-2 text-xs font-normal text-graphite">
-                    la instancia completa de tu proyecto
-                  </span>
-                </label>
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por versión o país..."
+                aria-label="Buscar proyectos"
+                className="flex-1 border border-line rounded-md px-3 py-2.5 bg-white text-ink text-sm"
+              />
+              {availableVersionFilters.length > 1 && (
                 <select
-                  id="version-select"
-                  className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
-                  value={selectedVersion}
-                  disabled={loadingModules}
-                  onChange={(e) => {
-                    setSelectedVersion(e.target.value);
-                    setSelectedModule("");
-                    setSelectedCountry("");
-                  }}
+                  value={versionFilter}
+                  onChange={(e) => setVersionFilter(e.target.value)}
+                  aria-label="Filtrar por versión de Odoo"
+                  className="border border-line rounded-md px-3 py-2.5 bg-white text-ink text-sm"
                 >
-                  <option value="">
-                    {loadingModules ? "Cargando…" : "Elegí una versión"}
-                  </option>
-                  {availableVersions.map((v) => (
+                  <option value="">Todas las versiones</option>
+                  {availableVersionFilters.map((v) => (
                     <option key={v} value={v}>
                       Odoo {v}
                     </option>
                   ))}
                 </select>
-                {loadingModules && (
-                  <p className="text-xs text-graphite mt-2">
-                    Esto puede tardar hasta un minuto la primera vez (el servidor
-                    estaba "dormido" y se está despertando).
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2" htmlFor="module-select">
-                  Primer módulo a validar
-                  <span className="ml-2 text-xs font-normal text-graphite">
-                    después sumás el resto
-                  </span>
-                </label>
-                <select
-                  id="module-select"
-                  className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
-                  value={selectedModule}
-                  onChange={(e) => {
-                    setSelectedModule(e.target.value);
-                    setSelectedCountry("");
-                  }}
-                  disabled={!selectedVersion}
-                >
-                  <option value="">Elegí un módulo</option>
-                  {availableModules.map((m) => (
-                    <option key={m} value={m}>
-                      {MODULE_LABELS[m] || m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Fila 2: País (solo para módulos que lo requieren) */}
-            {needsCountry && (
-              <div>
-                <label className="block text-sm font-medium mb-2" htmlFor="country-select">
-                  País de localización
-                  <span className="ml-2 text-xs font-normal text-graphite">
-                    Las reglas de {MODULE_LABELS[selectedModule] || selectedModule} varían según el país
-                  </span>
-                </label>
-                <select
-                  id="country-select"
-                  className="w-full border border-line rounded-md px-3 py-2.5 bg-white text-ink disabled:opacity-50"
-                  value={selectedCountry}
-                  onChange={(e) => setSelectedCountry(e.target.value)}
-                  disabled={!selectedModule}
-                >
-                  <option value="">Elegí un país</option>
-                  {availableCountries.map((c) => (
-                    <option key={c} value={c}>
-                      {COUNTRY_LABELS[c] || c.toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Zona de upload */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setIsDragging(false);
-                const dropped = e.dataTransfer.files[0];
-                if (dropped) setFile(dropped);
-              }}
-              className={`border-2 border-dashed rounded-lg p-10 text-center transition-colors ${
-                isDragging ? "border-verify bg-verify-light" : "border-line"
-              }`}
-            >
-              {file ? (
-                <div className="flex items-center justify-center gap-3 flex-wrap">
-                  <p className="text-sm text-ink">{file.name}</p>
-                  <label className="cursor-pointer text-verify text-sm font-medium underline">
-                    cambiar archivo
-                    <input
-                      type="file"
-                      accept=".csv,.xlsx,.xls"
-                      className="hidden"
-                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setFile(null)}
-                    className="text-alert text-sm font-medium underline"
-                  >
-                    quitar
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <p className="text-graphite mb-3">
-                    Arrastrá tu archivo CSV o Excel acá
-                  </p>
-                  <label className="inline-block cursor-pointer text-verify font-medium underline">
-                    o elegilo manualmente
-                    <input
-                      type="file"
-                      accept=".csv,.xlsx,.xls"
-                      className="hidden"
-                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                    />
-                  </label>
-                </>
               )}
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="bg-ink text-paper rounded-full px-5 py-2.5 font-medium hover:opacity-90 transition-opacity whitespace-nowrap"
+              >
+                + Nuevo proyecto
+              </button>
             </div>
 
-            {error && (
-              <p className="text-alert text-sm bg-alert-light rounded-md px-4 py-2.5">
-                {error}
+            {projectsError && (
+              <p className="text-alert text-sm bg-alert-light rounded-md px-4 py-2.5 mb-4">
+                {projectsError}
               </p>
             )}
 
-            <button
-              onClick={handleSubmit}
-              disabled={!isFormReady || uploading}
-              className="w-full bg-ink text-paper rounded-full py-3 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-            >
-              {uploading ? "Subiendo..." : "Analizar archivo gratis"}
-            </button>
-          </div>
+            {loadingProjects ? (
+              <p className="text-graphite text-sm">Cargando tus proyectos…</p>
+            ) : filteredProjects.length === 0 ? (
+              <div className="border border-line bg-white/60 rounded-lg p-8 text-center">
+                <p className="text-graphite">
+                  {projects.length === 0
+                    ? "Todavía no tenés proyectos. Creá el primero."
+                    : "Ningún proyecto coincide con la búsqueda."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredProjects.map((p) => (
+                  <Link
+                    key={p.project_id}
+                    href={`/proyectos/${p.project_id}`}
+                    className="flex items-center justify-between gap-3 border border-line rounded-lg px-4 py-3 bg-white/60 hover:border-ink transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">
+                        Odoo {p.odoo_version}
+                        {p.odoo_country ? ` · ${p.odoo_country.toUpperCase()}` : ""}
+                      </p>
+                      <p className="text-xs text-graphite mt-0.5">
+                        {p.modules_count} {p.modules_count === 1 ? "módulo" : "módulos"} ·{" "}
+                        {new Date(p.created_at).toLocaleDateString("es-AR")}
+                      </p>
+                    </div>
+                    <span className="text-xs text-graphite">→</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </section>
+
+      <NewProjectModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        getToken={getToken}
+        redirectBasePath="/proyectos"
+        locale="es"
+      />
     </main>
   );
 }
