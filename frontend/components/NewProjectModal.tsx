@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   getAvailableCombinations,
   createProject,
+  addModule,
   AvailableCombination,
 } from "@/lib/api";
 
@@ -90,7 +91,12 @@ const COPY: Record<
     countryLabel: string;
     countryHint: (moduleLabel: string) => string;
     countryPlaceholder: string;
+    fileDropHint: string;
+    fileChooseManually: string;
+    fileChange: string;
+    fileRemove: string;
     combosError: string;
+    uploadError: string;
     cancel: string;
     submit: string;
     submitting: string;
@@ -110,7 +116,12 @@ const COPY: Record<
     countryLabel: "País de localización",
     countryHint: (m) => `Las reglas de ${m} varían según el país`,
     countryPlaceholder: "Elegí un país",
+    fileDropHint: "Arrastrá tu archivo CSV o Excel acá",
+    fileChooseManually: "o elegilo manualmente",
+    fileChange: "cambiar archivo",
+    fileRemove: "quitar",
     combosError: "No se pudieron cargar los módulos disponibles.",
+    uploadError: "Error al crear el proyecto o subir el archivo",
     cancel: "Cancelar",
     submit: "Crear proyecto",
     submitting: "Creando...",
@@ -129,7 +140,12 @@ const COPY: Record<
     countryLabel: "País de localização",
     countryHint: (m) => `As regras de ${m} variam de acordo com o país`,
     countryPlaceholder: "Escolha um país",
+    fileDropHint: "Arraste seu arquivo CSV ou Excel aqui",
+    fileChooseManually: "ou escolha manualmente",
+    fileChange: "trocar arquivo",
+    fileRemove: "remover",
     combosError: "Não foi possível carregar os módulos disponíveis.",
+    uploadError: "Erro ao criar o projeto ou enviar o arquivo",
     cancel: "Cancelar",
     submit: "Criar projeto",
     submitting: "Criando...",
@@ -164,6 +180,8 @@ export function NewProjectModal({
   const [selectedVersion, setSelectedVersion] = useState<string>("");
   const [selectedModule, setSelectedModule] = useState<string>("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -184,6 +202,8 @@ export function NewProjectModal({
     setSelectedVersion("");
     setSelectedModule("");
     setSelectedCountry("");
+    setFile(null);
+    setIsDragging(false);
     setError(null);
     setCreating(false);
   }, [isOpen]);
@@ -220,21 +240,35 @@ export function NewProjectModal({
       )
     : [];
 
-  const isFormReady = selectedVersion && selectedModule && (!needsCountry || selectedCountry);
+  const isFormReady =
+    selectedVersion && selectedModule && (!needsCountry || selectedCountry) && file;
 
   async function handleSubmit() {
     if (!isFormReady) return;
     setCreating(true);
     setError(null);
     try {
+      // Una sola operación de cara al usuario: crear el proyecto contenedor
+      // y subir el primer módulo con su archivo antes de redirigir. Si
+      // addModule falla, el proyecto queda creado pero vacío -- aceptable
+      // por ahora porque el usuario ve el error y puede reintentar la carga
+      // desde /proyectos/[id]; no rompe el flujo, solo evita el peor caso
+      // (que era no llamar addModule nunca).
       const project = await createProject(
         getToken,
         selectedVersion,
         needsCountry ? selectedCountry : null
       );
+      await addModule(
+        getToken,
+        project.project_id,
+        selectedModule,
+        file!,
+        needsCountry ? selectedCountry : null
+      );
       router.push(`${redirectBasePath}/${project.project_id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al crear el proyecto");
+      setError(e instanceof Error ? e.message : t.uploadError);
     } finally {
       setCreating(false);
     }
@@ -345,6 +379,63 @@ export function NewProjectModal({
               </select>
             </div>
           )}
+
+          {/* Zona de upload -- restaurada del formulario original de /app,
+              con drag&drop y selección manual, más botones para cambiar o
+              quitar el archivo elegido sin recargar (fix f7a5f1d en main). */}
+          <div>
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                const dropped = e.dataTransfer.files[0];
+                if (dropped) setFile(dropped);
+              }}
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                isDragging ? "border-verify bg-verify-light" : "border-line"
+              }`}
+            >
+              {file ? (
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  <p className="text-sm text-ink">{file.name}</p>
+                  <label className="cursor-pointer text-verify text-sm font-medium underline">
+                    {t.fileChange}
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setFile(null)}
+                    className="text-alert text-sm font-medium underline"
+                  >
+                    {t.fileRemove}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-graphite text-sm mb-2">{t.fileDropHint}</p>
+                  <label className="inline-block cursor-pointer text-verify text-sm font-medium underline">
+                    {t.fileChooseManually}
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {error && (
