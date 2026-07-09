@@ -75,7 +75,7 @@ const COUNTRY_LABELS: Record<Locale, Record<string, string>> = {
 // mismo set que en /proyectos/[id] y que el formulario original de /app.
 const COUNTRY_SCOPED_MODULES = new Set(["contactos", "contabilidad", "facturacion"]);
 
-const COPY: Record
+const COPY: Record<
   Locale,
   {
     title: string;
