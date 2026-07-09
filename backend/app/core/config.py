@@ -13,7 +13,19 @@ class Settings(BaseSettings):
 
     # --- General ---
     environment: str = "development"
+    # Uno o más orígenes permitidos para CORS, separados por coma (ej.
+    # "https://omi.lat,https://www.omi.lat"). Necesario porque el apex
+    # sin "www" suele hacer un redirect 308 al dominio con "www" (o
+    # viceversa, según el proveedor DNS) -- el browser manda el Origin
+    # real post-redirect, así que si solo se permite uno de los dos, el
+    # otro queda bloqueado por CORS aunque el backend esté sano (bug real
+    # detectado en producción: omi.lat -> www.omi.lat, y FRONTEND_URL solo
+    # tenía el primero).
     frontend_url: str = "http://localhost:3000"
+
+    @property
+    def frontend_urls(self) -> list[str]:
+        return [origin.strip() for origin in self.frontend_url.split(",") if origin.strip()]
 
     # --- Base de datos (Render Postgres) ---
     database_url: str

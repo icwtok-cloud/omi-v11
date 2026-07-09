@@ -229,6 +229,56 @@ los textos y componentes nuevos, tanto en `/`, `/app` como en
 **Rollback:** sin migración de DB. `git revert` del commit alcanza;
 el endpoint `GET /projects` es aditivo (no rompe nada si se revierte).
 
+## 2026-07-09 — Fix producción: CORS bloqueaba omi.lat por el redirect a www
+
+**Síntoma:** en producción, `omi.lat/app` autenticado mostraba "No se
+pudieron cargar los módulos disponibles" con los selectores de
+Versión/Módulo vacíos y deshabilitados. El backend estaba sano
+(`/health` 200, `/projects/available-combinations` 200 con datos vía
+curl directo), lo que hacía parecer un problema de Clerk o de Vercel.
+
+**Causa raíz:** `https://omi.lat` hace un **308 redirect a
+`https://www.omi.lat`** (el dominio real donde sirve Vercel). El
+browser del usuario, después de seguir ese redirect, manda el fetch a
+`/projects/available-combinations` con `Origin: https://www.omi.lat`.
+Pero `FRONTEND_URL` en Render solo tenía `https://omi.lat` (sin
+`www`), y `CORSMiddleware` en `main.py` solo aceptaba ese único origen
+-- el preflight con `Origin: https://www.omi.lat` devolvía `400
+Disallowed CORS origin` sin header `access-control-allow-origin`, así
+que el browser bloqueaba la respuesta antes de que
+`frontend/lib/api.ts` pudiera leerla. Como `authedFetch` colapsa
+cualquier falla (red, CORS, timeout) al mismo mensaje genérico, en
+pantalla no había forma de distinguir esto de un problema de token de
+Clerk. Un chequeo manual con `curl -H "Origin: https://omi.lat"` daba
+falso positivo porque ese no es el origen real al que llega el
+browser tras el redirect.
+
+**Fix:**
+- `app/core/config.py`: `frontend_url` ahora puede traer varios
+  orígenes separados por coma; nueva property `frontend_urls` que los
+  parsea en una lista.
+- `app/main.py`: `CORSMiddleware(allow_origins=settings.frontend_urls)`
+  en vez de `[settings.frontend_url]` (que con una coma adentro se
+  convertía en un único origen inválido).
+- `app/core/error_handling.py`: el handler de errores 500 (que corre
+  fuera de `CORSMiddleware` y setea el header a mano) ahora refleja el
+  `Origin` real de la request si está en la whitelist, en vez de
+  asumir siempre el primero de la lista -- si no, un 500 real con
+  Origin `www` hubiera quedado igual de bloqueado.
+- **Acción pendiente en Render (no es código):** actualizar
+  `FRONTEND_URL` en el dashboard de `omi-backend` a
+  `https://omi.lat,https://www.omi.lat` (o al dominio real que
+  corresponda) y redeployar.
+
+**Tests:** `tests/test_cors_multi_origin.py` -- un solo origen sigue
+funcionando igual que antes, y separado por coma se parsea en una
+lista de N orígenes. 149/149 tests pasando.
+
+**Rollback:** sin migración de DB, `git revert` alcanza. Si hace falta
+revertir solo la env var, volver a poner `FRONTEND_URL=https://omi.lat`
+en Render (aunque eso reintroduce el bug si el dominio real sigue
+siendo `www.omi.lat`).
+
 ## 2026-07-02 — Fix crítico: validación de `vat` ignoraba el país del proyecto
 
 **Bug:** `format_rules.check()` validaba el campo `vat` contra `CUIT_RE`

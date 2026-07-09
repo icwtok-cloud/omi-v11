@@ -50,6 +50,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     # que sin este header el navegador la bloquea antes de que el frontend
     # pueda leer el mensaje (fetch() falla con "Failed to fetch" genérico,
     # tapando el mensaje bien armado de arriba). Hay que setearlo a mano acá.
-    response.headers["Access-Control-Allow-Origin"] = settings.frontend_url
+    # Se refleja el Origin real de la request (si está en la whitelist) en
+    # vez de asumir un único frontend_url fijo -- con más de un origen
+    # permitido (ej. apex + www), hardcodear el primero rompía el CORS de
+    # los demás exactamente en el peor momento (un error 500 real).
+    request_origin = request.headers.get("origin")
+    allowed_origin = (
+        request_origin if request_origin in settings.frontend_urls else settings.frontend_urls[0]
+    )
+    response.headers["Access-Control-Allow-Origin"] = allowed_origin
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
