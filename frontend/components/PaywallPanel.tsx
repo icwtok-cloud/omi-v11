@@ -40,6 +40,7 @@ const COPY = {
     coveredBySubscription: "Cubierto por tu suscripción",
     paymentConfirmed: "Pago confirmado",
     downloadFile: "Descargar archivo corregido",
+    preparingDownload: "Preparando descarga...",
     unlockDownload: "Desbloqueá la descarga",
     freeOneModule: "Gratis · 1 módulo",
     perProject: "Por proyecto · $99",
@@ -81,6 +82,7 @@ const COPY = {
     coveredBySubscription: "Coberto pela sua assinatura",
     paymentConfirmed: "Pagamento confirmado",
     downloadFile: "Baixar arquivo corrigido",
+    preparingDownload: "Preparando download...",
     unlockDownload: "Desbloqueie o download",
     freeOneModule: "Grátis · 1 módulo",
     perProject: "Por projeto · $99",
@@ -135,6 +137,7 @@ export function PaywallPanel({
   const [step, setStep] = useState<Step>("choose");
   const [payment, setPayment] = useState<PaymentStartResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [freeProjectAvailable, setFreeProjectAvailable] = useState(false);
   const [subscriptionCoveredInfo, setSubscriptionCoveredInfo] = useState<{
     used: number;
@@ -339,14 +342,22 @@ export function PaywallPanel({
             : t.paymentConfirmed}
         </p>
         <button
-          onClick={() =>
-            triggerAuthedDownload(getToken, downloadUrl(projectId), `omi_${projectId}.zip`).catch(
-              (e) => setErrorMsg(e instanceof Error ? e.message : t.downloadError)
-            )
-          }
-          className="inline-block bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity"
+          onClick={async () => {
+            if (isDownloading) return;
+            setIsDownloading(true);
+            setErrorMsg(null);
+            try {
+              await triggerAuthedDownload(getToken, downloadUrl(projectId), `omi_${projectId}.zip`);
+            } catch (e) {
+              setErrorMsg(e instanceof Error ? e.message : t.downloadError);
+            } finally {
+              setIsDownloading(false);
+            }
+          }}
+          disabled={isDownloading}
+          className="inline-block bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t.downloadFile}
+          {isDownloading ? t.preparingDownload : t.downloadFile}
         </button>
         {errorMsg && <p className="text-alert text-sm mt-2">{errorMsg}</p>}
         <PostDownloadChecklist locale={locale} />
