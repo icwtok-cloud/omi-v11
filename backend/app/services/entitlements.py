@@ -94,6 +94,24 @@ def reset_monthly_counter_if_needed(user: User) -> None:
         user.monthly_export_reset_at = current_month_start
 
 
+def is_exempt_from_free_tier_gate(user: User) -> bool:
+    """True si este usuario no debería ni pasar por el tope de 1 modulo
+    del proyecto gratis (upload_module) -- porque ya paga de alguna
+    forma: suscripcion activa y vigente, o membresia anual de partner.
+    Extraido como funcion propia (antes solo vivia inline dentro de
+    can_export_project) porque el gating de upload_module aplicaba el
+    tope gratis incluso a usuarios con suscripcion activa que nunca
+    habian gastado su free_project_used -- el comentario en
+    upload_module ya decia que esto no deberia pasar, pero el codigo
+    nunca lo chequeaba. Mismo criterio que usa can_export_project, para
+    que ambos gates no se desincronicen de nuevo."""
+    if user.annual_event_limit is not None:
+        return True
+    if user.has_active_subscription and user.subscription_expires_at and user.subscription_expires_at > datetime.utcnow():
+        return True
+    return False
+
+
 def can_export_project(db: Session, user: User, project: Project) -> tuple[bool, str | None]:
     """Decide si ESTE export específico está permitido, y por qué vía
     (proyecto pagado puntual / proyecto gratis / cuota de suscripción).

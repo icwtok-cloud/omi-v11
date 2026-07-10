@@ -48,6 +48,7 @@ from app.services.module_dependencies import import_order, missing_dependencies
 from app.services.report_pdf import build_module_report_pdf
 from app.services.entitlements import (
     user_can_download, can_export_project, FREE_TIER_MODULE_LIMIT,
+    is_exempt_from_free_tier_gate,
     can_process_validation_events, reset_annual_events_if_needed,
 )
 from app.api.schemas import (
@@ -316,7 +317,11 @@ async def upload_module(
     # suscripción, este chequeo ni se activa (el cobro real es al
     # exportar, ver can_export_project(), esto es solo el tope
     # intrínseco a qué significa "gratis").
-    if existing is None and not user.free_project_used:
+    if (
+        existing is None
+        and not user.free_project_used
+        and not is_exempt_from_free_tier_gate(user)
+    ):
         is_users_first_project = (
             db.query(Project).filter(Project.owner_id == user.id).count() == 1
         )
