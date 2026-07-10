@@ -251,7 +251,8 @@ export default function ProjectPage() {
       setAddModuleName("");
       setAddModuleCountry("");
       setAddModuleFile(null);
-      selectModule(result.module_id);
+      setActiveModuleId(result.module_id);
+      loadModuleReport(result.module_id, result.status);
     } catch (e) {
       setAddModuleError(e instanceof Error ? e.message : "No se pudo subir el módulo");
     } finally {

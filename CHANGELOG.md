@@ -8,6 +8,49 @@ y costó tiempo diagnosticarlo.
 Guardar este archivo como `CHANGELOG.md` en la raíz del repo (no en un
 subdirectorio) para que cualquiera que clone el proyecto lo vea primero.
 
+## 2026-07-10
+
+### Fix: storage de archivos no persistía entre reinicios de Render
+- `UPLOAD_DIR` usa `/tmp` (filesystem efímero) — cualquier reinicio del
+  proceso (deploy, restart, crash) borraba archivos subidos, aunque el
+  registro del `ProjectModule` en DB seguía existiendo. Causaba 500
+  (FileNotFoundError) al descargar/validar proyectos viejos.
+- Se agregó columna `ProjectModule.file_content` (LargeBinary) como
+  backup de los bytes originales en la base de datos.
+- Nueva función `_ensure_file_on_disk()` en `app/api/projects.py`:
+  reescribe el archivo a disco desde `file_content` si no está presente,
+  antes de leerlo (se usa en `validate_module` y `_ensure_corrected_file`).
+- Migración: `alembic/versions/0009_module_file_content.py`
+- Test actualizado: `test_path_de_excepcion_deja_status_failed_con_mensaje`
+  ahora también limpia `file_content` para simular el caso realmente
+  irrecuperable (antes solo borraba disco, lo cual ya no alcanza para
+  forzar el error con el fix nuevo).
+- Commits: `1450b02`, `afd6d31` (main)
+
+### Fix: usuarios con suscripción activa bloqueados en tope de 1 módulo
+- `upload_module` solo chequeaba `free_project_used` + "primer proyecto"
+  para aplicar `FREE_TIER_MODULE_LIMIT` — nunca miraba si el usuario ya
+  paga (suscripción activa/membresía anual), a pesar de que el comentario
+  en el código decía que debía estar exento.
+- Se agregó `is_exempt_from_free_tier_gate()` en `entitlements.py` (mismo
+  criterio que ya usaba `can_export_project`) y se usa en el gate de
+  `upload_module`.
+- Commit: `91808f2` (main)
+
+### Pendiente / en curso: UX del flujo de proyecto
+- Falta botón para volver de `/proyectos/[id]` al dashboard `/app` sin
+  forzar "Descargar".
+- Bug de closure diagnosticado (no arreglado aún) en `handleAddModule`
+  (`frontend/app/proyectos/[id]/page.tsx`, línea ~236): usa
+  `selectModule(result.module_id)`, que depende del `project` viejo del
+  closure y no encuentra el módulo recién subido. Fix: reemplazar por
+  `setActiveModuleId(result.module_id); loadModuleReport(result.module_id, result.status);`.
+- Falta aviso en frontend si hay módulos sin validar antes de descargar
+  (`download_project` en `app/api/projects.py` línea ~737 los excluye
+  del ZIP silenciosamente).
+- Herencia de país: pendiente de definir, sin avanzar.
+
+
 ## 2026-07-02 (4) — Traducción completa a portugués: producto funcional + 12 hubs SEO/GEO
 
 **Cierre de la traducción completa** pedida explícitamente después de
