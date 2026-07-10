@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import {
   runValidation,
@@ -319,6 +320,12 @@ export default function ProjectPage() {
 
   return (
     <main className="min-h-screen px-6 md:px-12 py-10 max-w-4xl mx-auto">
+      <Link
+        href="/app"
+        className="inline-flex items-center gap-1 text-sm font-medium text-graphite hover:text-ink mb-4"
+      >
+        &larr; Volver a mis proyectos
+      </Link>
       <header className="mb-6">
         <p className="font-mono text-xs uppercase tracking-widest text-verify mb-2">
           Tu proyecto · Odoo {project.odoo_version}
