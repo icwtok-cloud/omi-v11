@@ -60,12 +60,19 @@ class TestValidateAsync:
 
         project_id, module_id = _create_module(client)
 
-        # Forzamos la excepción borrando el archivo del disco antes de
-        # validar -- _read_tabular_file va a fallar al intentar abrirlo.
+        # Forzamos la excepción borrando el archivo del disco Y limpiando
+        # el backup en DB (file_content) antes de validar -- simula el
+        # caso irrecuperable real: el archivo ya no está en ningún lado
+        # (ni disco ni DB). Si solo borráramos el disco, _ensure_file_on_disk
+        # lo reescribiría desde file_content y la validación seguiría de
+        # largo -- eso es el comportamiento correcto, no el que este test
+        # verifica.
         module = (
             db_session.query(ProjectModule).filter(ProjectModule.id == module_id).first()
         )
         os.remove(module.storage_path)
+        module.file_content = None
+        db_session.commit()
 
         client.post(f"/projects/{project_id}/modules/{module_id}/validate")
 
