@@ -14,7 +14,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Column, String, DateTime, ForeignKey, Float, Boolean, Enum, JSON, Integer,
-    UniqueConstraint,
+    UniqueConstraint, LargeBinary,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -134,6 +134,7 @@ class ProjectModule(Base):
 
     original_filename = Column(String, nullable=False)
     storage_path = Column(String, nullable=False)  # path del archivo subido
+    file_content = Column(LargeBinary, nullable=True)  # bytes del archivo original, backup ante storage efimero de Render
 
     status = Column(Enum(ModuleStatus), default=ModuleStatus.uploaded)
 

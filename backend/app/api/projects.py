@@ -355,6 +355,7 @@ async def upload_module(
 
         existing.original_filename = file.filename
         existing.storage_path = str(storage_path)
+        existing.file_content = contents
         existing.status = ModuleStatus.uploaded
         existing.validation_report = None
         existing.confirmed_manual_fixes = None
@@ -371,6 +372,7 @@ async def upload_module(
             odoo_module=odoo_module,
             original_filename=file.filename,
             storage_path=str(storage_path),
+            file_content=contents,
             status=ModuleStatus.uploaded,
         )
         db.add(module)
@@ -445,6 +447,7 @@ def _run_validation_job(module_id: str) -> None:
 
         try:
             schema = load_rule_schema(module.odoo_module, project.odoo_version, project.odoo_country)
+            _ensure_file_on_disk(module)
             df = _read_tabular_file(Path(module.storage_path), module.original_filename)
             row_count = len(df)
 
@@ -807,6 +810,23 @@ def _invalidate_corrected_cache(storage_path: str) -> None:
         audit_log_path.unlink()
 
 
+def _ensure_file_on_disk(module: ProjectModule) -> Path:
+    """Si el archivo original ya no esta en el filesystem (Render usa /tmp
+    efimero por default: se borra en cada reinicio/deploy del proceso),
+    lo reescribe desde la copia guardada en la base de datos
+    (module.file_content, ver migracion 0009)."""
+    path = Path(module.storage_path)
+    if not path.exists():
+        if not module.file_content:
+            raise HTTPException(
+                status_code=500,
+                detail="El archivo original ya no esta disponible. Volve a subirlo.",
+            )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(module.file_content)
+    return path
+
+
 def _ensure_corrected_file(module: ProjectModule, db: Session) -> Path:
     """Genera (si no existe ya) el archivo con los fixes automáticos
     aplicados para este módulo. Los fixes manuales que el usuario haya
@@ -816,6 +836,7 @@ def _ensure_corrected_file(module: ProjectModule, db: Session) -> Path:
     if corrected_path.exists():
         return corrected_path
 
+    _ensure_file_on_disk(module)
     df = _read_tabular_file(Path(module.storage_path), module.original_filename)
     report = module.validation_report or {}
 

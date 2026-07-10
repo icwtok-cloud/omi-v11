@@ -36,6 +36,10 @@ const SECTIONS = [
     title: "Borrado de datos",
     body: "Podés pedir el borrado de un proyecto (archivo original, corregido y reporte) en cualquier momento escribiendo a hello@alterego.lat. Lo hacemos manualmente en esta etapa del producto -- todavía no hay un botón de autoservicio para esto.",
   },
+  {
+    title: "Reembolsos",
+    body: "Un pago en USDC ya confirmado no se reembolsa -- es una limitación real de pagar directo entre wallets, sin un intermediario que pueda revertir la transacción. Esto no significa que quedes sin lo que pagaste: una vez confirmado el pago, la descarga del proyecto queda disponible para volver a generarla las veces que necesites, sin cargo adicional. Si la descarga falla o el archivo corregido no se genera, intentá de nuevo desde el proyecto -- si el problema persiste, escribinos a hello@alterego.lat y lo resolvemos manualmente (evaluamos cada caso: reintento asistido, corrección del problema puntual, o un proyecto de cortesía si corresponde). No ofrecemos devolución del USDC en ningún caso.",
+  },
 ];
 
 export default function PrivacidadPage() {

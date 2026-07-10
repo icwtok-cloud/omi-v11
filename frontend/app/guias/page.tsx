@@ -22,6 +22,11 @@ const GUIDES = [
     title: "Cómo preparar un archivo Excel o CSV para importar en Odoo",
     body: "Qué revisa el importador nativo de Odoo, los errores más comunes por módulo y cómo evitarlos antes de subir el archivo.",
   },
+  {
+    href: "/guias/como-pagar-con-usdc",
+    title: "Cómo pagar en OMI con USDC (si nunca usaste una wallet)",
+    body: "Paso a paso para instalar MetaMask, conseguir USDC en Polygon o Base y pagar en OMI sin haber usado criptomonedas antes.",
+  },
 ];
 
 export default function GuiasIndex() {
