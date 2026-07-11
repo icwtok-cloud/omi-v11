@@ -505,6 +505,7 @@ export default function ProjectPage() {
           <PaywallPanel
             projectId={project.project_id}
             priceLabel="Descargá todos los módulos validados, listos para importar a Odoo."
+            unvalidatedCount={project.modules.filter((m) => m.status !== "validated").length}
           />
         ) : (
           <p className="text-graphite text-sm text-center py-4 border border-line rounded-md bg-white">

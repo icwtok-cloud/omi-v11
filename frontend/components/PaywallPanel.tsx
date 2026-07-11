@@ -40,6 +40,10 @@ const COPY = {
     coveredBySubscription: "Cubierto por tu suscripción",
     paymentConfirmed: "Pago confirmado",
     downloadFile: "Descargar archivo corregido",
+    unvalidatedWarning: (n: number) =>
+      `Tenés ${n} módulo${n === 1 ? "" : "s"} sin analizar -- ${n === 1 ? "no se incluirá" : "no se incluirán"} en la descarga.`,
+    downloadAnyway: "Descargar de todas formas",
+    cancelDownload: "Cancelar",
     preparingDownload: "Preparando descarga...",
     unlockDownload: "Desbloqueá la descarga",
     freeOneModule: "Gratis · 1 módulo",
@@ -82,6 +86,10 @@ const COPY = {
     coveredBySubscription: "Coberto pela sua assinatura",
     paymentConfirmed: "Pagamento confirmado",
     downloadFile: "Baixar arquivo corrigido",
+    unvalidatedWarning: (n: number) =>
+      `Você tem ${n} módulo${n === 1 ? "" : "s"} sem analisar -- ${n === 1 ? "não será incluído" : "não serão incluídos"} no download.`,
+    downloadAnyway: "Baixar mesmo assim",
+    cancelDownload: "Cancelar",
     preparingDownload: "Preparando download...",
     unlockDownload: "Desbloqueie o download",
     freeOneModule: "Grátis · 1 módulo",
@@ -121,10 +129,12 @@ export function PaywallPanel({
   projectId,
   priceLabel,
   locale = "es",
+  unvalidatedCount = 0,
 }: {
   projectId: string;
   priceLabel: string;
   locale?: Locale;
+  unvalidatedCount?: number;
 }) {
   const t = COPY[locale];
   const { getToken } = useAuth();
@@ -138,6 +148,7 @@ export function PaywallPanel({
   const [payment, setPayment] = useState<PaymentStartResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [confirmingUnvalidated, setConfirmingUnvalidated] = useState(false);
   const [freeProjectAvailable, setFreeProjectAvailable] = useState(false);
   const [subscriptionCoveredInfo, setSubscriptionCoveredInfo] = useState<{
     used: number;
@@ -341,24 +352,46 @@ export function PaywallPanel({
             ? t.coveredBySubscription
             : t.paymentConfirmed}
         </p>
-        <button
-          onClick={async () => {
-            if (isDownloading) return;
-            setIsDownloading(true);
-            setErrorMsg(null);
-            try {
-              await triggerAuthedDownload(getToken, downloadUrl(projectId), `omi_${projectId}.zip`);
-            } catch (e) {
-              setErrorMsg(e instanceof Error ? e.message : t.downloadError);
-            } finally {
-              setIsDownloading(false);
-            }
-          }}
-          disabled={isDownloading}
-          className="inline-block bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isDownloading ? t.preparingDownload : t.downloadFile}
-        </button>
+        {unvalidatedCount > 0 && !confirmingUnvalidated && (
+          <p className="text-alert text-sm bg-alert-light rounded-md px-4 py-2.5 mb-3">
+            {t.unvalidatedWarning(unvalidatedCount)}
+          </p>
+        )}
+        {unvalidatedCount > 0 && !confirmingUnvalidated ? (
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={() => setConfirmingUnvalidated(true)}
+              className="inline-block bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity"
+            >
+              {t.downloadAnyway}
+            </button>
+            <button
+              onClick={() => setStep("choose")}
+              className="inline-block border border-line text-graphite rounded-full px-6 py-2.5 font-medium hover:border-ink hover:text-ink transition-colors"
+            >
+              {t.cancelDownload}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={async () => {
+              if (isDownloading) return;
+              setIsDownloading(true);
+              setErrorMsg(null);
+              try {
+                await triggerAuthedDownload(getToken, downloadUrl(projectId), `omi_${projectId}.zip`);
+              } catch (e) {
+                setErrorMsg(e instanceof Error ? e.message : t.downloadError);
+              } finally {
+                setIsDownloading(false);
+              }
+            }}
+            disabled={isDownloading}
+            className="inline-block bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDownloading ? t.preparingDownload : t.downloadFile}
+          </button>
+        )}
         {errorMsg && <p className="text-alert text-sm mt-2">{errorMsg}</p>}
         <PostDownloadChecklist locale={locale} />
       </div>

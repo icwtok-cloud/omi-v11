@@ -475,6 +475,7 @@ export default function ProjectPagePT() {
             projectId={project.project_id}
             priceLabel="Baixe todos os módulos validados, prontos para importar no Odoo."
             locale="pt"
+            unvalidatedCount={project.modules.filter((m) => m.status !== "validated").length}
           />
         ) : (
           <p className="text-graphite text-sm text-center py-4 border border-line rounded-md bg-white">
