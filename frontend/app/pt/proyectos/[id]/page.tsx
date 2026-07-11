@@ -118,11 +118,31 @@ export default function ProjectPagePT() {
             const report = await getReport(getToken, projectId, moduleId);
             if (pollingModuleIdRef.current !== moduleId) return;
             setReports((prev) => ({ ...prev, [moduleId]: report }));
+            setProject((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    modules: prev.modules.map((m) =>
+                      m.module_id === moduleId ? { ...m, status: "validated" } : m
+                    ),
+                  }
+                : prev
+            );
             setLoadingModuleId(null);
             return;
           }
           if (status.status === "failed") {
             setError(status.error || "A validação falhou -- tente enviar o arquivo novamente.");
+            setProject((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    modules: prev.modules.map((m) =>
+                      m.module_id === moduleId ? { ...m, status: "failed" } : m
+                    ),
+                  }
+                : prev
+            );
             setLoadingModuleId(null);
             return;
           }
