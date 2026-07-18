@@ -56,6 +56,22 @@ class Settings(BaseSettings):
     # pero no instantáneas.
     confirmations_required: int = 20
 
+    # --- Lemon Squeezy (pagos con tarjeta, alternativa a cripto) ---
+    # API key privada, se crea en Lemon Squeezy > Settings > API.
+    lemonsqueezy_api_key: str = ""
+    # Store ID numérico (Settings > Stores, el número al lado del nombre).
+    lemonsqueezy_store_id: str = ""
+    # Signing secret del webhook (Settings > Webhooks > el que apunte a
+    # /webhooks/lemonsqueezy). Lemon Squeezy firma con HMAC-SHA256 en el
+    # header X-Signature, no con svix como Clerk.
+    lemonsqueezy_webhook_signing_secret: str = ""
+    # Variant IDs de los productos creados en Lemon Squeezy: uno para el
+    # pago por proyecto (one-off) y otro para la suscripción mensual
+    # (recurring). Se ven en la URL del producto en el dashboard, o vía
+    # GET /v1/variants de su API.
+    lemonsqueezy_variant_id_per_project: str = ""
+    lemonsqueezy_variant_id_subscription: str = ""
+
     # --- Precios ---
     price_per_project_usd: float = 99.0
     price_subscription_monthly_usd: float = 149.0

@@ -195,6 +195,17 @@ class PaymentNetwork(str, enum.Enum):
     base = "base"
 
 
+class PaymentProvider(str, enum.Enum):
+    """De qué gateway viene este Payment. `crypto` es el flujo histórico
+    (USDC on-chain, ver payment_listener.py); `lemonsqueezy` es el nuevo
+    checkout con tarjeta (ver app/services/lemonsqueezy.py +
+    app/api/webhooks.py). Ambos comparten la misma tabla y el mismo
+    `apply_payment_confirmation()` -- lo único que cambia es CÓMO se
+    detecta y confirma el pago, no qué se desbloquea."""
+    crypto = "crypto"
+    lemonsqueezy = "lemonsqueezy"
+
+
 class Payment(Base):
     __tablename__ = "payments"
 
@@ -203,17 +214,23 @@ class Payment(Base):
     project_id = Column(String, ForeignKey("projects.id"), nullable=True)  # null si es suscripción
 
     payment_type = Column(Enum(PaymentType), nullable=False)
-    network = Column(Enum(PaymentNetwork), nullable=True)  # se fija cuando el usuario elige red
+    provider = Column(Enum(PaymentProvider), nullable=False, default=PaymentProvider.crypto)
+    network = Column(Enum(PaymentNetwork), nullable=True)  # solo aplica si provider == crypto
 
     # Monto único con micro-variación para poder identificar la tx entrante
     # contra la dirección fija única (ver app/services/payment_matching.py).
-    # Ej: 99.0034 en vez de 99.00 exacto.
+    # Ej: 99.0034 en vez de 99.00 exacto. Para provider == lemonsqueezy este
+    # campo sigue guardando el precio esperado, pero el matching real no es
+    # por monto: es por el payment.id que viajó como custom_data en el
+    # checkout y vuelve en el webhook (ver lemonsqueezy.py).
     expected_amount_usd = Column(Float, nullable=False)
 
     status = Column(Enum(PaymentStatus), default=PaymentStatus.pending)
 
     tx_hash = Column(String, nullable=True)
     confirmations_seen = Column(Integer, default=0)
+
+    lemonsqueezy_order_id = Column(String, nullable=True, unique=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     confirmed_at = Column(DateTime, nullable=True)

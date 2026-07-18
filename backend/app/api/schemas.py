@@ -114,3 +114,13 @@ class PaymentStatusResponse(BaseModel):
     status: str
     confirmations_seen: int
     confirmations_required: int
+
+
+class LemonSqueezyCheckoutStartRequest(BaseModel):
+    payment_type: str  # "per_project" | "subscription"
+    project_id: str | None = None
+
+
+class LemonSqueezyCheckoutStartResponse(BaseModel):
+    payment_id: str
+    checkout_url: str
