@@ -36,6 +36,28 @@ from app.api.schemas import (
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 
+def _expire_stale_pending_payments(db: Session, user_id: str) -> None:
+    """Marca como expired los Payment pending de este usuario cuyo
+    expires_at ya pasó. Sin esto, un pago abandonado (usuario cancela
+    la wallet, cierra el checkout de Lemon Squeezy sin completar, etc.)
+    se queda en "pending" para siempre -- lo único que antes lo movía a
+    "expired" era el chequeo lazy en GET /payments/{id}/status, y si
+    nadie vuelve a consultar ESE pago puntual, nunca pasa. El síntoma
+    real: el tope de 3 pendientes simultáneos (ver más abajo) se
+    llenaba de pagos zombies y bloqueaba pagos nuevos legítimos, sin
+    ninguna forma de que se destrabara solo. Se llama al INICIO de
+    cada intento de pago nuevo, así el usuario se autodesbloquea con
+    su propio próximo intento -- no hace falta un worker de limpieza
+    aparte para esto.
+    """
+    db.query(Payment).filter(
+        Payment.user_id == user_id,
+        Payment.status == PaymentStatus.pending,
+        Payment.expires_at < datetime.utcnow(),
+    ).update({"status": PaymentStatus.expired})
+    db.commit()
+
+
 @router.post("/start", response_model=PaymentStartResponse)
 def start_payment(
     body: PaymentStartRequest,
@@ -54,6 +76,7 @@ def start_payment(
     # generar un monto único" para otros usuarios legítimos. No hace
     # falta Redis ni slowapi para esto -- es un simple count contra la
     # misma tabla que ya se consulta en todos lados.
+    _expire_stale_pending_payments(db, user.id)
     pending_count = (
         db.query(Payment)
         .filter(Payment.user_id == user.id, Payment.status == PaymentStatus.pending)
@@ -153,6 +176,7 @@ def start_lemonsqueezy_checkout(
     ):
         raise HTTPException(status_code=400, detail="payment_type inválido")
 
+    _expire_stale_pending_payments(db, user.id)
     pending_count = (
         db.query(Payment)
         .filter(Payment.user_id == user.id, Payment.status == PaymentStatus.pending)
