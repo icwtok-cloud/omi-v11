@@ -429,6 +429,30 @@ export async function getPaymentStatus(
   return res.json();
 }
 
+export interface LemonSqueezyCheckoutResult {
+  payment_id: string;
+  checkout_url: string;
+}
+
+export async function startLemonSqueezyCheckout(
+  getToken: GetToken,
+  paymentType: "per_project" | "subscription",
+  projectId?: string
+): Promise<LemonSqueezyCheckoutResult> {
+  const res = await authedFetch(
+    "/payments/lemonsqueezy/start", getToken, "No se pudo iniciar el pago con tarjeta",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        payment_type: paymentType,
+        project_id: projectId ?? null,
+      }),
+    }
+  );
+  return res.json();
+}
+
 export function downloadUrl(projectId: string): string {
   return `${API_BASE}/projects/${projectId}/download`;
 }

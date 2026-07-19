@@ -71,13 +71,18 @@ def create_checkout(payment: Payment, user_email: str) -> str:
                     "custom": {"payment_id": payment.id},
                 },
                 "product_options": {
-                    # A dónde volver después de pagar. El query param es
-                    # solo cosmético para el frontend (puede mostrar
-                    # "¡listo!" antes de que llegue el webhook) -- el
-                    # desbloqueo real SIEMPRE lo dispara el webhook, nunca
-                    # esta redirección (el usuario podría cerrar la
-                    # pestaña antes de volver).
-                    "redirect_url": f"{settings.frontend_urls[0]}/payment/success?payment_id={payment.id}",
+                    # A dónde volver después de pagar. Apunta a la página
+                    # del proyecto (?ls_payment_id=...) -- PaywallPanel.tsx
+                    # lee ese query param al montar y arranca el mismo
+                    # polling que usa para el flujo cripto. Igual que con
+                    # cripto, el desbloqueo real SIEMPRE lo dispara el
+                    # webhook, nunca esta redirección (el usuario podría
+                    # cerrar la pestaña antes de volver).
+                    "redirect_url": (
+                        f"{settings.frontend_urls[0]}/proyectos/{payment.project_id}?ls_payment_id={payment.id}"
+                        if payment.project_id
+                        else f"{settings.frontend_urls[0]}/app?ls_payment_id={payment.id}"
+                    ),
                 },
             },
             "relationships": {

@@ -7,6 +7,7 @@ import { polygon, base } from "wagmi/chains";
 import { parseUnits } from "viem";
 import {
   startPayment,
+  startLemonSqueezyCheckout,
   getPaymentStatus,
   getUserMe,
   PaymentStartResult,
@@ -23,7 +24,7 @@ const CHAIN_BY_NETWORK: Record<Network, typeof polygon | typeof base> = {
   base,
 };
 
-type Step = "choose" | "connect" | "confirm-wallet" | "waiting" | "confirmed" | "error";
+type Step = "choose" | "connect" | "confirm-wallet" | "waiting" | "resuming-card" | "confirmed" | "error";
 // "subscription_covered" = ya tiene una suscripción activa con cuota
 // disponible este mes -- no hay que iniciar un pago nuevo, solo usar
 // la cuota que ya pagó. "subscription" = arrancar una suscripción
@@ -57,6 +58,9 @@ const COPY = {
     network: "Red",
     downloadCta: "Descargar",
     continueUsdc: "Continuar con USDC",
+    payWithCard: "Pagar con tarjeta",
+    redirectingToCheckout: "Abriendo el checkout...",
+    resumingCardPayment: "Verificando tu pago con tarjeta...",
     exactAmount: "Monto exacto",
     address: "Dirección",
     amountMustMatch: "El monto tiene que coincidir exactamente — es lo que nos permite identificar tu pago de forma automática.",
@@ -103,6 +107,9 @@ const COPY = {
     network: "Rede",
     downloadCta: "Baixar",
     continueUsdc: "Continuar com USDC",
+    payWithCard: "Pagar com cartão",
+    redirectingToCheckout: "Abrindo o checkout...",
+    resumingCardPayment: "Verificando seu pagamento com cartão...",
     exactAmount: "Valor exato",
     address: "Endereço",
     amountMustMatch: "O valor precisa coincidir exatamente — é isso que nos permite identificar seu pagamento automaticamente.",
@@ -155,6 +162,63 @@ export function PaywallPanel({
     limit: number;
   } | null>(null);
   const [paymentType, setPaymentType] = useState<PaymentType>("per_project");
+  const [isStartingCardPayment, setIsStartingCardPayment] = useState(false);
+
+  // Al volver del checkout de Lemon Squeezy, la redirect_url que
+  // armamos en el backend (lemonsqueezy.py) trae ?ls_payment_id=... --
+  // NO es una confirmación de pago (el usuario pudo haber cancelado o
+  // cerrado la pestaña antes), es solo la señal de "puede que haya
+  // pagado, consultá el estado real". El desbloqueo real depende
+  // pura y exclusivamente del webhook (ver /webhooks/lemonsqueezy).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const lsPaymentId = params.get("ls_payment_id");
+    if (!lsPaymentId) return;
+
+    // Limpiamos el query param de la URL para que un refresh no vuelva
+    // a disparar este mismo chequeo con un pago que ya se resolvió.
+    window.history.replaceState({}, "", window.location.pathname);
+
+    setStep("resuming-card");
+    getPaymentStatus(getToken, lsPaymentId)
+      .then((status) => {
+        if (status.status === "confirmed") {
+          setStep("confirmed");
+        } else {
+          // pending o expired: no reintentamos indefinido -- si el
+          // webhook todavía no llegó (puede tardar unos segundos),
+          // un par de reintentos cortos alcanza; si tarda más que eso
+          // el usuario puede simplemente refrescar la página.
+          const expiresInTenMinutes = new Date(Date.now() + 10 * 60_000).toISOString();
+          setStep("waiting");
+          pollPaymentStatus(lsPaymentId, expiresInTenMinutes);
+        }
+      })
+      .catch(() => {
+        setStep("choose");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleCardPayment() {
+    setErrorMsg(null);
+    setIsStartingCardPayment(true);
+    try {
+      const result = await startLemonSqueezyCheckout(
+        getToken,
+        paymentType as "per_project" | "subscription",
+        projectId
+      );
+      // Redirección completa (no un fetch) -- el checkout de Lemon
+      // Squeezy es una página hosteada por ellos, no algo que se pueda
+      // embeber acá sin su widget de overlay.
+      window.location.href = result.checkout_url;
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : t.startPaymentError);
+      setStep("error");
+      setIsStartingCardPayment(false);
+    }
+  }
 
   // Si el usuario cierra la pestaña o recarga mientras espera la
   // confirmación on-chain (puede tardar minutos), sin esto perdía el
@@ -490,6 +554,15 @@ export function PaywallPanel({
               ? t.downloadCta
               : t.continueUsdc}
           </button>
+          {paymentType !== "free" && paymentType !== "subscription_covered" && (
+            <button
+              onClick={handleCardPayment}
+              disabled={isStartingCardPayment}
+              className="w-full border border-line text-ink rounded-full py-3 font-medium hover:border-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isStartingCardPayment ? t.redirectingToCheckout : t.payWithCard}
+            </button>
+          )}
         </>
       )}
 
@@ -523,6 +596,12 @@ export function PaywallPanel({
               ? t.payWithMetamask
               : t.connectAndPay}
           </button>
+        </div>
+      )}
+
+      {step === "resuming-card" && (
+        <div className="text-center py-4">
+          <p className="text-graphite text-sm">{t.resumingCardPayment}</p>
         </div>
       )}
 
