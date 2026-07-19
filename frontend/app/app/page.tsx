@@ -33,6 +33,12 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [versionFilter, setVersionFilter] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // Si se llega con ?checkout=annual (botón de la landing en #partners),
+  // no mostramos el dashboard de proyectos -- va directo a una pantalla
+  // mínima de "pagar" para no confundir a quien solo quiere suscribirse.
+  const [isAnnualCheckout] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("checkout") === "annual"
+  );
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -101,6 +107,32 @@ export default function HomePage() {
         )}
       </header>
 
+      {isAnnualCheckout ? (
+        <section className="px-6 md:px-12 pt-16 pb-24 max-w-lg mx-auto w-full text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-brand mb-4">
+            Plan anual · USD 799
+          </p>
+          <h1 className="font-extrabold text-3xl md:text-4xl leading-[1.1] mb-4 tracking-tight">
+            Ya casi -- solo falta confirmar quién sos
+          </h1>
+          {!isSignedIn ? (
+            <>
+              <p className="text-graphite mb-6">
+                Ingresá con tu cuenta para ir directo al pago del plan anual. No hace falta crear un proyecto antes.
+              </p>
+              <SignInButton mode="modal">
+                <button className="bg-verify text-white rounded-full px-6 py-2.5 font-medium hover:opacity-90 transition-opacity">
+                  Ingresar y continuar al pago
+                </button>
+              </SignInButton>
+            </>
+          ) : (
+            <p className="text-graphite mb-2">Redirigiendo al pago...</p>
+          )}
+          {projectsError && <p className="text-alert text-sm mt-4">{projectsError}</p>}
+        </section>
+      ) : (
+        <>
       <section className="px-6 md:px-12 pt-16 pb-12 max-w-3xl">
         <p className="text-xs font-semibold uppercase tracking-widest text-brand mb-4">
           Preparación de datos para Odoo
@@ -204,6 +236,8 @@ export default function HomePage() {
           </>
         )}
       </section>
+        </>
+      )}
 
       <NewProjectModal
         isOpen={isModalOpen}
