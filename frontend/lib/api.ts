@@ -395,7 +395,7 @@ export interface PaymentStartResult {
 
 export async function startPayment(
   getToken: GetToken,
-  paymentType: "per_project" | "subscription",
+  paymentType: "per_project" | "subscription" | "annual",
   network: "polygon" | "base",
   projectId?: string
 ): Promise<PaymentStartResult> {

@@ -64,7 +64,9 @@ def start_payment(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if body.payment_type not in (PaymentType.per_project.value, PaymentType.subscription.value):
+    if body.payment_type not in (
+        PaymentType.per_project.value, PaymentType.subscription.value, PaymentType.annual.value
+    ):
         raise HTTPException(status_code=400, detail="payment_type inválido")
     if body.network not in (PaymentNetwork.polygon.value, PaymentNetwork.base.value):
         raise HTTPException(status_code=400, detail="network inválida")
@@ -95,6 +97,8 @@ def start_payment(
         if not project or project.owner_id != user.id:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         base_price = settings.price_per_project_usd
+    elif body.payment_type == PaymentType.annual.value:
+        base_price = settings.price_annual_usd
     else:
         base_price = settings.price_subscription_monthly_usd
 

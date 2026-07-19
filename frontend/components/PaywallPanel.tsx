@@ -29,7 +29,7 @@ type Step = "choose" | "connect" | "confirm-wallet" | "waiting" | "resuming-card
 // disponible este mes -- no hay que iniciar un pago nuevo, solo usar
 // la cuota que ya pagó. "subscription" = arrancar una suscripción
 // nueva (todavía no tiene una, o se le venció).
-type PaymentType = "free" | "per_project" | "subscription" | "subscription_covered";
+type PaymentType = "free" | "per_project" | "subscription" | "subscription_covered" | "annual";
 
 const COPY = {
   es: {
@@ -51,6 +51,7 @@ const COPY = {
     perProject: "Por proyecto · $99",
     yourSubscription: (used: number, limit: number) => `Tu suscripción (${used}/${limit})`,
     monthly: "Mensual · $149",
+    annual: "Anual · $799",
     freeExplain:
       "Tu proyecto de prueba gratis incluye 1 módulo, con reporte y descarga -- una sola vez por cuenta. No hace falta wallet ni pago para esto.",
     coveredExplain: (used: number, limit: number) =>
@@ -100,6 +101,7 @@ const COPY = {
     perProject: "Por projeto · $99",
     yourSubscription: (used: number, limit: number) => `Sua assinatura (${used}/${limit})`,
     monthly: "Mensal · $149",
+    annual: "Anual · $799",
     freeExplain:
       "Seu projeto de teste grátis inclui 1 módulo, com relatório e download -- uma única vez por conta. Não precisa de carteira nem pagamento para isso.",
     coveredExplain: (used: number, limit: number) =>
@@ -164,19 +166,17 @@ export function PaywallPanel({
   const [paymentType, setPaymentType] = useState<PaymentType>("per_project");
   const [isStartingCardPayment, setIsStartingCardPayment] = useState(false);
 
-  // Al volver del checkout de Lemon Squeezy, la redirect_url que
-  // armamos en el backend (lemonsqueezy.py) trae ?ls_payment_id=... --
-  // NO es una confirmación de pago (el usuario pudo haber cancelado o
-  // cerrado la pestaña antes), es solo la señal de "puede que haya
-  // pagado, consultá el estado real". El desbloqueo real depende
-  // pura y exclusivamente del webhook (ver /webhooks/lemonsqueezy).
+  // Al volver del checkout de Lemon Squeezy, la redirect_url que arma
+  // el backend (lemonsqueezy.py) trae ?ls_payment_id=... -- NO es una
+  // confirmación de pago (el usuario pudo haber cancelado o cerrado la
+  // pestaña antes), es solo la señal de "puede que haya pagado,
+  // consultá el estado real". El desbloqueo real depende pura y
+  // exclusivamente del webhook (ver /webhooks/lemonsqueezy).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const lsPaymentId = params.get("ls_payment_id");
     if (!lsPaymentId) return;
 
-    // Limpiamos el query param de la URL para que un refresh no vuelva
-    // a disparar este mismo chequeo con un pago que ya se resolvió.
     window.history.replaceState({}, "", window.location.pathname);
 
     setStep("resuming-card");
@@ -185,10 +185,6 @@ export function PaywallPanel({
         if (status.status === "confirmed") {
           setStep("confirmed");
         } else {
-          // pending o expired: no reintentamos indefinido -- si el
-          // webhook todavía no llegó (puede tardar unos segundos),
-          // un par de reintentos cortos alcanza; si tarda más que eso
-          // el usuario puede simplemente refrescar la página.
           const expiresInTenMinutes = new Date(Date.now() + 10 * 60_000).toISOString();
           setStep("waiting");
           pollPaymentStatus(lsPaymentId, expiresInTenMinutes);
@@ -206,12 +202,9 @@ export function PaywallPanel({
     try {
       const result = await startLemonSqueezyCheckout(
         getToken,
-        paymentType as "per_project" | "subscription",
+        paymentType as "per_project" | "subscription" | "annual",
         projectId
       );
-      // Redirección completa (no un fetch) -- el checkout de Lemon
-      // Squeezy es una página hosteada por ellos, no algo que se pueda
-      // embeber acá sin su widget de overlay.
       window.location.href = result.checkout_url;
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : t.startPaymentError);
@@ -471,7 +464,7 @@ export function PaywallPanel({
 
       {step === "choose" && (
         <>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {freeProjectAvailable && (
               <button
                 onClick={() => setPaymentType("free")}
@@ -517,7 +510,27 @@ export function PaywallPanel({
                 {t.monthly}
               </button>
             )}
+            <button
+              onClick={() => setPaymentType("annual")}
+              className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
+                paymentType === "annual"
+                  ? "border-verify bg-verify-light text-verify"
+                  : "border-line text-graphite"
+              }`}
+            >
+              {t.annual}
+            </button>
           </div>
+
+          {paymentType !== "free" && paymentType !== "subscription_covered" && (
+            <button
+              onClick={handleCardPayment}
+              disabled={isStartingCardPayment}
+              className="w-full border border-line text-ink rounded-full py-3 font-medium hover:border-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isStartingCardPayment ? t.redirectingToCheckout : t.payWithCard}
+            </button>
+          )}
 
           {paymentType === "free" ? (
             <p className="text-xs text-graphite">{t.freeExplain}</p>
@@ -554,16 +567,13 @@ export function PaywallPanel({
               ? t.downloadCta
               : t.continueUsdc}
           </button>
-          {paymentType !== "free" && paymentType !== "subscription_covered" && (
-            <button
-              onClick={handleCardPayment}
-              disabled={isStartingCardPayment}
-              className="w-full border border-line text-ink rounded-full py-3 font-medium hover:border-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isStartingCardPayment ? t.redirectingToCheckout : t.payWithCard}
-            </button>
-          )}
         </>
+      )}
+
+      {step === "resuming-card" && (
+        <div className="text-center py-4">
+          <p className="text-graphite text-sm">{t.resumingCardPayment}</p>
+        </div>
       )}
 
       {(step === "connect" || step === "confirm-wallet") && payment && (
@@ -596,12 +606,6 @@ export function PaywallPanel({
               ? t.payWithMetamask
               : t.connectAndPay}
           </button>
-        </div>
-      )}
-
-      {step === "resuming-card" && (
-        <div className="text-center py-4">
-          <p className="text-graphite text-sm">{t.resumingCardPayment}</p>
         </div>
       )}
 
