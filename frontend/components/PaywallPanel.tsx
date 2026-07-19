@@ -54,6 +54,12 @@ const COPY = {
     monthlyTrialBadge: "3 días gratis",
     monthlyTrialExplain: "Empezás con 3 días gratis. Recién después se cobra la suscripción mensual -- podés cancelar antes sin que se cobre nada.",
     annual: "Anual · $799",
+    annualBenefits: [
+      "Exportaciones ilimitadas -- sin tope mensual, todo el año",
+      "Soporte personalizado, prioridad de respuesta",
+      "Pensado para varios clientes/proyectos a la vez",
+    ],
+    annualBenefitsTitle: "Lo que incluye el plan anual:",
     freeExplain:
       "Tu proyecto de prueba gratis incluye 1 módulo, con reporte y descarga -- una sola vez por cuenta. No hace falta wallet ni pago para esto.",
     coveredExplain: (used: number, limit: number) =>
@@ -106,6 +112,12 @@ const COPY = {
     monthlyTrialBadge: "3 dias grátis",
     monthlyTrialExplain: "Você começa com 3 dias grátis. A assinatura mensal só é cobrada depois -- pode cancelar antes sem pagar nada.",
     annual: "Anual · $799",
+    annualBenefits: [
+      "Exportações ilimitadas -- sem teto mensal, o ano todo",
+      "Suporte personalizado, prioridade de resposta",
+      "Pensado para vários clientes/projetos ao mesmo tempo",
+    ],
+    annualBenefitsTitle: "O que inclui o plano anual:",
     freeExplain:
       "Seu projeto de teste grátis inclui 1 módulo, com relatório e download -- uma única vez por conta. Não precisa de carteira nem pagamento para isso.",
     coveredExplain: (used: number, limit: number) =>
@@ -533,6 +545,20 @@ export function PaywallPanel({
             <p className="text-verify text-sm font-medium bg-verify-light rounded-md px-3 py-2">
               🎁 {t.monthlyTrialExplain}
             </p>
+          )}
+
+          {paymentType === "annual" && (
+            <div className="text-verify text-sm bg-verify-light rounded-md px-3 py-2.5">
+              <p className="font-semibold mb-1.5">✨ {t.annualBenefitsTitle}</p>
+              <ul className="space-y-1">
+                {t.annualBenefits.map((benefit) => (
+                  <li key={benefit} className="flex items-start gap-2">
+                    <span className="shrink-0">✓</span>
+                    <span>{benefit}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {paymentType !== "free" && paymentType !== "subscription_covered" && (
