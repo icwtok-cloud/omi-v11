@@ -51,6 +51,8 @@ const COPY = {
     perProject: "Por proyecto · $99",
     yourSubscription: (used: number, limit: number) => `Tu suscripción (${used}/${limit})`,
     monthly: "Mensual · $149",
+    monthlyTrialBadge: "3 días gratis",
+    monthlyTrialExplain: "Empezás con 3 días gratis. Recién después se cobra la suscripción mensual -- podés cancelar antes sin que se cobre nada.",
     annual: "Anual · $799",
     freeExplain:
       "Tu proyecto de prueba gratis incluye 1 módulo, con reporte y descarga -- una sola vez por cuenta. No hace falta wallet ni pago para esto.",
@@ -101,6 +103,8 @@ const COPY = {
     perProject: "Por projeto · $99",
     yourSubscription: (used: number, limit: number) => `Sua assinatura (${used}/${limit})`,
     monthly: "Mensal · $149",
+    monthlyTrialBadge: "3 dias grátis",
+    monthlyTrialExplain: "Você começa com 3 dias grátis. A assinatura mensal só é cobrada depois -- pode cancelar antes sem pagar nada.",
     annual: "Anual · $799",
     freeExplain:
       "Seu projeto de teste grátis inclui 1 módulo, com relatório e download -- uma única vez por conta. Não precisa de carteira nem pagamento para isso.",
@@ -501,12 +505,15 @@ export function PaywallPanel({
             ) : (
               <button
                 onClick={() => setPaymentType("subscription")}
-                className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
+                className={`relative flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
                   paymentType === "subscription"
                     ? "border-verify bg-verify-light text-verify"
                     : "border-line text-graphite"
                 }`}
               >
+                <span className="absolute -top-2.5 right-2 bg-verify text-white text-[10px] font-bold rounded-full px-2 py-0.5 whitespace-nowrap">
+                  {t.monthlyTrialBadge}
+                </span>
                 {t.monthly}
               </button>
             )}
@@ -521,6 +528,12 @@ export function PaywallPanel({
               {t.annual}
             </button>
           </div>
+
+          {paymentType === "subscription" && (
+            <p className="text-verify text-sm font-medium bg-verify-light rounded-md px-3 py-2">
+              🎁 {t.monthlyTrialExplain}
+            </p>
+          )}
 
           {paymentType !== "free" && paymentType !== "subscription_covered" && (
             <button

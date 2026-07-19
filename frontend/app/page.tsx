@@ -446,7 +446,10 @@ export default function LandingPage() {
                 <p className="font-extrabold text-4xl tracking-tight">USD 149</p>
                 <p className="text-graphite/60 line-through text-lg">USD 495</p>
               </div>
-              <p className="text-verify text-xs font-semibold mb-4">Ahorrás 70% vs. pagar 5 proyectos sueltos</p>
+              <p className="text-verify text-xs font-semibold mb-1">Ahorrás 70% vs. pagar 5 proyectos sueltos</p>
+              <p className="inline-block bg-verify-light text-verify text-xs font-bold rounded-full px-3 py-1 mb-4">
+                🎁 3 días gratis para probar
+              </p>
               <p className="text-sm text-graphite mb-6">Hasta 5 proyectos exportados por mes</p>
               <ul className="space-y-2 text-sm mb-6">
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Todo lo del plan por proyecto</li>
