@@ -58,6 +58,30 @@ def _expire_stale_pending_payments(db: Session, user_id: str) -> None:
     db.commit()
 
 
+def _supersede_pending_lemonsqueezy_payments(db: Session, user_id: str) -> None:
+    """Expira TODOS los Payment pending con provider=lemonsqueezy de
+    este usuario, sin importar si expires_at ya pasó. A diferencia de
+    cripto (ver _expire_stale_pending_payments), acá el tope de 3
+    pendientes no tiene sentido: el pool finito de generate_unique_amount()
+    no aplica a Lemon Squeezy, cada click en "Pagar con tarjeta" crea un
+    Payment nuevo ANTES de que el usuario llegue siquiera a completar el
+    checkout, y con el bug del botón trabado (fix en PaywallPanel.tsx)
+    un usuario podía acumular 3 filas "pending" en minutos con un solo
+    intento real de pago, bloqueándose a sí mismo hasta por 30 min sin
+    ninguna forma de destrabarse. Solo puede haber un checkout de
+    tarjeta genuinamente "en curso" a la vez -- cualquier intento nuevo
+    supera al anterior. Si el usuario vuelve a una pestaña vieja y
+    completa el pago ahí, el webhook igual la confirma: matchea por
+    payment_id exacto en custom_data, no por status (ver webhooks.py).
+    """
+    db.query(Payment).filter(
+        Payment.user_id == user_id,
+        Payment.status == PaymentStatus.pending,
+        Payment.provider == PaymentProvider.lemonsqueezy,
+    ).update({"status": PaymentStatus.expired})
+    db.commit()
+
+
 @router.post("/start", response_model=PaymentStartResponse)
 def start_payment(
     body: PaymentStartRequest,
@@ -180,17 +204,7 @@ def start_lemonsqueezy_checkout(
     ):
         raise HTTPException(status_code=400, detail="payment_type inválido")
 
-    _expire_stale_pending_payments(db, user.id)
-    pending_count = (
-        db.query(Payment)
-        .filter(Payment.user_id == user.id, Payment.status == PaymentStatus.pending)
-        .count()
-    )
-    if pending_count >= 3:
-        raise HTTPException(
-            status_code=429,
-            detail="Ya tenés pagos pendientes -- esperá a que se confirmen o expiren antes de iniciar uno nuevo.",
-        )
+    _supersede_pending_lemonsqueezy_payments(db, user.id)
 
     if body.payment_type == PaymentType.per_project.value:
         if not body.project_id:
