@@ -80,21 +80,34 @@ app.include_router(users.router)
 
 
 @app.get("/health")
+@app.head("/health")
 def health_check():
     """Liveness: el proceso está arriba y puede responder. No verifica
     dependencias -- si esto falla, no hay nada que reintentar, hay que
-    reiniciar el proceso."""
+    reiniciar el proceso.
+
+    @app.head explícito: en teoría Starlette agrega HEAD solo cuando
+    "GET" está en methods, pero en producción UptimeRobot (que en el
+    plan free fuerza HEAD, sin opción de cambiar a GET) recibía 405
+    igual -- posiblemente por interacción con el middleware de
+    logging/CORS de más abajo. Declararlo a mano saca la ambigüedad.
+    """
     return {"status": "ok"}
 
 
 @app.get("/health/ready")
+@app.head("/health/ready")
 def readiness_check():
     """Readiness: además de estar vivo, puede hablar con la DB. Antes,
     `/health` siempre devolvía "ok" incluso con la base caída -- un
     monitor externo (o el propio Render) nunca se enteraba de una
     caída real de la base, solo de que el proceso web seguía
     respondiendo. Se abre una sesión propia (no la dependency `get_db`)
-    para no depender del resto del stack de la app en este chequeo."""
+    para no depender del resto del stack de la app en este chequeo.
+
+    @app.head explícito por el mismo motivo que en /health de arriba
+    -- este es el endpoint que efectivamente monitorea UptimeRobot.
+    """
     db = SessionLocal()
     try:
         db.execute(text("SELECT 1"))
