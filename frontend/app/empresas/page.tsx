@@ -32,7 +32,7 @@ const QUESTIONS = [
   },
   {
     q: "¿Cuánto cuesta validar los datos antes de migrar?",
-    a: "El reporte completo es gratis para un proyecto de un módulo. Exportar el archivo corregido tiene un costo por proyecto o por suscripción mensual si migrás con volumen -- sin tarjeta de crédito, se paga en USDC.",
+    a: "El reporte completo es gratis para un proyecto de un módulo. Exportar el archivo corregido tiene un costo por proyecto, por suscripción mensual, o por plan anual si migrás con volumen -- pagás con tarjeta o en USDC, lo que te resulte más cómodo.",
   },
   {
     q: "¿Cuánto tarda?",

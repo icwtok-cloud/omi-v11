@@ -398,8 +398,8 @@ export default function LandingPage() {
             Precios simples, pagás cuando estás listo
           </h2>
           <p className="text-graphite mb-14">
-            El análisis y el reporte siempre son gratis. Se paga solo al exportar, hoy en USDC
-            (Polygon o Base) desde tu wallet -- sin tarjeta ni intermediarios.
+            El análisis y el reporte siempre son gratis. Se paga solo al exportar, con
+            tarjeta o en USDC (Polygon o Base) desde tu wallet -- vos elegís.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
@@ -410,7 +410,7 @@ export default function LandingPage() {
               <ul className="space-y-2 text-sm mb-6">
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Reporte completo</li>
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Descarga del archivo corregido incluida</li>
-                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Sin tarjeta ni wallet</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> No requiere pago para probar</li>
               </ul>
               <Link
                 href="/app"
@@ -442,7 +442,11 @@ export default function LandingPage() {
                 Para consultoras
               </span>
               <p className="font-bold text-lg mb-1">Mensual</p>
-              <p className="font-extrabold text-4xl tracking-tight mb-1">USD 149</p>
+              <div className="flex items-baseline gap-2 mb-1">
+                <p className="font-extrabold text-4xl tracking-tight">USD 149</p>
+                <p className="text-graphite/60 line-through text-lg">USD 495</p>
+              </div>
+              <p className="text-verify text-xs font-semibold mb-4">Ahorrás 70% vs. pagar 5 proyectos sueltos</p>
               <p className="text-sm text-graphite mb-6">Hasta 5 proyectos exportados por mes</p>
               <ul className="space-y-2 text-sm mb-6">
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Todo lo del plan por proyecto</li>
@@ -460,48 +464,59 @@ export default function LandingPage() {
           <p className="text-sm text-graphite mt-8">
             ¿Migrás con volumen real? Mirá el{" "}
             <a href="#partners" className="text-brand font-medium hover:underline">
-              programa de partners
+              plan anual
             </a>
             .
           </p>
         </div>
       </section>
 
-      <section id="partners" className="border-t border-line py-20">
-        <div className="max-w-3xl mx-auto px-6 text-center">
+      <section id="partners" className="border-t border-line bg-white/60 py-20">
+        <div className="max-w-md mx-auto px-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-graphite mb-3">
-            Programa de partners
+            Para consultoras y equipos con volumen
           </p>
           <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight mb-4">
-            Para partners y consultoras que migran con volumen real
+            Plan anual, exportaciones ilimitadas
           </h2>
-          <p className="text-graphite mb-10 max-w-xl mx-auto">
-            No es otro plan de autoservicio -- es una activación directa con el
-            equipo de OMI, pensada para quien necesita usar la herramienta muy por
-            encima de un proyecto suelto.
+          <p className="text-graphite mb-10">
+            Pensado para quien migra todo el año, no un proyecto suelto -- pagás
+            una vez y te sacás de encima el tope mensual.
           </p>
-          <div className="bg-white border border-line rounded-xl p-8 text-left max-w-xl mx-auto mb-8">
-            <ul className="space-y-3 text-sm">
-              <li className="flex items-start gap-2">
-                <span className="text-verify shrink-0">✓</span> Membresía anual: USD 499/año
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-verify shrink-0">✓</span> 5.000.000 de eventos por año (1 evento = 1 fila analizada)
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-verify shrink-0">✓</span> Sin límite de proyectos ni exportes mientras dure la cuota
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-verify shrink-0">✓</span> Activación manual -- hablás directo con el equipo, no es autoservicio
-              </li>
+
+          <div className="bg-white border-2 border-brand rounded-xl p-8 text-left relative">
+            <span className="absolute -top-3 left-7 bg-brand text-white text-xs font-bold rounded-full px-3 py-1">
+              Mejor precio
+            </span>
+            <p className="font-bold text-lg mb-1">Anual</p>
+            <div className="flex items-baseline gap-2 mb-1">
+              <p className="font-extrabold text-4xl tracking-tight">USD 799</p>
+              <p className="text-graphite/60 line-through text-lg">USD 1.788</p>
+            </div>
+            <p className="text-verify text-xs font-semibold mb-6">
+              Ahorrás 55% vs. pagar la mensual los 12 meses
+            </p>
+            <ul className="space-y-2 text-sm mb-8">
+              <li className="flex items-start gap-2"><span className="text-verify shrink-0">✓</span> Exportaciones ilimitadas, sin tope mensual</li>
+              <li className="flex items-start gap-2"><span className="text-verify shrink-0">✓</span> Todo lo del plan mensual</li>
+              <li className="flex items-start gap-2"><span className="text-verify shrink-0">✓</span> Pensado para varios clientes a la vez, todo el año</li>
             </ul>
+            <Link
+              href="/app?checkout=annual"
+              className="block text-center bg-brand text-white font-semibold rounded-md px-4 py-3 hover:bg-brand-dark transition-colors"
+            >
+              Suscribirme al plan anual
+            </Link>
           </div>
-          <a
-            href="mailto:hello@alterego.lat?subject=Programa%20de%20Partners%20OMI"
-            className="inline-block bg-brand text-white font-semibold rounded-md px-6 py-3 hover:bg-brand-dark transition-colors"
-          >
-            Contactanos
-          </a>
+
+          <p className="text-sm text-graphite mt-8">
+            ¿Necesitás algo a medida (facturación distinta, volumen fuera de estos
+            planes)? Escribinos a{" "}
+            <a href="mailto:hello@alterego.lat?subject=Plan%20a%20medida%20OMI" className="text-brand font-medium hover:underline">
+              hello@alterego.lat
+            </a>
+            .
+          </p>
         </div>
       </section>
 

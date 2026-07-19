@@ -30,7 +30,7 @@ const SECTIONS = [
   },
   {
     title: "Pagos",
-    body: "El pago por proyecto o suscripción se hace en USDC (Polygon o Base) directo desde tu wallet -- OMI no procesa ni guarda datos de tarjeta. Estamos sumando un método de pago con tarjeta/fiat; cuando esté disponible, esta página se actualiza con el procesador correspondiente.",
+    body: "Podés pagar por proyecto, suscripción mensual o plan anual de dos formas: con tarjeta, procesado por Lemon Squeezy (nuestro merchant of record -- ellos manejan los datos de tu tarjeta, OMI nunca los ve ni los guarda), o en USDC (Polygon o Base) directo desde tu wallet, sin intermediarios. Elegís el método al momento de pagar.",
   },
   {
     title: "Borrado de datos",
@@ -38,7 +38,7 @@ const SECTIONS = [
   },
   {
     title: "Reembolsos",
-    body: "Un pago en USDC ya confirmado no se reembolsa -- es una limitación real de pagar directo entre wallets, sin un intermediario que pueda revertir la transacción. Esto no significa que quedes sin lo que pagaste: una vez confirmado el pago, la descarga del proyecto queda disponible para volver a generarla las veces que necesites, sin cargo adicional. Si la descarga falla o el archivo corregido no se genera, intentá de nuevo desde el proyecto -- si el problema persiste, escribinos a hello@alterego.lat y lo resolvemos manualmente (evaluamos cada caso: reintento asistido, corrección del problema puntual, o un proyecto de cortesía si corresponde). No ofrecemos devolución del USDC en ningún caso.",
+    body: "Si pagaste con tarjeta (Lemon Squeezy), podés pedir el reembolso escribiendo a hello@alterego.lat y lo evaluamos caso por caso. Un pago en USDC ya confirmado, en cambio, no se reembolsa -- es una limitación real de pagar directo entre wallets, sin un intermediario que pueda revertir la transacción. Esto no significa que quedes sin lo que pagaste: una vez confirmado el pago (por cualquiera de los dos métodos), la descarga del proyecto queda disponible para volver a generarla las veces que necesites, sin cargo adicional. Si la descarga falla o el archivo corregido no se genera, intentá de nuevo desde el proyecto -- si el problema persiste, escribinos a hello@alterego.lat y lo resolvemos manualmente (evaluamos cada caso: reintento asistido, corrección del problema puntual, o un proyecto de cortesía si corresponde).",
   },
 ];
 

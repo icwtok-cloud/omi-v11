@@ -66,6 +66,15 @@ class User(Base):
     annual_events_used = Column(Integer, default=0)
     annual_events_reset_at = Column(DateTime, nullable=True)
 
+    # Vencimiento del plan anual self-service (comprado vía Lemon
+    # Squeezy, ver PaymentType.annual en entitlements.py). Queda en
+    # None para los deals manuales de partners de arriba -- ese caso
+    # nunca vence solo, se maneja a mano. Con fecha seteada, en cambio,
+    # sí se puede auto-revocar el acceso si no renueva (ver
+    # _revoke_subscription en app/api/webhooks.py) y sirve de backstop
+    # en los chequeos de exención por si ese webhook se pierde.
+    annual_plan_expires_at = Column(DateTime, nullable=True)
+
     projects = relationship("Project", back_populates="owner")
     payments = relationship("Payment", back_populates="user")
 
@@ -182,6 +191,7 @@ class ProjectModule(Base):
 class PaymentType(str, enum.Enum):
     per_project = "per_project"
     subscription = "subscription"
+    annual = "annual"
 
 
 class PaymentStatus(str, enum.Enum):
@@ -197,11 +207,8 @@ class PaymentNetwork(str, enum.Enum):
 
 class PaymentProvider(str, enum.Enum):
     """De qué gateway viene este Payment. `crypto` es el flujo histórico
-    (USDC on-chain, ver payment_listener.py); `lemonsqueezy` es el nuevo
-    checkout con tarjeta (ver app/services/lemonsqueezy.py +
-    app/api/webhooks.py). Ambos comparten la misma tabla y el mismo
-    `apply_payment_confirmation()` -- lo único que cambia es CÓMO se
-    detecta y confirma el pago, no qué se desbloquea."""
+    (USDC on-chain); `lemonsqueezy` es el checkout con tarjeta. Ambos
+    comparten la misma tabla y el mismo `apply_payment_confirmation()`."""
     crypto = "crypto"
     lemonsqueezy = "lemonsqueezy"
 
@@ -219,10 +226,8 @@ class Payment(Base):
 
     # Monto único con micro-variación para poder identificar la tx entrante
     # contra la dirección fija única (ver app/services/payment_matching.py).
-    # Ej: 99.0034 en vez de 99.00 exacto. Para provider == lemonsqueezy este
-    # campo sigue guardando el precio esperado, pero el matching real no es
-    # por monto: es por el payment.id que viajó como custom_data en el
-    # checkout y vuelve en el webhook (ver lemonsqueezy.py).
+    # Ej: 99.0034 en vez de 99.00 exacto. No aplica a lemonsqueezy (ahí el
+    # matching es por payment.id via custom_data, no por monto).
     expected_amount_usd = Column(Float, nullable=False)
 
     status = Column(Enum(PaymentStatus), default=PaymentStatus.pending)
@@ -230,11 +235,18 @@ class Payment(Base):
     tx_hash = Column(String, nullable=True)
     confirmations_seen = Column(Integer, default=0)
 
-    lemonsqueezy_order_id = Column(String, nullable=True, unique=True)
-
     created_at = Column(DateTime, default=datetime.utcnow)
     confirmed_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=False)  # ventana para pagar, ej 30 min
+
+    # Para provider == lemonsqueezy: guarda una referencia única del
+    # evento que confirmó ESTE Payment específico ("{event_name}:{id}"),
+    # no el order_id crudo de Lemon Squeezy -- ver comentario largo en
+    # app/api/webhooks.py sobre por qué (custom_data se repite en cada
+    # evento de una misma suscripción, incluidas las renovaciones, así
+    # que el order_id crudo de Lemon Squeezy no alcanza para diferenciar
+    # "pago inicial" de "renovación mensual").
+    lemonsqueezy_order_id = Column(String, nullable=True, unique=True)
 
     user = relationship("User", back_populates="payments")
     project = relationship("Project", back_populates="payment")

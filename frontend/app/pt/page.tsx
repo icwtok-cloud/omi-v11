@@ -162,7 +162,7 @@ const DOUBTS = [
   },
   {
     q: "Como é o pagamento?",
-    a: "Em USDC, pela Polygon ou Base, direto da sua carteira. Você escolhe por projeto ou assinatura mensal -- sem cartão de crédito.",
+    a: "Com cartão (via Lemon Squeezy) ou em USDC, pela Polygon ou Base, direto da sua carteira. Você escolhe por projeto, assinatura mensal ou plano anual, no método que preferir.",
   },
 ];
 
@@ -514,8 +514,8 @@ export default function LandingPagePT() {
             Preços simples, você paga quando estiver pronto
           </h2>
           <p className="text-graphite mb-14">
-            A análise e o relatório são sempre grátis. Você paga só ao exportar, hoje em USDC
-            (Polygon ou Base) direto da sua carteira -- sem cartão nem intermediários.
+            A análise e o relatório são sempre grátis. Você paga só ao exportar, com
+            cartão ou em USDC (Polygon ou Base) direto da sua carteira -- você escolhe.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
@@ -526,7 +526,7 @@ export default function LandingPagePT() {
               <ul className="space-y-2 text-sm mb-6">
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Relatório completo</li>
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Download do arquivo corrigido incluído</li>
-                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Sem cartão nem carteira</li>
+                <li className="flex items-start gap-2"><span className="text-verify">✓</span> Não precisa pagar para testar</li>
               </ul>
               <Link
                 href="/app"
@@ -558,7 +558,11 @@ export default function LandingPagePT() {
                 Para consultorias
               </span>
               <p className="font-bold text-lg mb-1">Mensal</p>
-              <p className="font-extrabold text-4xl tracking-tight mb-1">USD 149</p>
+              <div className="flex items-baseline gap-2 mb-1">
+                <p className="font-extrabold text-4xl tracking-tight">USD 149</p>
+                <p className="text-graphite/60 line-through text-lg">USD 495</p>
+              </div>
+              <p className="text-verify text-xs font-semibold mb-4">Economize 70% vs. pagar 5 projetos avulsos</p>
               <p className="text-sm text-graphite mb-6">Até 5 projetos exportados por mês</p>
               <ul className="space-y-2 text-sm mb-6">
                 <li className="flex items-start gap-2"><span className="text-verify">✓</span> Tudo do plano por projeto</li>
@@ -576,50 +580,62 @@ export default function LandingPagePT() {
           <p className="text-sm text-graphite mt-8">
             Migra com volume real?{" "}
             <a href="#partners" className="text-brand font-medium hover:underline">
-              Veja o programa de parceiros
+              Veja o plano anual
             </a>
             .
           </p>
         </div>
       </section>
 
-      <section id="partners" className="border-t border-line py-20">
-        <div className="max-w-3xl mx-auto px-6 text-center">
+      <section id="partners" className="border-t border-line bg-white/60 py-20">
+        <div className="max-w-md mx-auto px-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-graphite mb-3">
-            Programa de parceiros
+            Para consultorias e equipes com volume
           </p>
           <h2 className="font-extrabold text-3xl md:text-4xl tracking-tight mb-4">
-            Para parceiros e consultorias que migram com volume real
+            Plano anual, exportações ilimitadas
           </h2>
-          <p className="text-graphite mb-10 max-w-xl mx-auto">
-            Não é mais um plano de autoatendimento -- é uma ativação direta com a
-            equipe da OMI, pensada para quem precisa usar a ferramenta muito além
-            de um projeto isolado.
+          <p className="text-graphite mb-10">
+            Pensado para quem migra o ano todo, não um projeto avulso -- você paga
+            uma vez e se livra do teto mensal.
           </p>
-          <div className="bg-white border border-line rounded-xl p-8 text-left max-w-xl mx-auto mb-8">
-            <ul className="space-y-3 text-sm">
-              <li className="flex items-start gap-2">
-                <span className="text-verify shrink-0">✓</span> Assinatura anual: USD 499/ano
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-verify shrink-0">✓</span> 5.000.000 de eventos por ano (1 evento = 1 linha analisada)
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-verify shrink-0">✓</span> Sem limite de projetos nem exportações enquanto durar a cota
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-verify shrink-0">✓</span> Ativação manual -- você fala direto com a equipe, não é autoatendimento
-              </li>
+
+          <div className="bg-white border-2 border-brand rounded-xl p-8 text-left relative">
+            <span className="absolute -top-3 left-7 bg-brand text-white text-xs font-bold rounded-full px-3 py-1">
+              Melhor preço
+            </span>
+            <p className="font-bold text-lg mb-1">Anual</p>
+            <div className="flex items-baseline gap-2 mb-1">
+              <p className="font-extrabold text-4xl tracking-tight">USD 799</p>
+              <p className="text-graphite/60 line-through text-lg">USD 1.788</p>
+            </div>
+            <p className="text-verify text-xs font-semibold mb-6">
+              Economize 55% vs. pagar o mensal os 12 meses
+            </p>
+            <ul className="space-y-2 text-sm mb-8">
+              <li className="flex items-start gap-2"><span className="text-verify shrink-0">✓</span> Exportações ilimitadas, sem teto mensal</li>
+              <li className="flex items-start gap-2"><span className="text-verify shrink-0">✓</span> Tudo do plano mensal</li>
+              <li className="flex items-start gap-2"><span className="text-verify shrink-0">✓</span> Pensado para vários clientes ao mesmo tempo, o ano todo</li>
             </ul>
+            <Link
+              href="/pt/app?checkout=annual"
+              className="block text-center bg-brand text-white font-semibold rounded-md px-4 py-3 hover:bg-brand-dark transition-colors"
+            >
+              Assinar o plano anual
+            </Link>
           </div>
-          <a
-            href="mailto:hello@alterego.lat?subject=Programa%20de%20Parceiros%20OMI"
-            className="inline-block bg-brand text-white font-semibold rounded-md px-6 py-3 hover:bg-brand-dark transition-colors"
-          >
-            Fale conosco
-          </a>
+
+          <p className="text-sm text-graphite mt-8">
+            Precisa de algo sob medida (faturamento diferente, volume fora desses
+            planos)? Escreva para{" "}
+            <a href="mailto:hello@alterego.lat?subject=Plano%20sob%20medida%20OMI" className="text-brand font-medium hover:underline">
+              hello@alterego.lat
+            </a>
+            .
+          </p>
         </div>
       </section>
+
 
       <section className="border-t border-line bg-ink py-16">
         <div className="max-w-2xl mx-auto px-6 text-center">

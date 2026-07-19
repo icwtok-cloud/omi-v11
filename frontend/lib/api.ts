@@ -436,7 +436,7 @@ export interface LemonSqueezyCheckoutResult {
 
 export async function startLemonSqueezyCheckout(
   getToken: GetToken,
-  paymentType: "per_project" | "subscription",
+  paymentType: "per_project" | "subscription" | "annual",
   projectId?: string
 ): Promise<LemonSqueezyCheckoutResult> {
   const res = await authedFetch(

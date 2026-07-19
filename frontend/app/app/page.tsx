@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth, SignInButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { listProjects, ProjectListItem } from "@/lib/api";
+import { listProjects, ProjectListItem, startLemonSqueezyCheckout } from "@/lib/api";
 import { NewProjectModal } from "@/components/NewProjectModal";
 
 const COUNTRY_LABELS: Record<string, string> = {
@@ -44,6 +44,26 @@ export default function HomePage() {
       })
       .catch(() => setProjectsError("No se pudieron cargar tus proyectos."))
       .finally(() => setLoadingProjects(false));
+  }, [isSignedIn, getToken]);
+
+  // Botón "Suscribirme al plan anual" de la landing linkea acá con
+  // ?checkout=annual -- si el usuario ya está logueado, dispara el
+  // checkout de una. Si todavía no inició sesión, este efecto no hace
+  // nada hasta que isSignedIn pase a true (el modal de SignInButton no
+  // navega a otra URL, así que el query param sigue ahí cuando cierra
+  // sesión el modal y este efecto se re-ejecuta solo).
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") !== "annual") return;
+    window.history.replaceState({}, "", window.location.pathname);
+    startLemonSqueezyCheckout(getToken, "annual")
+      .then((result) => {
+        window.location.href = result.checkout_url;
+      })
+      .catch(() => {
+        setProjectsError("No se pudo iniciar el pago del plan anual. Probá de nuevo desde el botón en la landing.");
+      });
   }, [isSignedIn, getToken]);
 
   const availableVersionFilters = useMemo(

@@ -15,6 +15,19 @@ from app.models.db_models import Payment, PaymentType, Project, ProjectStatus, U
 
 SUBSCRIPTION_DURATION_DAYS = 30
 
+# Mismo mecanismo que las membresías anuales de partner que ya existían
+# como deal manual (ver README) -- ahora también se vende sola, self
+# service, vía Lemon Squeezy. "Exportaciones ilimitadas" en el sentido
+# de que no hay tope de PROYECTOS exportados por mes (a diferencia de
+# la suscripción mensual, que sí tiene el tope de
+# SUBSCRIPTION_MONTHLY_EXPORT_LIMIT) -- el único límite real es la
+# cantidad total de FILAS procesadas en el año, vía
+# can_process_validation_events(). 5,000,000 es el mismo número que
+# tenía el plan anual anterior ($499/5M líneas) -- si el nuevo precio
+# de $799 viene con otra cuota de filas, cambiar solo esta constante.
+ANNUAL_PLAN_EVENT_LIMIT = 5_000_000
+ANNUAL_PLAN_DURATION_DAYS = 365
+
 # Tope de módulos del proyecto gratis -- 1 módulo, para poder probar que
 # la plataforma funciona de verdad antes de pagar. Se enforce en
 # app/api/projects.py (upload_module), no acá.
@@ -53,6 +66,21 @@ def apply_payment_confirmation(db: Session, payment: Payment) -> None:
             user.has_active_subscription = True
             user.subscription_expires_at = base + timedelta(days=SUBSCRIPTION_DURATION_DAYS)
 
+    elif payment.payment_type == PaymentType.annual:
+        user = db.query(User).filter(User.id == payment.user_id).first()
+        if user:
+            # Mismo mecanismo de exención que un partner con deal manual
+            # (annual_event_limit), pero con vencimiento propio
+            # (annual_plan_expires_at) para que se pueda auto-revocar si
+            # no renueva -- los deals manuales nunca tocan este campo,
+            # así que quedan con annual_plan_expires_at=None (sin
+            # vencimiento) y este bloque no los afecta.
+            base = user.annual_plan_expires_at or datetime.utcnow()
+            if base < datetime.utcnow():
+                base = datetime.utcnow()
+            user.annual_event_limit = ANNUAL_PLAN_EVENT_LIMIT
+            user.annual_plan_expires_at = base + timedelta(days=ANNUAL_PLAN_DURATION_DAYS)
+
 
 def user_can_download(db: Session, project: Project) -> bool:
     """Un usuario puede descargar un proyecto si: pagó ese proyecto
@@ -71,10 +99,14 @@ def user_can_download(db: Session, project: Project) -> bool:
     user = db.query(User).filter(User.id == project.owner_id).first()
     if user and user.annual_event_limit is not None:
         # Socio con membresía anual: exento del gating de pago (igual que
-        # en can_export_project). Sin esto, el `can_download` informativo
-        # del reporte mostraba False para partners aunque el export real
-        # sí les funcionara -- veían el paywall sin estar bloqueados.
-        return True
+        # en can_export_project). annual_plan_expires_at es None para
+        # deals manuales de partners (sin vencimiento); para el plan
+        # anual self-service sí tiene fecha, y si venció no cuenta como
+        # exento acá (aunque el webhook de cancelación/expiración ya
+        # debería haber limpiado annual_event_limit -- esto es un
+        # backstop extra por si ese webhook se perdió).
+        if user.annual_plan_expires_at is None or user.annual_plan_expires_at > datetime.utcnow():
+            return True
     if user and user.has_active_subscription:
         if user.subscription_expires_at and user.subscription_expires_at > datetime.utcnow():
             return True
@@ -106,7 +138,8 @@ def is_exempt_from_free_tier_gate(user: User) -> bool:
     nunca lo chequeaba. Mismo criterio que usa can_export_project, para
     que ambos gates no se desincronicen de nuevo."""
     if user.annual_event_limit is not None:
-        return True
+        if user.annual_plan_expires_at is None or user.annual_plan_expires_at > datetime.utcnow():
+            return True
     if user.has_active_subscription and user.subscription_expires_at and user.subscription_expires_at > datetime.utcnow():
         return True
     return False
@@ -119,12 +152,15 @@ def can_export_project(db: Session, user: User, project: Project) -> tuple[bool,
     de download) recién si el export efectivamente se concreta, en el
     mismo commit que el resto de sus side-effects (atómico, evita doble
     conteo en un retry). Devuelve (permitido, mensaje_de_error_si_no)."""
-    if user.annual_event_limit is not None:
-        # Socio con membresía anual (deal manual, ver README) -- no
-        # paga por proyecto ni tiene tope de exportes/mes, su único
-        # límite es la cuota de eventos (filas validadas) del año,
-        # que se controla aparte en can_process_validation_events().
-        # Acá solo se lo exime del gating normal de pago.
+    if user.annual_event_limit is not None and (
+        user.annual_plan_expires_at is None or user.annual_plan_expires_at > datetime.utcnow()
+    ):
+        # Socio con membresía anual (deal manual, ver README, o plan
+        # anual self-service pagado) -- no paga por proyecto ni tiene
+        # tope de exportes/mes, su único límite es la cuota de eventos
+        # (filas validadas) del año, que se controla aparte en
+        # can_process_validation_events(). Acá solo se lo exime del
+        # gating normal de pago.
         return True, None
 
     if project.status == ProjectStatus.paid:

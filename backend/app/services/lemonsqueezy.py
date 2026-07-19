@@ -2,23 +2,23 @@
 Integración con Lemon Squeezy como pasarela de pago alternativa a cripto.
 
 Flujo:
-  1. El frontend llama POST /payments/lemonsqueezy/start (mismo patrón que
-     el flujo cripto en app/api/payments.py).
-  2. Acá creamos un Payment(provider=lemonsqueezy, status=pending) igual
-     que en el flujo cripto, y le pedimos a la API de Lemon Squeezy que
-     genere un checkout para el variant correspondiente (per_project o
-     subscription), pasando el id de nuestro Payment como `custom_data`.
-  3. Devolvemos la URL de checkout al frontend, que redirige o abre el
-     overlay (checkout.lemonsqueezy.com).
+  1. El frontend llama POST /payments/lemonsqueezy/start.
+  2. Creamos un Payment(provider=lemonsqueezy, status=pending) y le
+     pedimos a la API de Lemon Squeezy que genere un checkout para el
+     variant correspondiente, pasando el id de ese Payment como
+     `custom_data.payment_id`.
+  3. Devolvemos la URL de checkout al frontend.
   4. Cuando el usuario paga, Lemon Squeezy dispara un webhook a
-     /webhooks/lemonsqueezy (ver app/api/webhooks.py). Ese handler lee
-     `custom_data.payment_id` del evento, encuentra ESTE Payment, y aplica
-     apply_payment_confirmation() -- el mismo efecto que produce el
-     listener de blockchain al confirmar un pago cripto.
+     /webhooks/lemonsqueezy. Ese handler lee `custom_data.payment_id`,
+     encuentra ESTE Payment, y aplica apply_payment_confirmation().
 
-No usamos el SDK oficial de Lemon Squeezy (no está en requirements.txt)
-para no sumar una dependencia más -- es un solo endpoint REST simple,
-alcanza con httpx (ya usado en el proyecto).
+  IMPORTANTE (suscripciones): Lemon Squeezy guarda el custom_data del
+  checkout de forma PERMANENTE y lo reenvía en TODOS los webhooks
+  futuros relacionados a esa suscripción -- incluidas las renovaciones
+  mensuales, meses después del pago inicial. Esto significa que el
+  webhook ve el MISMO payment_id una y otra vez, mes tras mes. La lógica
+  de diferenciar "primera confirmación" de "renovación" vive en
+  app/api/webhooks.py, no acá -- este archivo solo arma el checkout.
 """
 
 from __future__ import annotations
@@ -32,34 +32,24 @@ LEMONSQUEEZY_API_BASE = "https://api.lemonsqueezy.com/v1"
 
 
 class LemonSqueezyError(RuntimeError):
-    """La API de Lemon Squeezy respondió con un error o algo inesperado."""
+    pass
 
 
 def _variant_id_for(payment_type: PaymentType) -> str:
-    variant_id = (
-        settings.lemonsqueezy_variant_id_per_project
-        if payment_type == PaymentType.per_project
-        else settings.lemonsqueezy_variant_id_subscription
-    )
+    variant_id = {
+        PaymentType.per_project: settings.lemonsqueezy_variant_id_per_project,
+        PaymentType.subscription: settings.lemonsqueezy_variant_id_subscription,
+        PaymentType.annual: settings.lemonsqueezy_variant_id_annual,
+    }.get(payment_type, "")
     if not variant_id:
         raise LemonSqueezyError(
             f"No hay variant_id configurado para payment_type={payment_type.value} "
-            "-- revisá LEMONSQUEEZY_VARIANT_ID_PER_PROJECT / "
-            "LEMONSQUEEZY_VARIANT_ID_SUBSCRIPTION en las env vars de Render."
+            "-- revisá las env vars de Render."
         )
     return variant_id
 
 
 def create_checkout(payment: Payment, user_email: str) -> str:
-    """Crea un checkout en Lemon Squeezy para este Payment ya persistido
-    (pending) y devuelve la URL a la que hay que mandar al usuario.
-
-    `custom_data.payment_id` es la pieza clave: es lo único que nos
-    permite, en el webhook, volver de "orden de Lemon Squeezy" a "cuál
-    Payment nuestro es este" -- Lemon Squeezy no sabe nada de nuestros
-    ids de proyecto/usuario, solo nos devuelve de vuelta lo que le
-    mandamos acá.
-    """
     variant_id = _variant_id_for(payment.payment_type)
 
     body = {
@@ -71,19 +61,20 @@ def create_checkout(payment: Payment, user_email: str) -> str:
                     "custom": {"payment_id": payment.id},
                 },
                 "product_options": {
-                    # A dónde volver después de pagar. Apunta a la página
-                    # del proyecto (?ls_payment_id=...) -- PaywallPanel.tsx
-                    # lee ese query param al montar y arranca el mismo
-                    # polling que usa para el flujo cripto. Igual que con
-                    # cripto, el desbloqueo real SIEMPRE lo dispara el
-                    # webhook, nunca esta redirección (el usuario podría
-                    # cerrar la pestaña antes de volver).
+                    # Vuelve a la página del proyecto -- PaywallPanel.tsx
+                    # lee ?ls_payment_id=... al montar y retoma el
+                    # polling. El desbloqueo real SIEMPRE lo dispara el
+                    # webhook, nunca esta redirección.
                     "redirect_url": (
                         f"{settings.frontend_urls[0]}/proyectos/{payment.project_id}?ls_payment_id={payment.id}"
                         if payment.project_id
                         else f"{settings.frontend_urls[0]}/app?ls_payment_id={payment.id}"
                     ),
                 },
+                # Habilita el trial configurado en el variant (si lo
+                # hay) también quedar reflejado -- Lemon Squeezy toma el
+                # trial del variant automáticamente, no hace falta
+                # pedirlo acá explícitamente.
             },
             "relationships": {
                 "store": {"data": {"type": "stores", "id": settings.lemonsqueezy_store_id}},

@@ -148,17 +148,11 @@ def start_lemonsqueezy_checkout(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Equivalente a /payments/start pero para el gateway de tarjeta. No
-    reutilizamos ese endpoint porque el flujo cripto necesita elegir red
-    y generar un monto único -- acá no hace falta ninguna de las dos
-    cosas, Lemon Squeezy ya sabe el precio del variant y no hay ambigüedad
-    de "qué transacción es cuál" (el checkout_url ya identifica todo)."""
-    if body.payment_type not in (PaymentType.per_project.value, PaymentType.subscription.value):
+    if body.payment_type not in (
+        PaymentType.per_project.value, PaymentType.subscription.value, PaymentType.annual.value
+    ):
         raise HTTPException(status_code=400, detail="payment_type inválido")
 
-    # Mismo tope que el flujo cripto (ver comentario en start_payment) --
-    # acá no protege un pool finito de montos, pero sí evita spam de
-    # checkouts (y de llamadas a la API de Lemon Squeezy) por usuario.
     pending_count = (
         db.query(Payment)
         .filter(Payment.user_id == user.id, Payment.status == PaymentStatus.pending)
@@ -177,6 +171,8 @@ def start_lemonsqueezy_checkout(
         if not project or project.owner_id != user.id:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         base_price = settings.price_per_project_usd
+    elif body.payment_type == PaymentType.annual.value:
+        base_price = settings.price_annual_usd
     else:
         base_price = settings.price_subscription_monthly_usd
 
@@ -195,9 +191,6 @@ def start_lemonsqueezy_checkout(
     try:
         checkout_url = lemonsqueezy.create_checkout(payment, user.email)
     except LemonSqueezyError as e:
-        # No dejamos un Payment pending huérfano si Lemon Squeezy no pudo
-        # generar el checkout -- sin esto, el usuario ve un error pero el
-        # pending_count de arriba igual lo cuenta contra su tope de 3.
         db.delete(payment)
         db.commit()
         log_event("LemonSqueezyCheckoutFailed", user_id=user.id, error=str(e))

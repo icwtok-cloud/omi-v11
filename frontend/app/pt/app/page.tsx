@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth, SignInButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { listProjects, ProjectListItem } from "@/lib/api";
+import { listProjects, ProjectListItem, startLemonSqueezyCheckout } from "@/lib/api";
 import { NewProjectModal } from "@/components/NewProjectModal";
 
 // Os VALORES (chaves) seguem em espanhol -- são o contrato real com o
@@ -48,6 +48,20 @@ export default function HomePagePT() {
       })
       .catch(() => setProjectsError("Não foi possível carregar seus projetos."))
       .finally(() => setLoadingProjects(false));
+  }, [isSignedIn, getToken]);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") !== "annual") return;
+    window.history.replaceState({}, "", window.location.pathname);
+    startLemonSqueezyCheckout(getToken, "annual")
+      .then((result) => {
+        window.location.href = result.checkout_url;
+      })
+      .catch(() => {
+        setProjectsError("Não foi possível iniciar o pagamento do plano anual. Tente de novo pelo botão na landing.");
+      });
   }, [isSignedIn, getToken]);
 
   const availableVersionFilters = useMemo(

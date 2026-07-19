@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Web3Providers } from "@/components/Web3Providers";
+import { WhatsAppFloatingButton } from "@/components/WhatsAppFloatingButton";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -93,6 +94,7 @@ export default function RootLayout({
       <html lang="es">
         <body className="font-sans bg-canvas text-ink min-h-screen">
           <Web3Providers>{children}</Web3Providers>
+          <WhatsAppFloatingButton />
         </body>
       </html>
     </ClerkProvider>
