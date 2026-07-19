@@ -182,6 +182,31 @@ export function PaywallPanel({
   const [paymentType, setPaymentType] = useState<PaymentType>("per_project");
   const [isStartingCardPayment, setIsStartingCardPayment] = useState(false);
 
+  // Bug: al tocar "Pagar con tarjeta" hacemos window.location.href al
+  // checkout de Lemon Squeezy con isStartingCardPayment=true. Si el
+  // usuario vuelve con el botón Atrás del navegador, Chrome suele
+  // restaurar la página desde bfcache en vez de recargarla -- ese
+  // estado de React queda congelado en true para siempre y el botón
+  // se queda trabado en "Abriendo el checkout..." pase lo que pase
+  // después (incluso si cambia de plan). "pageshow" con
+  // event.persisted=true detecta justo esa restauración desde bfcache.
+  useEffect(() => {
+    function handlePageShow(event: PageTransitionEvent) {
+      if (event.persisted) {
+        setIsStartingCardPayment(false);
+      }
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
+  // Salvavidas adicional: si el usuario cambia de plan, claramente
+  // quiere intentar de nuevo -- no tiene sentido dejarlo trabado en el
+  // estado "iniciando pago" del plan anterior.
+  useEffect(() => {
+    setIsStartingCardPayment(false);
+  }, [paymentType]);
+
   // Al volver del checkout de Lemon Squeezy, la redirect_url que arma
   // el backend (lemonsqueezy.py) trae ?ls_payment_id=... -- NO es una
   // confirmación de pago (el usuario pudo haber cancelado o cerrado la
