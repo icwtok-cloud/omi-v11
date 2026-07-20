@@ -11,6 +11,7 @@ const NAV_LINKS: Record<Locale, { href: string; label: string }[]> = {
     { href: "/guias", label: "Guías" },
     { href: "/datos", label: "Datos" },
     { href: "/versiones", label: "Versiones" },
+    { href: "/afiliados", label: "Afiliados" },
     { href: "/preguntas-frecuentes", label: "FAQ" },
   ],
   pt: [
@@ -21,6 +22,7 @@ const NAV_LINKS: Record<Locale, { href: string; label: string }[]> = {
     { href: "/pt/guias", label: "Guias" },
     { href: "/pt/datos", label: "Dados" },
     { href: "/pt/versiones", label: "Versões" },
+    { href: "/pt/afiliados", label: "Afiliados" },
     { href: "/pt/preguntas-frecuentes", label: "FAQ" },
   ],
 };
