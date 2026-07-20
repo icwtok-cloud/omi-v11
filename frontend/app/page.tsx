@@ -122,6 +122,7 @@ export default function LandingPage() {
             <a href="#latam" className="hover:text-ink transition-colors">LatAm</a>
             <a href="#precios" className="hover:text-ink transition-colors">Precios</a>
             <a href="#partners" className="hover:text-ink transition-colors">Partners</a>
+            <Link href="/afiliados" className="hover:text-ink transition-colors">Afiliados</Link>
           </nav>
           <div className="hidden md:flex items-center gap-4">
             <Link href="/pt" className="text-sm font-medium text-graphite hover:text-ink transition-colors" title="Ver em português">
@@ -153,6 +154,7 @@ export default function LandingPage() {
                 <a href="#latam" className="px-4 py-2 text-graphite hover:bg-canvas hover:text-ink transition-colors">LatAm</a>
                 <a href="#precios" className="px-4 py-2 text-graphite hover:bg-canvas hover:text-ink transition-colors">Precios</a>
                 <a href="#partners" className="px-4 py-2 text-graphite hover:bg-canvas hover:text-ink transition-colors">Partners</a>
+                <Link href="/afiliados" className="px-4 py-2 text-graphite hover:bg-canvas hover:text-ink transition-colors">Afiliados</Link>
               </nav>
               <div className="border-t border-line mt-2 pt-2 px-4 flex flex-col gap-2">
                 <Link href="/pt" className="text-sm font-medium text-graphite hover:text-ink transition-colors">
