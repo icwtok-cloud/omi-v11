@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Web3Providers } from "@/components/Web3Providers";
 import { WhatsAppFloatingButton } from "@/components/WhatsAppFloatingButton";
+import Script from "next/script";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
-
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
@@ -40,7 +40,6 @@ export const metadata: Metadata = {
     follow: true,
   },
 };
-
 export default function RootLayout({
   children,
 }: {
@@ -56,9 +55,6 @@ export default function RootLayout({
           colorTextSecondary: "#5B6270",
           colorInputBackground: "#FFFFFF",
           colorInputText: "#0E1116",
-          // Mismo radius que Tailwind `rounded-md` (0.375rem), usado en
-          // toda la landing -- si no coincide exacto, el modal se ve con
-          // esquinas más redondeadas que el resto de la UI.
           borderRadius: "0.375rem",
           fontFamily: "Inter, system-ui, sans-serif",
         },
@@ -68,10 +64,6 @@ export default function RootLayout({
           socialButtonsVariant: "blockButton",
         },
         elements: {
-          // `variables` solo define tokens; sin overrides de `elements`
-          // Clerk sigue usando su propio padding/sombras/tipografía por
-          // default en varios sub-componentes, lo que hacía que el modal
-          // se sintiera "ajeno" a la landing.
           card: "shadow-none border border-line rounded-md",
           headerTitle: "font-sans font-extrabold text-ink tracking-tight",
           headerSubtitle: "font-sans text-graphite",
@@ -95,6 +87,13 @@ export default function RootLayout({
         <body className="font-sans bg-canvas text-ink min-h-screen">
           <Web3Providers>{children}</Web3Providers>
           <WhatsAppFloatingButton />
+          <Script id="ls-affiliate-config" strategy="afterInteractive">
+            {`window.lemonSqueezyAffiliateConfig = { store: "omilat" };`}
+          </Script>
+          <Script
+            src="https://lmsqueezy.com/affiliate.js"
+            strategy="afterInteractive"
+          />
         </body>
       </html>
     </ClerkProvider>
