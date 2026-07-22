@@ -638,6 +638,13 @@ export default function LandingPagePT() {
             </a>
             .
           </p>
+          <p className="text-sm text-graphite mt-3">
+            Você implementa Odoo para clientes?{" "}
+            <a href="https://omilat.lemonsqueezy.com/affiliates" target="_blank" rel="noopener noreferrer" className="text-brand font-medium hover:underline">
+              Junte-se como parceiro
+            </a>{" "}
+            e ganhe 40% de comissão por cada cliente que você indicar.
+          </p>
         </div>
       </section>
 
