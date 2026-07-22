@@ -51,8 +51,8 @@ const FAQS = [
     a: "No para ver el reporte. El primer proyecto (1 módulo) es gratis, incluye reporte completo y una descarga, sin wallet ni pago. Solo necesitás USDC si vas a exportar un proyecto adicional o una suscripción mensual.",
   },
   {
-    q: "¿Por qué USDC y no tarjeta de crédito?",
-    a: "Hoy el único método de pago es USDC en Polygon o Base -- no procesamos ni guardamos datos de tarjeta. Estamos sumando un método de pago con tarjeta/fiat; cuando esté disponible se va a poder pagar sin wallet.",
+    q: "¿Por qué elegir USDC en vez de tarjeta de crédito?",
+    a: "Hoy podés elegir: tarjeta de crédito o débito internacional (procesado por Lemon Squeezy), o USDC en Polygon o Base directo desde tu wallet. Esta guía es para quienes prefieren la opción sin intermediarios.",
   },
   {
     q: "¿Qué pasa si me equivoco de red al retirar del exchange?",
@@ -113,6 +113,11 @@ export default function ComoPagarConUsdcGuide() {
             Guía · Pagos
           </p>
           <h1 className="font-extrabold text-3xl md:text-4xl tracking-tight mb-6">{TITLE}</h1>
+          <p className="bg-canvas border border-line rounded-md px-5 py-4 text-graphite leading-relaxed mb-8">
+            Hoy también podés pagar con tarjeta de crédito o débito internacional,
+            procesado por Lemon Squeezy, sin necesidad de wallet ni criptomonedas.
+            Esta guía sigue disponible para quienes prefieran pagar con USDC.
+          </p>
           <p className="text-lg text-graphite leading-relaxed mb-10">
             Si nunca pagaste con criptomonedas, esto puede sonar más complicado de lo
             que es. No hace falta que entiendas blockchain -- con una wallet (MetaMask)

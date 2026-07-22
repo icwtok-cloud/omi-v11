@@ -401,7 +401,7 @@ export default function LandingPage() {
           </h2>
           <p className="text-graphite mb-14">
             El análisis y el reporte siempre son gratis. Se paga solo al exportar, con
-            tarjeta o en USDC (Polygon o Base) desde tu wallet -- vos elegís.
+            tarjeta de crédito o débito internacional, procesado por Lemon Squeezy.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
@@ -521,6 +521,13 @@ export default function LandingPage() {
               hello@alterego.lat
             </a>
             .
+          </p>
+          <p className="text-sm text-graphite mt-3">
+            ¿Implementás Odoo para clientes?{" "}
+            <a href="https://omilat.lemonsqueezy.com/affiliates" target="_blank" rel="noopener noreferrer" className="text-brand font-medium hover:underline">
+              Sumate como partner
+            </a>{" "}
+            y ganá 40% de comisión por cada cliente que refieras.
           </p>
         </div>
       </section>

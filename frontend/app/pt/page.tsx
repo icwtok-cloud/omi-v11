@@ -162,7 +162,7 @@ const DOUBTS = [
   },
   {
     q: "Como é o pagamento?",
-    a: "Com cartão (via Lemon Squeezy) ou em USDC, pela Polygon ou Base, direto da sua carteira. Você escolhe por projeto, assinatura mensal ou plano anual, no método que preferir.",
+    a: "Com cartão de crédito ou débito internacional, processado pela Lemon Squeezy. Você escolhe por projeto, assinatura mensal ou plano anual, no método que preferir.",
   },
 ];
 
@@ -517,7 +517,7 @@ export default function LandingPagePT() {
           </h2>
           <p className="text-graphite mb-14">
             A análise e o relatório são sempre grátis. Você paga só ao exportar, com
-            cartão ou em USDC (Polygon ou Base) direto da sua carteira -- você escolhe.
+            cartão de crédito ou débito internacional, processado pela Lemon Squeezy.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">

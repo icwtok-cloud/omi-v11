@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 const DOUBTS = [
   {
     q: "Já tenho Odoo, para que preciso disso?",
-    a: "A OMI não substitui o Odoo -- valida o que você vai alimentar nele antes que o Odoo rejeite ou, pior, aceite errado.",
+    a: "A OMI não substitui o Odoo, valida o que você vai alimentar nele antes que o Odoo rejeite ou, pior, aceite errado.",
   },
   {
     q: "Já uso Excel para limpar meus dados",
@@ -30,7 +30,7 @@ const DOUBTS = [
   },
   {
     q: "Minhas importações costumam funcionar",
-    a: "Costumam. O problema aparece nas que não funcionam -- e nesse momento você já está em produção. A OMI mostra os erros antes disso.",
+    a: "Costumam. O problema aparece nas que não funcionam, e nesse momento você já está em produção. A OMI mostra os erros antes disso.",
   },
   {
     q: "Não migro com frequência, vale a pena?",
@@ -46,7 +46,7 @@ const DOUBTS = [
   },
   {
     q: "Meus dados ficam guardados?",
-    a: "Seu arquivo fica guardado apenas enquanto o projeto existir na sua conta -- assim você pode voltar para baixá-lo ou adicionar módulos sem reenviar nada. Você pode pedir a exclusão de um projeto quando quiser escrevendo para hello@alterego.lat.",
+    a: "Seu arquivo fica guardado apenas enquanto o projeto existir na sua conta, assim você pode voltar para baixá-lo ou adicionar módulos sem reenviar nada. Você pode pedir a exclusão de um projeto quando quiser escrevendo para hello@alterego.lat.",
   },
   {
     q: "Posso usar sem ser técnico?",
@@ -54,15 +54,15 @@ const DOUBTS = [
   },
   {
     q: "Quais formatos são aceitos?",
-    a: "CSV e Excel (.xlsx / .xls). O arquivo pode ter qualquer nome de coluna -- a OMI mapeia contra os campos reais do Odoo.",
+    a: "CSV e Excel (.xlsx / .xls). O arquivo pode ter qualquer nome de coluna, a OMI mapeia contra os campos reais do Odoo.",
   },
   {
     q: "Quais versões do Odoo são suportadas?",
-    a: "Da 14 à 19, incluindo versões que já não têm suporte oficial -- são justamente as que têm mais urgência de migração.",
+    a: "Da 14 à 19, incluindo versões que já não têm suporte oficial, são justamente as que têm mais urgência de migração.",
   },
   {
     q: "Como é o pagamento?",
-    a: "Em USDC, pela Polygon ou Base, direto da sua carteira. Você escolhe por projeto ou assinatura mensal -- sem cartão de crédito.",
+    a: "Com cartão de crédito ou débito internacional, processado pela Lemon Squeezy. Você escolhe por projeto, assinatura mensal ou plano anual, no método que preferir.",
   },
 ];
 

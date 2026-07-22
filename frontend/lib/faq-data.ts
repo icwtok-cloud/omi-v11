@@ -41,6 +41,6 @@ export const DOUBTS = [
   },
   {
     q: "¿Cómo se paga?",
-    a: "En USDC, por Polygon o Base, directo desde tu wallet. Elegís por proyecto o suscripción mensual -- sin tarjeta de crédito.",
+    a: "Con tarjeta de crédito o débito internacional, procesado por Lemon Squeezy. Elegís por proyecto, suscripción mensual o plan anual, en el método que prefieras.",
   },
 ];

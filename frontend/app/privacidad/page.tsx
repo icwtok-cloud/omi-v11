@@ -18,11 +18,11 @@ export const metadata: Metadata = {
 const SECTIONS = [
   {
     title: "Qué subís y para qué se usa",
-    body: "Tu archivo (CSV o Excel) se usa exclusivamente para validarlo contra las reglas de la versión de Odoo y el módulo que elegiste, y para generar el archivo corregido que descargás. No se usa para entrenar ningún modelo ni se comparte con terceros -- OMI valida con reglas determinísticas leídas del código fuente de Odoo, no con IA.",
+    body: "Tu archivo (CSV o Excel) se usa exclusivamente para validarlo contra las reglas de la versión de Odoo y el módulo que elegiste, y para generar el archivo corregido que descargás. No se usa para entrenar ningún modelo ni se comparte con terceros. OMI valida con reglas determinísticas leídas del código fuente de Odoo, no con IA.",
   },
   {
     title: "Cuánto tiempo se guarda",
-    body: "Tu archivo (original y corregido) queda asociado a tu cuenta mientras el proyecto exista -- así podés volver, agregar más módulos o volver a descargar sin resubir nada. No se borra automáticamente al generar la descarga. Si querés que borremos un proyecto y sus archivos, escribinos y lo hacemos a pedido.",
+    body: "Tu archivo (original y corregido) queda asociado a tu cuenta mientras el proyecto exista, así podés volver, agregar más módulos o volver a descargar sin resubir nada. No se borra automáticamente al generar la descarga. Si querés que borremos un proyecto y sus archivos, escribinos y lo hacemos a pedido.",
   },
   {
     title: "Quién puede ver tus datos",
@@ -30,15 +30,15 @@ const SECTIONS = [
   },
   {
     title: "Pagos",
-    body: "Podés pagar por proyecto, suscripción mensual o plan anual de dos formas: con tarjeta, procesado por Lemon Squeezy (nuestro merchant of record -- ellos manejan los datos de tu tarjeta, OMI nunca los ve ni los guarda), o en USDC (Polygon o Base) directo desde tu wallet, sin intermediarios. Elegís el método al momento de pagar.",
+    body: "Podés pagar por proyecto, suscripción mensual o plan anual con tarjeta de crédito o débito internacional, procesado por Lemon Squeezy (nuestro merchant of record, ellos manejan los datos de tu tarjeta, OMI nunca los ve ni los guarda).",
   },
   {
     title: "Borrado de datos",
-    body: "Podés pedir el borrado de un proyecto (archivo original, corregido y reporte) en cualquier momento escribiendo a hello@alterego.lat. Lo hacemos manualmente en esta etapa del producto -- todavía no hay un botón de autoservicio para esto.",
+    body: "Podés pedir el borrado de un proyecto (archivo original, corregido y reporte) en cualquier momento escribiendo a hello@alterego.lat. Lo hacemos manualmente en esta etapa del producto, todavía no hay un botón de autoservicio para esto.",
   },
   {
     title: "Reembolsos",
-    body: "Si pagaste con tarjeta (Lemon Squeezy), podés pedir el reembolso escribiendo a hello@alterego.lat y lo evaluamos caso por caso. Un pago en USDC ya confirmado, en cambio, no se reembolsa -- es una limitación real de pagar directo entre wallets, sin un intermediario que pueda revertir la transacción. Esto no significa que quedes sin lo que pagaste: una vez confirmado el pago (por cualquiera de los dos métodos), la descarga del proyecto queda disponible para volver a generarla las veces que necesites, sin cargo adicional. Si la descarga falla o el archivo corregido no se genera, intentá de nuevo desde el proyecto -- si el problema persiste, escribinos a hello@alterego.lat y lo resolvemos manualmente (evaluamos cada caso: reintento asistido, corrección del problema puntual, o un proyecto de cortesía si corresponde).",
+    body: "Si pagaste con tarjeta, podés pedir el reembolso escribiendo a hello@alterego.lat y lo evaluamos caso por caso. Esto no significa que quedes sin lo que pagaste: una vez confirmado el pago, la descarga del proyecto queda disponible para volver a generarla las veces que necesites, sin cargo adicional. Si la descarga falla o el archivo corregido no se genera, intentá de nuevo desde el proyecto, si el problema persiste, escribinos a hello@alterego.lat y lo resolvemos manualmente (evaluamos cada caso: reintento asistido, corrección del problema puntual, o un proyecto de cortesía si corresponde).",
   },
 ];
 
