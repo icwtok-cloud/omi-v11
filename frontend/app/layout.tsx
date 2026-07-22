@@ -94,6 +94,16 @@ export default function RootLayout({
             src="https://lmsqueezy.com/affiliate.js"
             strategy="afterInteractive"
           />
+          <Script
+            src="https://www.googletagmanager.com/gtag/js?id=G-HZJ9BNQ0QT"
+            strategy="afterInteractive"
+          />
+          <Script id="ga4-init" strategy="afterInteractive">
+            {`window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-HZJ9BNQ0QT');`}
+          </Script>
         </body>
       </html>
     </ClerkProvider>
